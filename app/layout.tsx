@@ -1,12 +1,9 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import { Sidebar } from '@/components/layout/Sidebar';
-import { Header } from '@/components/layout/Header';
-
-import { Geist, Geist_Mono } from "next/font/google";
-
+import { MainLayout } from '@/components/layout/MainLayout';
 import { OpenCVLoader } from '@/components/OpenCVLoader';
 import { Providers } from '@/components/Providers';
+import { Geist, Geist_Mono } from "next/font/google";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,21 +27,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        <OpenCVLoader />
-        <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
-          <Sidebar />
-          <Providers> {/* Wrapped content with Providers */}
-            <div className="flex-1 flex flex-col ml-64">
-              <Header />
-              <main className="p-6">
-                {children}
-              </main>
-            </div>
-          </Providers>
-        </div>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <Providers>
+          <OpenCVLoader />
+          <MainLayout>
+            {children}
+          </MainLayout>
+        </Providers>
       </body>
     </html>
   );

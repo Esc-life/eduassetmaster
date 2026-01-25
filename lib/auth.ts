@@ -1,24 +1,6 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-
-// Simple hardcoded user for demo
-// Phase 2: Fetch from Google Sheets "Users" tab
-const USERS = [
-    {
-        id: "1",
-        name: "Admin User",
-        email: "admin@test.com",
-        password: "1234",
-        spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID
-    },
-    {
-        id: "2",
-        name: "Teacher B",
-        email: "teacher@test.com",
-        password: "1234",
-        spreadsheetId: "" // User with no sheet yet
-    }
-];
+import { getData } from "@/lib/google-sheets";
 
 export const authOptions: NextAuthOptions = {
     providers: [
@@ -31,15 +13,52 @@ export const authOptions: NextAuthOptions = {
             async authorize(credentials) {
                 if (!credentials?.email || !credentials?.password) return null;
 
-                const user = USERS.find(u => u.email === credentials.email);
+                try {
+                    // Fetch users from Sheet (Master Sheet, so no sheetId passed)
+                    // Expected: [ID, Name, Email, Password, SpreadsheetID, CreatedAt]
+                    const rows = await getData('Users!A:E');
 
-                if (user && user.password === credentials.password) {
-                    return {
-                        id: user.id,
-                        name: user.name,
-                        email: user.email,
-                        spreadsheetId: user.spreadsheetId
-                    } as any;
+                    if (!rows) {
+                        // Fallback for initial Admin if sheet is empty/missing
+                        if (credentials.email === 'admin@test.com' && credentials.password === '1234') {
+                            return {
+                                id: 'admin',
+                                name: 'Admin User',
+                                email: 'admin@test.com',
+                                spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID
+                            } as any;
+                        }
+                        return null;
+                    }
+
+                    // Find user (Column Index 2 is Email)
+                    // Row: [0:ID, 1:Name, 2:Email, 3:Password, 4:SheetID]
+                    const userRow = rows.find(r => r[2] === credentials.email);
+
+                    if (userRow) {
+                        // Check password (In prod, use bcrypt.compare)
+                        if (userRow[3] === credentials.password) {
+                            return {
+                                id: userRow[0],
+                                name: userRow[1],
+                                email: userRow[2],
+                                spreadsheetId: userRow[4] // This is the user's personal sheet
+                            } as any;
+                        }
+                    }
+
+                    // Fallback/Legacy Admin support even if sheet exists but user not found
+                    if (credentials.email === 'admin@test.com' && credentials.password === '1234') {
+                        return {
+                            id: 'admin',
+                            name: 'Admin User',
+                            email: 'admin@test.com',
+                            spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID
+                        } as any;
+                    }
+
+                } catch (e) {
+                    console.error('Auth Error:', e);
                 }
                 return null;
             }
@@ -65,5 +84,5 @@ export const authOptions: NextAuthOptions = {
     session: {
         strategy: "jwt",
     },
-    secret: process.env.NEXTAUTH_SECRET || 'secret', // Fallback for dev
+    secret: process.env.NEXTAUTH_SECRET || 'secret',
 };
