@@ -174,9 +174,11 @@ export async function saveMapConfiguration(mapImage: string | null, zones: Locat
         // Write to Sheet
         await updateData('Config!A1', values);
         return { success: true };
-    } catch (error) {
+    } catch (error: any) {
         console.error('Failed to save map config:', error);
-        return { success: false, error };
+        // Return clear error message string for client debugging
+        const errorMessage = error?.result?.error?.message || error?.message || String(error);
+        return { success: false, error: errorMessage };
     }
 }
 
