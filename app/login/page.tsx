@@ -94,17 +94,16 @@ export default function LoginPage() {
                     )}
 
                     <div className="flex gap-3 mt-2">
-                        <button
-                            type="button"
-                            onClick={() => router.push('/register')}
-                            className="flex-1 py-2.5 px-4 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none transition-colors"
+                        <Link
+                            href="/register"
+                            className="flex-1 py-2.5 px-4 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none transition-colors text-center cursor-pointer"
                         >
                             회원가입
-                        </button>
+                        </Link>
                         <button
                             type="submit"
                             disabled={loading}
-                            className="flex-1 py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
+                            className="flex-1 py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors cursor-pointer"
                         >
                             {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : '로그인'}
                         </button>

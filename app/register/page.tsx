@@ -199,7 +199,7 @@ export default function RegisterPage() {
                             <button
                                 type="button"
                                 onClick={() => setIsGuideOpen(true)}
-                                className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-700 font-medium"
+                                className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-700 font-medium cursor-pointer"
                             >
                                 <HelpCircle className="w-3 h-3" />
                                 ID 확인 및 설정 방법
@@ -234,7 +234,7 @@ export default function RegisterPage() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
                         >
                             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : '계정 생성 완료'}
                         </button>
