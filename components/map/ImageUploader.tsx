@@ -42,8 +42,8 @@ export const ImageUploader = forwardRef<ImageUploaderHandle, PropsWithChildren<I
                 const img = new Image();
                 img.src = event.target?.result as string;
                 img.onload = () => {
-                    const MAX_WIDTH = 1600;
-                    const MAX_HEIGHT = 1600;
+                    const MAX_WIDTH = 1280; // Reduced for Vercel/Sheets limit safety
+                    const MAX_HEIGHT = 1280;
                     let width = img.width;
                     let height = img.height;
 
@@ -65,7 +65,7 @@ export const ImageUploader = forwardRef<ImageUploaderHandle, PropsWithChildren<I
                     const ctx = canvas.getContext('2d');
                     ctx?.drawImage(img, 0, 0, width, height);
 
-                    // Convert to Blob (JPEG 0.7)
+                    // Convert to Blob (JPEG 0.6 - High compression)
                     canvas.toBlob((blob) => {
                         if (blob) {
                             const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", {
@@ -77,7 +77,7 @@ export const ImageUploader = forwardRef<ImageUploaderHandle, PropsWithChildren<I
                             setPreview(url);
                             onImageUpload(compressedFile, url);
                         }
-                    }, 'image/jpeg', 0.7);
+                    }, 'image/jpeg', 0.6); // Quality 0.6
                 };
             };
         };
