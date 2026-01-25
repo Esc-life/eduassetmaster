@@ -12,6 +12,7 @@ export default function SoftwarePage() {
     const [softwareList, setSoftwareList] = useState<any[]>([]);
     const [accountList, setAccountList] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -24,13 +25,20 @@ export default function SoftwarePage() {
 
     const loadData = async () => {
         setIsLoading(true);
-        const [sw, acc] = await Promise.all([
-            getSoftwareList(),
-            getAccountList()
-        ]);
-        setSoftwareList(sw);
-        setAccountList(acc);
-        setIsLoading(false);
+        setError(null);
+        try {
+            const [sw, acc] = await Promise.all([
+                getSoftwareList(),
+                getAccountList()
+            ]);
+            setSoftwareList(sw);
+            setAccountList(acc);
+        } catch (e) {
+            console.error("Load Error:", e);
+            setError(`데이터를 불러오는 중 오류가 발생했습니다: ${String(e)}`);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const handleOpenModal = (item?: any) => {
@@ -119,6 +127,12 @@ export default function SoftwarePage() {
                     관리자 계정 ({accountList.length})
                 </button>
             </div>
+
+            {error && (
+                <div className="p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300 rounded-lg text-sm">
+                    ⚠️ {error}
+                </div>
+            )}
 
             {isLoading ? (
                 <div className="flex justify-center py-20">
