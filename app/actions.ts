@@ -338,6 +338,40 @@ export async function deleteAccount(id: string) {
     }
 }
 
+export async function registerBulkDevices(devices: any[]) {
+    const sheetId = await getUserSheetId();
+    if (sheetId === 'NO_SHEET') return { success: false, error: '스프레드시트가 연동되지 않았습니다.' };
+    if (isGlobalMockMode && !sheetId) return { success: true };
+
+    try {
+        let rows = await getData('Devices!A:A', sheetId);
+
+        if (rows === null) {
+            await addSheet('Devices', sheetId);
+            await updateData('Devices!A1', [['ID', 'Category', 'Model', 'IP', 'Status', 'PurchaseDate', 'Location', 'Name']], sheetId);
+            rows = [];
+        }
+
+        // Prepare rows for appending
+        const newRows = devices.map(d => [
+            d.id || crypto.randomUUID(), // Local crypto usage requires Node 18+ (Vercel ok)
+            d.category || '기타',
+            d.model || '',
+            d.ip || '',
+            d.status || 'Active',
+            d.purchaseDate || '',
+            d.groupId || '', // This is technically Location/Zone ID
+            d.name || ''
+        ]);
+
+        await appendData('Devices!A1', newRows, sheetId);
+        return { success: true, count: newRows.length };
+    } catch (error) {
+        console.error('Bulk Register Error:', error);
+        return { success: false, error: String(error) };
+    }
+}
+
 export async function syncZonesToSheet(zones: Location[]) {
     const sheetId = await getUserSheetId();
     if (sheetId === 'NO_SHEET') return { success: false };

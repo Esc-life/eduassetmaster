@@ -1,15 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { fetchAssetData } from '@/app/actions';
+import { useState, useEffect, useMemo } from 'react';
+import { fetchAssetData, registerBulkDevices } from '@/app/actions';
 import { Device, DeviceStatus } from '@/types';
-import { Search, Filter, MoreHorizontal, Laptop, Tablet, Smartphone, Monitor, Loader2 } from 'lucide-react';
+import { Search, Filter, MoreHorizontal, Laptop, Tablet, Smartphone, Monitor, Loader2, FileSpreadsheet, Plus } from 'lucide-react';
+import { BulkUploadModal } from '@/components/devices/BulkUploadModal';
+import { useRouter } from 'next/navigation';
 
 export default function DevicesPage() {
+    const router = useRouter();
     const [devices, setDevices] = useState<Device[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [filterStatus, setFilterStatus] = useState<DeviceStatus | 'All'>('All');
     const [searchTerm, setSearchTerm] = useState('');
+    const [isBulkOpen, setIsBulkOpen] = useState(false);
 
     useEffect(() => {
         const loadData = async () => {
@@ -20,14 +24,29 @@ export default function DevicesPage() {
         loadData();
     }, []);
 
-    const filteredDevices = devices.filter((device) => {
-        const matchesStatus = filterStatus === 'All' || device.status === filterStatus;
-        const matchesSearch =
-            device.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            device.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            device.id.toLowerCase().includes(searchTerm.toLowerCase());
-        return matchesStatus && matchesSearch;
-    });
+    const handleBulkSave = async (data: any[]) => {
+        setIsLoading(true);
+        const result = await registerBulkDevices(data);
+        if (result.success) {
+            alert(`${result.count}개 기기가 성공적으로 등록되었습니다.`);
+            // Reload page to reflect changes
+            window.location.reload();
+        } else {
+            alert('등록 실패: ' + result.error);
+            setIsLoading(false);
+        }
+    };
+
+    const filteredDevices = useMemo(() => {
+        return devices.filter((device) => {
+            const matchesStatus = filterStatus === 'All' || device.status === filterStatus;
+            const matchesSearch =
+                device.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                device.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                device.id.toLowerCase().includes(searchTerm.toLowerCase());
+            return matchesStatus && matchesSearch;
+        });
+    }, [devices, filterStatus, searchTerm]);
 
     const getStatusColor = (status: DeviceStatus) => {
         switch (status) {
@@ -50,6 +69,12 @@ export default function DevicesPage() {
 
     return (
         <div className="space-y-6">
+            <BulkUploadModal
+                isOpen={isBulkOpen}
+                onClose={() => setIsBulkOpen(false)}
+                onSave={handleBulkSave}
+            />
+
             {/* Header Section */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -57,11 +82,16 @@ export default function DevicesPage() {
                     <p className="text-gray-500 dark:text-gray-400 text-sm">전체 자산 목록 및 상태를 관리합니다.</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <button className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                        내보내기
+                    <button
+                        onClick={() => setIsBulkOpen(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm text-sm font-medium"
+                    >
+                        <FileSpreadsheet className="w-4 h-4" />
+                        일괄 등록 (엑셀)
                     </button>
-                    <button className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-blue-900 transition-colors shadow-sm">
-                        + 기기 등록
+                    <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm">
+                        <Plus className="w-4 h-4" />
+                        기기 추가
                     </button>
                 </div>
             </div>
@@ -165,7 +195,7 @@ export default function DevicesPage() {
                                     {filteredDevices.length === 0 && (
                                         <tr>
                                             <td colSpan={6} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                                                검색 결과가 없습니다.
+                                                등록된 기기가 없습니다. '일괄 등록' 버튼을 눌러 데이터를 추가해보세요!
                                             </td>
                                         </tr>
                                     )}
@@ -173,15 +203,6 @@ export default function DevicesPage() {
                             )}
                         </tbody>
                     </table>
-                </div>
-                {/* Pagination Placeholder */}
-                <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 flex items-center justify-between text-xs text-gray-500">
-                    <span>Showing {filteredDevices.length} items</span>
-                    <div className="flex gap-1">
-                        <button className="px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800" disabled>Prev</button>
-                        <button className="px-2 py-1 bg-primary text-white rounded">1</button>
-                        <button className="px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800">Next</button>
-                    </div>
                 </div>
             </div>
         </div>
