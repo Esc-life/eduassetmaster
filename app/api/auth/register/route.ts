@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getData, updateData, appendData, addSheet } from "@/lib/google-sheets";
+import { getData, updateData, appendData, addSheet, initializeUserSheet } from "@/lib/google-sheets";
 
 export async function POST(req: Request) {
     try {
@@ -9,7 +9,28 @@ export async function POST(req: Request) {
             return NextResponse.json({ message: "필수 정보가 누락되었습니다." }, { status: 400 });
         }
 
+        // 0. Verify Spreadsheet Access (if provided)
+        if (spreadsheetId) {
+            try {
+                // Try to initialize (create tabs/headers)
+                // This will throw if we don't have edit access
+                await initializeUserSheet(spreadsheetId);
+            } catch (initError: any) {
+                console.error("Sheet Init Error:", initError);
+                if (initError.message === 'PERMISSION_DENIED' || initError.code === 403) {
+                    return NextResponse.json({
+                        message: "스프레드시트 접근 권한이 없습니다.\n서비스 계정을 '편집자'로 초대했는지 확인해주세요."
+                    }, { status: 403 });
+                }
+                // Other errors (e.g. invalid ID)
+                return NextResponse.json({
+                    message: "스프레드시트 ID가 올바르지 않거나 접근할 수 없습니다."
+                }, { status: 400 });
+            }
+        }
+
         // 1. Check if Users sheet exists (Master Sheet)
+        // ... (Existing logic)
         let rows = await getData('Users!A:E');
 
         if (rows === null) {
