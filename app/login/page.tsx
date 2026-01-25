@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { Lock, Mail, Loader2 } from 'lucide-react';
+import { Lock, Mail, Loader2, BookOpen } from 'lucide-react';
+import Link from 'next/link';
 
 export default function LoginPage() {
     const router = useRouter();
@@ -40,8 +41,11 @@ export default function LoginPage() {
         <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
             <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 border border-gray-100 dark:border-gray-700">
                 <div className="text-center mb-8">
+                    <div className="mx-auto w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mb-4">
+                        <BookOpen className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                    </div>
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white">EduAsset Master</h1>
-                    <p className="text-sm text-gray-500 mt-2">학교 기자재 관리 시스템 로그인</p>
+                    <p className="text-sm text-gray-500 mt-2">학교 기자재 효율적 관리의 시작</p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
@@ -84,26 +88,30 @@ export default function LoginPage() {
                     </div>
 
                     {error && (
-                        <div className="text-sm text-red-600 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg text-center">
+                        <div className="text-sm text-red-600 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg text-center font-medium">
                             {error}
                         </div>
                     )}
 
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                        {loading ? (
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                        ) : (
-                            '로그인'
-                        )}
-                    </button>
+                    <div className="flex gap-3 mt-2">
+                        <button
+                            type="button"
+                            onClick={() => router.push('/register')}
+                            className="flex-1 py-2.5 px-4 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none transition-colors"
+                        >
+                            회원가입
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="flex-1 py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
+                        >
+                            {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : '로그인'}
+                        </button>
+                    </div>
 
-                    <div className="text-center text-xs text-gray-500 mt-4">
-                        계정이 없으신가요? 관리자(정보부장)에게 문의하세요.
-                        <br />
+                    <div className="text-center text-xs text-gray-500 mt-6 pt-6 border-t border-gray-100 dark:border-gray-700">
+                        처음이신가요? 관리자(정보부장) 전용 시스템입니다.<br />
                         (초기 계정: admin@test.com / 1234)
                     </div>
                 </form>
