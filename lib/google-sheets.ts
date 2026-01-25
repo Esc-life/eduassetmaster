@@ -4,11 +4,22 @@ const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
 
 // Environment variables should be set in .env.local
 const SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-// Handle Private Key newlines for Vercel/Node environment
+// Handle Private Key newlines for Vercel/Node environment (Robust)
 const RAW_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY || '';
-const PRIVATE_KEY = RAW_PRIVATE_KEY.includes('\\n')
-    ? RAW_PRIVATE_KEY.replace(/\\n/g, '\n')
-    : RAW_PRIVATE_KEY;
+let PRIVATE_KEY = RAW_PRIVATE_KEY;
+
+// 1. Remove surrounding quotes if present (e.g., "KEY")
+if (PRIVATE_KEY.startsWith('"') && PRIVATE_KEY.endsWith('"')) {
+    PRIVATE_KEY = PRIVATE_KEY.slice(1, -1);
+}
+
+// 2. Unescape newlines (handle both literal \n and \\n)
+PRIVATE_KEY = PRIVATE_KEY.replace(/\\n/g, '\n');
+
+// 3. Ensure PEM headers are intact (just in case)
+if (!PRIVATE_KEY.includes('-----BEGIN PRIVATE KEY-----')) {
+    console.warn('Warning: Private Key might be malformed or missing headers.');
+}
 const SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID;
 
 // Initialize Auth
