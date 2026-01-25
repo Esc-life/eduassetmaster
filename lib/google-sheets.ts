@@ -20,7 +20,7 @@ PRIVATE_KEY = PRIVATE_KEY.replace(/\\n/g, '\n');
 if (!PRIVATE_KEY.includes('-----BEGIN PRIVATE KEY-----')) {
     console.warn('Warning: Private Key might be malformed or missing headers.');
 }
-const SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID;
+const DEFAULT_SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID;
 
 // Initialize Auth
 const auth = new google.auth.GoogleAuth({
@@ -36,16 +36,18 @@ const sheets = google.sheets({ version: 'v4', auth });
 /**
  * Fetch data from a specific range in the Google Sheet.
  * @param range The A1 notation of the range to fetch (e.g., 'Devices!A2:G')
+ * @param spreadsheetId Optional: The ID of the spreadsheet to use. Defaults to GOOGLE_SPREADSHEET_ID env var.
  */
-export async function getData(range: string) {
+export async function getData(range: string, spreadsheetId?: string) {
     try {
-        if (!SPREADSHEET_ID || !SERVICE_ACCOUNT_EMAIL || !PRIVATE_KEY) {
+        const targetSheetId = spreadsheetId || DEFAULT_SPREADSHEET_ID;
+        if (!targetSheetId || !SERVICE_ACCOUNT_EMAIL || !PRIVATE_KEY) {
             console.warn('Google Sheets credentials are missing.');
             return [['Mock ID', 'Mock Category', 'Mock Model', '192.168.0.1', 'Active', '2024-01-01', 'Room 101']];
         }
 
         const response = await sheets.spreadsheets.values.get({
-            spreadsheetId: SPREADSHEET_ID,
+            spreadsheetId: targetSheetId,
             range,
         });
         return response.data.values || [];
@@ -64,13 +66,15 @@ export async function getData(range: string) {
 /**
  * Add a new sheet (tab) to the spreadsheet.
  * @param title The title of the new sheet.
+ * @param spreadsheetId Optional: The ID of the spreadsheet to use. Defaults to GOOGLE_SPREADSHEET_ID env var.
  */
-export async function addSheet(title: string) {
+export async function addSheet(title: string, spreadsheetId?: string) {
     try {
-        if (!SPREADSHEET_ID) throw new Error('Spreadsheet ID is missing');
+        const targetSheetId = spreadsheetId || DEFAULT_SPREADSHEET_ID;
+        if (!targetSheetId) throw new Error('Spreadsheet ID is missing');
 
         const response = await sheets.spreadsheets.batchUpdate({
-            spreadsheetId: SPREADSHEET_ID,
+            spreadsheetId: targetSheetId,
             requestBody: {
                 requests: [{
                     addSheet: {
@@ -98,13 +102,15 @@ export async function addSheet(title: string) {
  * Update data in a specific range.
  * @param range The A1 notation of the range to update
  * @param values The 2D array of values to write
+ * @param spreadsheetId Optional: The ID of the spreadsheet to use. Defaults to GOOGLE_SPREADSHEET_ID env var.
  */
-export async function updateData(range: string, values: any[][]) {
+export async function updateData(range: string, values: any[][], spreadsheetId?: string) {
     try {
-        if (!SPREADSHEET_ID) throw new Error('Spreadsheet ID is missing');
+        const targetSheetId = spreadsheetId || DEFAULT_SPREADSHEET_ID;
+        if (!targetSheetId) throw new Error('Spreadsheet ID is missing');
 
         const response = await sheets.spreadsheets.values.update({
-            spreadsheetId: SPREADSHEET_ID,
+            spreadsheetId: targetSheetId,
             range,
             valueInputOption: 'USER_ENTERED',
             requestBody: {
@@ -122,13 +128,15 @@ export async function updateData(range: string, values: any[][]) {
  * Append data to a sheet.
  * @param range The A1 notation of the range (e.g. 'Sheet1!A1') to search for a table.
  * @param values The 2D array of values to append.
+ * @param spreadsheetId Optional: The ID of the spreadsheet to use. Defaults to GOOGLE_SPREADSHEET_ID env var.
  */
-export async function appendData(range: string, values: any[][]) {
+export async function appendData(range: string, values: any[][], spreadsheetId?: string) {
     try {
-        if (!SPREADSHEET_ID) throw new Error('Spreadsheet ID is missing');
+        const targetSheetId = spreadsheetId || DEFAULT_SPREADSHEET_ID;
+        if (!targetSheetId) throw new Error('Spreadsheet ID is missing');
 
         const response = await sheets.spreadsheets.values.append({
-            spreadsheetId: SPREADSHEET_ID,
+            spreadsheetId: targetSheetId,
             range,
             valueInputOption: 'USER_ENTERED',
             requestBody: {
