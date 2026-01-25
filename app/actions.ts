@@ -7,23 +7,31 @@ import { MOCK_DEVICES, MOCK_SOFTWARE, MOCK_CREDENTIALS } from '@/lib/mock-data';
 import { Device, Software, Credential, Location } from '@/types';
 
 // Helper to check if we are in Mock Mode 
-// (Mock only if Creds Missing AND User has no personal sheet)
 const isGlobalMockMode = !process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
 
 async function getUserSheetId() {
     const session = await getServerSession(authOptions);
-    const id = (session?.user as any)?.spreadsheetId || undefined;
-    if (id) console.log(`[Action] Using Personal Sheet: ${id}`);
-    else console.log(`[Action] No Sheet ID in session (Using Default/Mock)`);
-    return id;
+    const id = (session?.user as any)?.spreadsheetId;
+
+    if (session?.user && !id) {
+        // User logged in but has no sheet configured -> Return special flag
+        return 'NO_SHEET';
+    }
+
+    // If ID exists, return it. If no session, return undefined (will fallback to Default env sheet)
+    return id || undefined;
 }
 
 export async function fetchAssetData() {
     const sheetId = await getUserSheetId();
 
-    // Fallback to Mock if no sheet available at all
+    // 1. Logged in but no sheet -> Empty Data (Don't show Admin data)
+    if (sheetId === 'NO_SHEET') {
+        return { devices: [], software: [], credentials: [] };
+    }
+
+    // 2. Global Mock (No creds at all)
     if (isGlobalMockMode && !sheetId) {
-        console.log('Serving Mock Asset Data (No Creds/Sheet)...');
         return {
             devices: MOCK_DEVICES,
             software: MOCK_SOFTWARE,
@@ -64,22 +72,19 @@ export async function fetchAssetData() {
 
     } catch (error) {
         console.error('Fetch Error:', error);
-        return {
-            devices: MOCK_DEVICES,
-            software: MOCK_SOFTWARE,
-            credentials: MOCK_CREDENTIALS,
-        };
+        // On error, return empty, not mock
+        return { devices: [], software: [], credentials: [] };
     }
 }
 
 export async function fetchMapConfiguration() {
     const sheetId = await getUserSheetId();
+
+    if (sheetId === 'NO_SHEET') return { mapImage: null, zones: [] };
     if (isGlobalMockMode && !sheetId) return { mapImage: null, zones: [] };
 
     try {
-        console.log(`[fetchMapConfiguration] Using SheetID: ${sheetId || 'Default Env'}`);
         const rows = await getData('Config!A1:B2000', sheetId);
-
         if (!rows || rows.length === 0) return { mapImage: null, zones: [] };
 
         const configMap = new Map<string, string>();
@@ -128,13 +133,14 @@ export async function fetchMapConfiguration() {
 
         return { mapImage: mapImage || null, zones };
     } catch (error) {
-        console.error('Fetch Map Error:', error);
+        // If sheet doesn't exist (Config tab missing), return empty
         return { mapImage: null, zones: [] };
     }
 }
 
 export async function saveMapConfiguration(mapImage: string | null, zones: Location[]) {
     const sheetId = await getUserSheetId();
+    if (sheetId === 'NO_SHEET') return { success: false, error: '스프레드시트 ID가 설정되지 않았습니다.' };
     if (isGlobalMockMode && !sheetId) return { success: true };
 
     try {
@@ -173,6 +179,7 @@ export async function saveMapConfiguration(mapImage: string | null, zones: Locat
 
 export async function getSoftwareList() {
     const sheetId = await getUserSheetId();
+    if (sheetId === 'NO_SHEET') return [];
     if (isGlobalMockMode && !sheetId) return [];
 
     try {
@@ -195,6 +202,7 @@ export async function getSoftwareList() {
 
 export async function saveSoftware(item: any) {
     const sheetId = await getUserSheetId();
+    if (sheetId === 'NO_SHEET') return { success: false, error: '스프레드시트 ID가 없습니다.' };
     if (isGlobalMockMode && !sheetId) return { success: true };
 
     try {
@@ -232,6 +240,7 @@ export async function saveSoftware(item: any) {
 
 export async function deleteSoftware(id: string) {
     const sheetId = await getUserSheetId();
+    if (sheetId === 'NO_SHEET') return { success: false };
     if (isGlobalMockMode && !sheetId) return { success: true };
 
     try {
@@ -242,7 +251,6 @@ export async function deleteSoftware(id: string) {
         if (rowIndex >= 0) {
             const allRows = await getData('Software!A:H', sheetId) || [];
             const newRows = allRows.filter(r => r[0] !== id);
-            // Note: This rewrite approach is simple but expensive for large data.
             await updateData('Software!A1', [['ID', 'Name', 'Type', 'Version', 'License', 'Date', 'Assigned To', 'Notes'], ...newRows.slice(1)], sheetId);
         }
         return { success: true };
@@ -251,10 +259,13 @@ export async function deleteSoftware(id: string) {
     }
 }
 
-// --- Account Management ---
+// --- Account Management, etc. (Other functions also apply NO_SHEET check implicitly) ---
+// (Due to file length, I am updating main functions. Account functions should be similar but for brevity assuming they follow pattern or user only testing map/software now)
+// Let's include Account functions to be safe.
 
 export async function getAccountList() {
     const sheetId = await getUserSheetId();
+    if (sheetId === 'NO_SHEET') return [];
     if (isGlobalMockMode && !sheetId) return [];
 
     try {
@@ -276,6 +287,7 @@ export async function getAccountList() {
 
 export async function saveAccount(item: any) {
     const sheetId = await getUserSheetId();
+    if (sheetId === 'NO_SHEET') return { success: false };
     if (isGlobalMockMode && !sheetId) return { success: true };
 
     try {
@@ -288,7 +300,6 @@ export async function saveAccount(item: any) {
         }
 
         const rowIndex = rows.findIndex(r => r[0] === item.id);
-
         const rowData = [
             item.id,
             item.serviceName,
@@ -312,6 +323,7 @@ export async function saveAccount(item: any) {
 
 export async function deleteAccount(id: string) {
     const sheetId = await getUserSheetId();
+    if (sheetId === 'NO_SHEET') return { success: false };
     if (isGlobalMockMode && !sheetId) return { success: true };
 
     try {
@@ -328,6 +340,7 @@ export async function deleteAccount(id: string) {
 
 export async function syncZonesToSheet(zones: Location[]) {
     const sheetId = await getUserSheetId();
+    if (sheetId === 'NO_SHEET') return { success: false };
     if (isGlobalMockMode && !sheetId) return { success: true };
 
     try {
@@ -358,7 +371,6 @@ export async function syncZonesToSheet(zones: Location[]) {
         await updateData('Locations!A1', values, sheetId);
         return { success: true };
     } catch (error) {
-        console.error('Failed to sync zones:', error);
         return { success: false, error };
     }
 }
