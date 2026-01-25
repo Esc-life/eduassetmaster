@@ -3,11 +3,17 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --primary: #1E3A8A; /* Deep Blue */
+  --sidebar-bg: #1E3A8A;
+  --sidebar-fg: #ffffff;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-sidebar: var(--sidebar-bg);
+  --color-sidebar-fg: var(--sidebar-fg);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -16,6 +22,9 @@
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    /* In dark mode, maybe primary stays the same or adjusts? 
+       For now keeping strict deep blue as requested for main theme
+    */
   }
 }
 
