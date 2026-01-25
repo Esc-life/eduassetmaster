@@ -14,12 +14,12 @@ export const authOptions: NextAuthOptions = {
                 if (!credentials?.email || !credentials?.password) return null;
 
                 try {
-                    // Fetch users from Sheet (Master Sheet, so no sheetId passed)
+                    // Fetch users from Sheet (Master Sheet)
                     // Expected: [ID, Name, Email, Password, SpreadsheetID, CreatedAt]
                     const rows = await getData('Users!A:E');
 
                     if (!rows) {
-                        // Fallback for initial Admin if sheet is empty/missing
+                        // Fallback for initial Admin
                         if (credentials.email === 'admin@test.com' && credentials.password === '1234') {
                             return {
                                 id: 'admin',
@@ -32,23 +32,29 @@ export const authOptions: NextAuthOptions = {
                     }
 
                     // Find user (Column Index 2 is Email)
-                    // Row: [0:ID, 1:Name, 2:Email, 3:Password, 4:SheetID]
                     const userRow = rows.find(r => r[2] === credentials.email);
 
                     if (userRow) {
-                        // Check password (In prod, use bcrypt.compare)
+                        console.log(`[Auth] ✅ User found: ${userRow[2]} | SheetID: ${userRow[4]}`);
+
+                        // Check password
                         if (userRow[3] === credentials.password) {
                             return {
                                 id: userRow[0],
                                 name: userRow[1],
                                 email: userRow[2],
-                                spreadsheetId: userRow[4] // This is the user's personal sheet
+                                spreadsheetId: userRow[4] // Important: Index 4
                             } as any;
+                        } else {
+                            console.log(`[Auth] ❌ Password mismatch for ${userRow[2]}`);
                         }
+                    } else {
+                        console.log(`[Auth] ❌ User not found in sheet: ${credentials.email}`);
                     }
 
-                    // Fallback/Legacy Admin support even if sheet exists but user not found
+                    // Fallback/Legacy Admin support
                     if (credentials.email === 'admin@test.com' && credentials.password === '1234') {
+                        console.log('[Auth] Using Fallback Admin');
                         return {
                             id: 'admin',
                             name: 'Admin User',
@@ -84,5 +90,6 @@ export const authOptions: NextAuthOptions = {
     session: {
         strategy: "jwt",
     },
-    secret: process.env.NEXTAUTH_SECRET || 'secret',
+    // Ensure we use the strong secret from env
+    secret: process.env.NEXTAUTH_SECRET,
 };

@@ -12,7 +12,10 @@ const isGlobalMockMode = !process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
 
 async function getUserSheetId() {
     const session = await getServerSession(authOptions);
-    return (session?.user as any)?.spreadsheetId || undefined;
+    const id = (session?.user as any)?.spreadsheetId || undefined;
+    if (id) console.log(`[Action] Using Personal Sheet: ${id}`);
+    else console.log(`[Action] No Sheet ID in session (Using Default/Mock)`);
+    return id;
 }
 
 export async function fetchAssetData() {
