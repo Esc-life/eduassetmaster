@@ -96,7 +96,7 @@ export default function LoginPage() {
                     <div className="flex gap-3 mt-2">
                         <Link
                             href="/register"
-                            className="flex-1 py-2.5 px-4 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none transition-colors text-center cursor-pointer"
+                            className="flex-1 py-2.5 px-4 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none transition-colors text-center cursor-pointer flex items-center justify-center"
                         >
                             회원가입
                         </Link>
@@ -108,8 +108,6 @@ export default function LoginPage() {
                             {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : '로그인'}
                         </button>
                     </div>
-
-
                 </form>
             </div>
         </div>
