@@ -4,7 +4,11 @@ const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
 
 // Environment variables should be set in .env.local
 const SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-const PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+// Handle Private Key newlines for Vercel/Node environment
+const RAW_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY || '';
+const PRIVATE_KEY = RAW_PRIVATE_KEY.includes('\\n')
+    ? RAW_PRIVATE_KEY.replace(/\\n/g, '\n')
+    : RAW_PRIVATE_KEY;
 const SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID;
 
 // Initialize Auth
