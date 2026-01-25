@@ -110,10 +110,7 @@ export default function LoginPage() {
                         </button>
                     </div>
 
-                    <div className="text-center text-xs text-gray-500 mt-6 pt-6 border-t border-gray-100 dark:border-gray-700">
-                        처음이신가요? 관리자(정보부장) 전용 시스템입니다.<br />
-                        (초기 계정: admin@test.com / 1234)
-                    </div>
+
                 </form>
             </div>
         </div>
