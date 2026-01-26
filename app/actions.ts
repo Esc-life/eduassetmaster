@@ -408,3 +408,22 @@ export async function syncZonesToSheet(zones: Location[]) {
         return { success: false, error };
     }
 }
+
+export async function extractTextFromPdf(formData: FormData) {
+    const file = formData.get('file') as File;
+    if (!file) return { success: false, error: '파일을 찾을 수 없습니다.' };
+
+    try {
+        const arrayBuffer = await file.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
+        // Dynamic Key Import to avoid build issues with server-only modules
+        const pdfParse = (await import('pdf-parse')).default;
+        const data = await pdfParse(buffer);
+
+        return { success: true, text: data.text };
+    } catch (error: any) {
+        console.error('PDF Parse Error:', error);
+        return { success: false, error: 'PDF 읽기 실패: ' + error.message };
+    }
+}
