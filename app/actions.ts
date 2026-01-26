@@ -5,6 +5,22 @@ import { authOptions } from "@/lib/auth";
 import { getData, updateData, appendData, addSheet } from '@/lib/google-sheets';
 import { MOCK_DEVICES, MOCK_SOFTWARE, MOCK_CREDENTIALS } from '@/lib/mock-data';
 import { Device, Software, Credential, Location } from '@/types';
+import { PDFParse } from 'pdf-parse';
+
+export async function parsePdfAction(formData: FormData) {
+    const file = formData.get('file') as File;
+    if (!file) return { success: false, error: 'No file uploaded' };
+
+    try {
+        const buffer = await file.arrayBuffer();
+        const parser = new PDFParse({ data: buffer });
+        const result = await parser.getText();
+        return { success: true, text: result.text };
+    } catch (error) {
+        console.error('PDF Parse Error:', error);
+        return { success: false, error: 'Failed to parse PDF' };
+    }
+}
 
 // Helper to check if we are in Mock Mode 
 const isGlobalMockMode = !process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
@@ -406,24 +422,5 @@ export async function syncZonesToSheet(zones: Location[]) {
         return { success: true };
     } catch (error) {
         return { success: false, error };
-    }
-}
-
-export async function extractTextFromPdf(formData: FormData) {
-    const file = formData.get('file') as File;
-    if (!file) return { success: false, error: '파일을 찾을 수 없습니다.' };
-
-    try {
-        const arrayBuffer = await file.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-
-        // Dynamic Key Import to avoid build issues with server-only modules
-        const pdfParse = (await import('pdf-parse')).default;
-        const data = await pdfParse(buffer);
-
-        return { success: true, text: data.text };
-    } catch (error: any) {
-        console.error('PDF Parse Error:', error);
-        return { success: false, error: 'PDF 읽기 실패: ' + error.message };
     }
 }

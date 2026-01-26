@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import { X, Save, AlertCircle, FileText, ArrowRight, Upload, Loader2, FileSpreadsheet } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { X, Upload, FileSpreadsheet, FileText, Check, AlertCircle, Loader2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { extractTextFromPdf } from '@/app/actions';
+import { parsePdfAction } from '@/app/actions';
 
 interface BulkUploadModalProps {
     isOpen: boolean;
@@ -11,305 +11,377 @@ interface BulkUploadModalProps {
     onSave: (data: any[]) => Promise<void>;
 }
 
-const COLUMNS = [
-    { key: 'ignore', label: '- 무시함 -' },
-    { key: 'name', label: '기기명/별칭' },
-    { key: 'model', label: '모델명' },
-    { key: 'category', label: '종류(노트북/태블릿 등)' },
-    { key: 'purchaseDate', label: '구입일' },
-    { key: 'status', label: '상태' },
-    { key: 'note', label: '비고' },
-    { key: 'ip', label: 'IP 주소' },
-    { key: 'sn', label: 'S/N' },
+type Step = 'upload' | 'mapping' | 'preview';
+
+interface ColumnMapping {
+    target: string;
+    source: string;
+}
+
+const TARGET_FIELDS = [
+    { key: 'name', label: '기기명 (Name)', required: true },
+    { key: 'model', label: '모델명 (Model)', required: true },
+    { key: 'category', label: '카테고리 (Category)', required: true },
+    { key: 'ip', label: 'IP 주소', required: false },
+    { key: 'status', label: '상태 (Status)', required: false },
+    { key: 'purchaseDate', label: '구매일 (Purchase Date)', required: false },
+    { key: 'groupId', label: '위치/그룹 (Location)', required: false },
 ];
 
 export function BulkUploadModal({ isOpen, onClose, onSave }: BulkUploadModalProps) {
-    const [step, setStep] = useState<'paste' | 'map'>('paste');
-    const [rawText, setRawText] = useState('');
-    const [parsedData, setParsedData] = useState<string[][]>([]);
-    const [columnMapping, setColumnMapping] = useState<string[]>([]);
-    const [isSaving, setIsSaving] = useState(false);
+    const [step, setStep] = useState<Step>('upload');
+    const [textData, setTextData] = useState('');
+    const [parsedData, setParsedData] = useState<any[]>([]);
+    const [headers, setHeaders] = useState<string[]>([]);
+    const [mappings, setMappings] = useState<ColumnMapping[]>([]);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [dragActive, setDragActive] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Reset state when modal opens/closes
+    useEffect(() => {
+        if (!isOpen) {
+            setStep('upload');
+            setTextData('');
+            setParsedData([]);
+            setHeaders([]);
+            setMappings([]);
+            setIsProcessing(false);
+        }
+    }, [isOpen]);
+
+    const handleDrag = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.type === 'dragenter' || e.type === 'dragover') {
+            setDragActive(true);
+        } else if (e.type === 'dragleave') {
+            setDragActive(false);
+        }
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragActive(false);
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            handleFile(e.dataTransfer.files[0]);
+        }
+    };
+
+    const handleFile = async (file: File) => {
+        setIsProcessing(true);
+        try {
+            if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls') || file.name.endsWith('.csv')) {
+                // Handle Spreadsheet
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const data = e.target?.result;
+                    const workbook = XLSX.read(data, { type: 'binary' });
+                    const sheetName = workbook.SheetNames[0];
+                    const sheet = workbook.Sheets[sheetName];
+                    const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+                    if (json && json.length > 0) {
+                        const headerRow = json[0] as string[];
+                        const dataRows = json.slice(1);
+
+                        // Convert to array of objects based on index
+                        const objects = dataRows.map((row: any) => {
+                            const obj: any = {};
+                            headerRow.forEach((h, i) => {
+                                obj[h] = row[i];
+                            });
+                            return obj;
+                        });
+
+                        setHeaders(headerRow);
+                        setParsedData(objects);
+                        autoMapColumns(headerRow);
+                        setStep('mapping');
+                    }
+                };
+                reader.readAsBinaryString(file);
+            } else if (file.name.endsWith('.pdf')) {
+                // Handle PDF via Server Action
+                const formData = new FormData();
+                formData.append('file', file);
+                const result = await parsePdfAction(formData);
+                if (result.success && result.text) {
+                    setTextData(result.text);
+                    alert('PDF 텍스트가 추출되었습니다. 확인 후 "다음"을 눌러주세요.');
+                } else {
+                    alert('PDF 처리 실패: ' + result.error);
+                }
+            } else {
+                alert('지원되지 않는 파일 형식입니다. (xlsx, xls, csv, pdf)');
+            }
+        } catch (error) {
+            console.error(error);
+            alert('파일 처리 중 오류가 발생했습니다.');
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const handleTextParse = () => {
+        // Parse tab-separated or comma-separated text
+        const rows = textData.trim().split('\n');
+        if (rows.length < 1) return;
+
+        // Detect delimiter (tab or comma)
+        const firstRow = rows[0];
+        const delimiter = firstRow.includes('\t') ? '\t' : ',';
+
+        const headerRow = rows[0].split(delimiter).map(h => h.trim());
+        const dataRows = rows.slice(1).map(r => {
+            const values = r.split(delimiter);
+            const obj: any = {};
+            headerRow.forEach((h, i) => {
+                obj[h] = values[i]?.trim();
+            });
+            return obj;
+        });
+
+        setHeaders(headerRow);
+        setParsedData(dataRows);
+        autoMapColumns(headerRow);
+        setStep('mapping');
+    };
+
+    const autoMapColumns = (headers: string[]) => {
+        const newMappings: ColumnMapping[] = [];
+        TARGET_FIELDS.forEach(field => {
+            // Find best match
+            const match = headers.find(h =>
+                h.toLowerCase().includes(field.key.toLowerCase()) ||
+                h.toLowerCase().includes(field.label.split(' (')[0].toLowerCase()) // Match Korean part
+            );
+            if (match) {
+                newMappings.push({ target: field.key, source: match });
+            }
+        });
+        setMappings(newMappings);
+    };
+
+    const handleMappingChange = (target: string, source: string) => {
+        const newMappings = mappings.filter(m => m.target !== target);
+        if (source) {
+            newMappings.push({ target, source });
+        }
+        setMappings(newMappings);
+    };
+
+    const getPreviewData = () => {
+        return parsedData.map(row => {
+            const newRow: any = {};
+            mappings.forEach(m => {
+                newRow[m.target] = row[m.source];
+            });
+            return newRow;
+        });
+    };
+
+    const handleFinalSave = async () => {
+        const dataToSave = getPreviewData();
+        await onSave(dataToSave);
+        onClose();
+    };
 
     if (!isOpen) return null;
 
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        setIsProcessing(true);
-
-        try {
-            if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
-                // Excel Parsing (Client-side)
-                const buffer = await file.arrayBuffer();
-                const workbook = XLSX.read(buffer, { type: 'array' });
-                const sheetName = workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[sheetName];
-                const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
-
-                // Convert to string table
-                const stringData = jsonData.map(row => row.map(cell => String(cell === undefined || cell === null ? '' : cell)));
-
-                // Filter empty rows
-                const validRows = stringData.filter(r => r.some(c => c.trim() !== ''));
-
-                if (validRows.length === 0) {
-                    alert('엑셀 파일에 유효한 데이터가 없습니다.');
-                } else {
-                    const initialMapping = validRows[0].map(() => 'ignore');
-                    setColumnMapping(initialMapping);
-                    setParsedData(validRows);
-                    setStep('map');
-                }
-
-            } else if (file.name.toLowerCase().endsWith('.pdf')) {
-                // PDF Parsing (Server-side)
-                const formData = new FormData();
-                formData.append('file', file);
-
-                const result = await extractTextFromPdf(formData);
-                if (result.success && result.text) {
-                    setRawText(result.text); // Allow user to edit extracted text
-                    // Optional: Try to auto-parse lines if structure looks like a table?
-                    // For now, let user see the text.
-                } else {
-                    alert('PDF 텍스트 추출 실패: ' + result.error);
-                }
-            } else {
-                alert('지원하지 않는 파일 형식입니다. (.xlsx, .xls, .pdf)');
-            }
-        } catch (error: any) {
-            console.error(error);
-            alert('파일 처리 중 오류가 발생했습니다: ' + error.message);
-        } finally {
-            setIsProcessing(false);
-            e.target.value = ''; // Reset input
-        }
-    };
-
-    const handleParse = () => {
-        if (!rawText.trim()) return;
-
-        // Split by newlines, then by tabs (common excel copy format) or 2+ spaces (PDF tables often use spaces)
-        const lines = rawText.trim().split('\n');
-
-        // Detect likely separator: Tab or Multiple Spaces
-        const hasTabs = lines.some(l => l.includes('\t'));
-
-        const rows = lines.map(line => {
-            if (hasTabs) return line.split('\t').map(c => c.trim());
-            // Fallback for PDF text which might use spaces
-            // Split by 2 or more spaces
-            return line.split(/\s{2,}/).map(c => c.trim());
-        });
-
-        const validRows = rows.filter(r => r.some(c => c !== ''));
-
-        if (validRows.length === 0) {
-            alert('데이터가 없습니다.');
-            return;
-        }
-
-        const initialMapping = validRows[0].map(() => 'ignore');
-        setColumnMapping(initialMapping);
-        setParsedData(validRows);
-        setStep('map');
-    };
-
-    const handleSave = async () => {
-        setIsSaving(true);
-        try {
-            const devices = parsedData.map(row => {
-                const device: any = {};
-                row.forEach((cell, index) => {
-                    const key = columnMapping[index];
-                    if (key && key !== 'ignore') {
-                        device[key] = cell;
-                    }
-                });
-                return device;
-            });
-
-            const validDevices = devices.filter(d => Object.keys(d).length > 0);
-
-            if (validDevices.length === 0) {
-                alert('저장할 데이터가 유효하지 않습니다. 열을 매핑해주세요.');
-                setIsSaving(false);
-                return;
-            }
-
-            await onSave(validDevices);
-            onClose();
-            setStep('paste');
-            setRawText('');
-            setParsedData([]);
-        } catch (e) {
-            alert('오류 발생: ' + e);
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-5xl w-full max-h-[90vh] flex flex-col">
-                <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 rounded-t-xl">
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                        <FileSpreadsheet className="w-5 h-5 text-green-600" />
-                        기기 일괄 등록 {step === 'map' && '> 열 매핑'}
-                    </h3>
-                    <button onClick={onClose} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
-                        <X className="w-5 h-5" />
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className={`bg-white dark:bg-gray-900 rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl transition-all`}>
+                {/* Header */}
+                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        <Upload className="w-5 h-5" />
+                        기기 일괄 등록 (Bulk Upload)
+                    </h2>
+                    <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+                        <X className="w-5 h-5 text-gray-500" />
                     </button>
                 </div>
 
-                <div className="flex-1 overflow-hidden p-6 flex flex-col">
-                    {step === 'paste' ? (
-                        <div className="flex flex-col h-full gap-4">
-                            {/* File Upload Area */}
-                            <div className="relative group">
+                {/* Content */}
+                <div className="flex-1 overflow-auto p-6">
+                    {/* Steps Indicator */}
+                    <div className="flex items-center justify-center mb-8">
+                        <div className={`flex items-center gap-2 ${step === 'upload' ? 'text-blue-600 font-bold' : 'text-gray-400'}`}>
+                            <span className="w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs border-current">1</span>
+                            업로드
+                        </div>
+                        <div className="w-12 h-px bg-gray-200 mx-2"></div>
+                        <div className={`flex items-center gap-2 ${step === 'mapping' ? 'text-blue-600 font-bold' : 'text-gray-400'}`}>
+                            <span className="w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs border-current">2</span>
+                            매핑
+                        </div>
+                        <div className="w-12 h-px bg-gray-200 mx-2"></div>
+                        <div className={`flex items-center gap-2 ${step === 'preview' ? 'text-blue-600 font-bold' : 'text-gray-400'}`}>
+                            <span className="w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs border-current">3</span>
+                            확인
+                        </div>
+                    </div>
+
+                    {step === 'upload' && (
+                        <div className="space-y-6">
+                            {/* Drag & Drop Area */}
+                            <div
+                                className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer ${dragActive ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-300 dark:border-gray-700 hover:border-blue-400'
+                                    }`}
+                                onDragEnter={handleDrag}
+                                onDragLeave={handleDrag}
+                                onDragOver={handleDrag}
+                                onDrop={handleDrop}
+                                onClick={() => fileInputRef.current?.click()}
+                            >
                                 <input
+                                    ref={fileInputRef}
                                     type="file"
-                                    accept=".xlsx, .xls, .pdf"
-                                    onChange={handleFileUpload}
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                                    disabled={isProcessing}
+                                    className="hidden"
+                                    accept=".xlsx,.xls,.csv,.pdf"
+                                    onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
                                 />
-                                <div className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center transition-colors ${isProcessing ? 'bg-gray-100 border-gray-300' : 'border-blue-300 bg-blue-50 dark:bg-blue-900/10 dark:border-blue-700 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/20'
-                                    }`}>
-                                    {isProcessing ? (
-                                        <>
-                                            <Loader2 className="w-10 h-10 text-blue-500 animate-spin mb-3" />
-                                            <p className="font-medium text-gray-700 dark:text-gray-300">파일 분석 중...</p>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Upload className="w-10 h-10 text-blue-500 mb-3" />
-                                            <p className="font-medium text-gray-900 dark:text-white text-lg">파일을 여기로 드래그하거나 클릭하세요</p>
-                                            <p className="text-sm text-gray-500 mt-1">지원 형식: 엑셀 파일(.xlsx), PDF 문서(.pdf)</p>
-                                        </>
-                                    )}
+                                {isProcessing ? (
+                                    <div className="flex flex-col items-center gap-2 text-gray-500">
+                                        <Loader2 className="w-8 h-8 animate-spin" />
+                                        <p>파일 처리 중...</p>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center gap-2 text-gray-500 dark:text-gray-400">
+                                        <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-2">
+                                            <Upload className="w-6 h-6" />
+                                        </div>
+                                        <p className="font-medium text-lg">파일을 드래그하거나 클릭하여 업로드</p>
+                                        <p className="text-sm">지원: XLSX, PDF, CSV</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="relative">
+                                <div className="absolute inset-0 flex items-center">
+                                    <div className="w-full border-t border-gray-200 dark:border-gray-700"></div>
+                                </div>
+                                <div className="relative flex justify-center text-sm">
+                                    <span className="px-2 bg-white dark:bg-gray-900 text-gray-500">또는 직접 입력</span>
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-4">
-                                <div className="h-px bg-gray-200 dark:bg-gray-700 flex-1" />
-                                <span className="text-sm text-gray-400 font-medium">또는 직접 붙여넣기</span>
-                                <div className="h-px bg-gray-200 dark:bg-gray-700 flex-1" />
-                            </div>
+                            <textarea
+                                className="w-full h-48 p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                placeholder={`여기에 데이터를 붙여넣으세요 (엑셀에서 복사 가능).\n예:\n이름\t모델\t카테고리\nPC-01\tDell Optiplex\tDesktop`}
+                                value={textData}
+                                onChange={(e) => setTextData(e.target.value)}
+                            ></textarea>
 
-                            <div className="flex-1 flex flex-col min-h-0">
-                                <div className="mb-2 text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
-                                    <AlertCircle className="w-4 h-4 text-gray-400" />
-                                    <span>엑셀 표를 복사(Ctrl+C)하여 아래에 붙여넣으세요. PDF 텍스트는 자동으로 추출되어 여기에 표시됩니다.</span>
-                                </div>
-                                <textarea
-                                    className="flex-1 w-full p-4 border border-gray-300 dark:border-gray-600 rounded-lg font-mono text-sm focus:ring-2 focus:ring-primary focus:border-transparent bg-gray-50 dark:bg-gray-900 resize-none custom-scrollbar"
-                                    placeholder={`예시:\n삼성전자\t갤럭시탭 S7\t2023-01-01\nLG전자\t그램 15\t2022-05-05\n...`}
-                                    value={rawText}
-                                    onChange={(e) => setRawText(e.target.value)}
-                                />
-                            </div>
-
-                            <div className="flex justify-end pt-2">
+                            <div className="flex justify-end">
                                 <button
-                                    onClick={handleParse}
-                                    disabled={!rawText.trim() || isProcessing}
-                                    className="px-6 py-2.5 bg-blue-600 text-white rounded-lg flex items-center gap-2 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm font-medium transition-all"
+                                    onClick={handleTextParse}
+                                    disabled={!textData.trim()}
+                                    className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium transition-colors"
                                 >
-                                    데이터 분석 및 매핑
-                                    <ArrowRight className="w-4 h-4" />
+                                    다음 단계로
                                 </button>
                             </div>
                         </div>
-                    ) : (
-                        <div className="flex flex-col h-full">
-                            <div className="mb-4 bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800 p-3 rounded-lg text-sm text-yellow-800 dark:text-yellow-200 flex items-center gap-2">
+                    )}
+
+                    {step === 'mapping' && (
+                        <div className="space-y-6">
+                            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg flex gap-3 text-blue-700 dark:text-blue-300">
                                 <AlertCircle className="w-5 h-5 shrink-0" />
-                                <div>
-                                    각 열(Column)의 의미를 선택해주세요. <strong>'기기명', '모델명', '구입일'</strong> 같은 핵심 정보를 매핑해야 합니다.
+                                <div className="text-sm">
+                                    <p className="font-bold mb-1">데이터 매핑</p>
+                                    <p>업로드한 데이터의 각 열(Column)을 시스템 필드와 연결해주세요.</p>
                                 </div>
                             </div>
 
-                            <div className="flex-1 overflow-auto border border-gray-200 dark:border-gray-700 rounded-lg shadow-inner bg-gray-50 dark:bg-gray-900/50 relative">
-                                <table className="w-full text-sm text-left whitespace-nowrap border-collapse">
-                                    <thead className="sticky top-0 bg-white dark:bg-gray-800 z-10 shadow-sm">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {TARGET_FIELDS.map((field) => (
+                                    <div key={field.key} className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            {field.label} {field.required && <span className="text-red-500">*</span>}
+                                        </label>
+                                        <select
+                                            className="w-full p-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md text-sm"
+                                            value={mappings.find(m => m.target === field.key)?.source || ''}
+                                            onChange={(e) => handleMappingChange(field.key, e.target.value)}
+                                        >
+                                            <option value="">(선택 안 함)</option>
+                                            {headers.map(h => (
+                                                <option key={h} value={h}>{h}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="flex justify-between pt-4">
+                                <button
+                                    onClick={() => setStep('upload')}
+                                    className="px-4 py-2 text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 rounded-lg"
+                                >
+                                    뒤로
+                                </button>
+                                <button
+                                    onClick={() => setStep('preview')}
+                                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                                >
+                                    미리보기
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {step === 'preview' && (
+                        <div className="space-y-6">
+                            <div className="flex items-center justify-between mb-2">
+                                <h3 className="font-bold text-lg">데이터 확인 ({parsedData.length}건)</h3>
+                            </div>
+
+                            <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden max-h-[400px] overflow-auto">
+                                <table className="w-full text-sm text-left">
+                                    <thead className="bg-gray-50 dark:bg-gray-800 text-gray-500 font-medium sticky top-0">
                                         <tr>
-                                            {parsedData[0]?.map((_, index) => (
-                                                <th key={index} className="p-2 border-b-2 border-gray-200 dark:border-gray-600 min-w-[160px] bg-gray-50 dark:bg-gray-700/50">
-                                                    <div className="mb-1 text-xs text-gray-500 font-mono text-center">Column {index + 1}</div>
-                                                    <select
-                                                        className={`w-full p-2 border rounded-lg text-sm font-medium transition-colors focus:ring-2 focus:ring-blue-500 ${columnMapping[index] !== 'ignore'
-                                                                ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-500'
-                                                                : 'border-gray-300 bg-white text-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600'
-                                                            }`}
-                                                        value={columnMapping[index]}
-                                                        onChange={(e) => {
-                                                            const newMapping = [...columnMapping];
-                                                            newMapping[index] = e.target.value;
-                                                            setColumnMapping(newMapping);
-                                                        }}
-                                                    >
-                                                        {COLUMNS.map(col => (
-                                                            <option key={col.key} value={col.key}>
-                                                                {col.label}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                </th>
+                                            {TARGET_FIELDS.map(f => (
+                                                <th key={f.key} className="px-4 py-3 whitespace-nowrap">{f.label}</th>
                                             ))}
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-gray-200 dark:divide-gray-800 bg-white dark:bg-gray-900">
-                                        {parsedData.slice(0, 100).map((row, rIndex) => (
-                                            <tr key={rIndex} className="hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors">
-                                                {row.map((cell, cIndex) => (
-                                                    <td key={cIndex} className={`p-3 border-r last:border-0 border-gray-100 dark:border-gray-800 truncate max-w-[200px] ${columnMapping[cIndex] !== 'ignore' ? 'text-gray-900 dark:text-white font-medium bg-blue-50/10' : 'text-gray-500 dark:text-gray-500'
-                                                        }`}>
-                                                        {cell}
+                                    <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
+                                        {getPreviewData().slice(0, 50).map((row, i) => (
+                                            <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                                                {TARGET_FIELDS.map(f => (
+                                                    <td key={f.key} className="px-4 py-2 whitespace-nowrap text-gray-700 dark:text-gray-300">
+                                                        {row[f.key] || <span className="text-gray-300">-</span>}
                                                     </td>
                                                 ))}
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
-                                {parsedData.length > 100 && (
-                                    <div className="p-3 text-center text-xs text-gray-500 bg-gray-50 dark:bg-gray-800 border-t sticky bottom-0">
-                                        ... 외 {parsedData.length - 100}개 항목
+                                {parsedData.length > 50 && (
+                                    <div className="p-2 text-center text-xs text-gray-500 bg-gray-50 dark:bg-gray-800 border-t border-gray-200">
+                                        ... 외 {parsedData.length - 50}건
                                     </div>
                                 )}
                             </div>
 
-                            <div className="mt-4 flex justify-between items-center pt-2 border-t border-gray-200 dark:border-gray-700">
+                            <div className="flex justify-between pt-4">
                                 <button
-                                    onClick={() => setStep('paste')}
-                                    className="px-5 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-sm font-medium transition-colors"
+                                    onClick={() => setStep('mapping')}
+                                    className="px-4 py-2 text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 rounded-lg"
                                 >
-                                    다시 업로드
+                                    뒤로
                                 </button>
-                                <div className="flex items-center gap-4">
-                                    <div className="text-sm text-gray-500">
-                                        총 <strong className="text-blue-600">{parsedData.length}</strong>개 항목 감지됨
-                                    </div>
-                                    <button
-                                        onClick={handleSave}
-                                        disabled={isSaving}
-                                        className="px-6 py-2.5 bg-green-600 text-white rounded-lg flex items-center gap-2 hover:bg-green-700 disabled:opacity-50 shadow-sm font-medium transition-all transform active:scale-95"
-                                    >
-                                        {isSaving ? (
-                                            <>
-                                                <Loader2 className="w-4 h-4 animate-spin" />
-                                                저장 중...
-                                            </button>
-                                        ) : (
-                                        <>
-                                            <Save className="w-4 h-4" />
-                                            데이터 등록 완료
-                                        </>
-                                        )}
-                                    </button>
-                                </div>
+                                <button
+                                    onClick={handleFinalSave}
+                                    className="flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium shadow-sm transition-all hover:scale-105"
+                                >
+                                    <Check className="w-4 h-4" />
+                                    일괄 등록 완료
+                                </button>
                             </div>
                         </div>
                     )}
