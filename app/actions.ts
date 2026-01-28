@@ -8,17 +8,18 @@ import { Device, Software, Credential, Location } from '@/types';
 import { PDFParse } from 'pdf-parse';
 
 export async function parsePdfAction(formData: FormData) {
-    const file = formData.get('file') as File;
-    if (!file) return { success: false, error: 'No file uploaded' };
-
     try {
+        const file = formData.get('file') as File;
+        if (!file) return { success: false, error: 'No file uploaded' };
+
         const buffer = await file.arrayBuffer();
         const parser = new PDFParse({ data: buffer });
         const result = await parser.getText();
+
         return { success: true, text: result.text };
-    } catch (error) {
-        console.error('PDF Parse Error:', error);
-        return { success: false, error: 'Failed to parse PDF' };
+    } catch (error: any) {
+        console.error('PDF Parse Action Error:', error);
+        return { success: false, error: error.message || 'Server error during PDF parsing' };
     }
 }
 
