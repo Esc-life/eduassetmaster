@@ -80,7 +80,8 @@ export default function Home() {
       const currentImage = base64String;
       console.log(`[Client] Saving Image...`);
       saveMapConfiguration(currentImage, pins)
-        .then(res => console.log('[Client] Server Save Result:', res));
+        .then(res => console.log('[Client] Server Save Result:', res))
+        .catch(err => console.warn('[Client] Server save failed (working offline):', err));
     };
     reader.readAsDataURL(file);
   };
@@ -95,7 +96,8 @@ export default function Home() {
 
     // Sync to Server
     saveMapConfiguration(currentImage || null, newPins)
-      .then(res => console.log('[Client] Server Save Result:', res));
+      .then(res => console.log('[Client] Server Save Result:', res))
+      .catch(err => console.warn('[Client] Server save failed (working offline):', err));
   };
 
   const toggleZoneSelection = (id: string, e: React.MouseEvent) => {
