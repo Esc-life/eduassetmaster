@@ -2,45 +2,54 @@ import { google } from 'googleapis';
 
 const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
 
-// Environment variables should be set in .env.local
-const SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-// Handle Private Key newlines
-const RAW_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY || '';
-let PRIVATE_KEY = RAW_PRIVATE_KEY;
+// Lazy Load Sheets Client
+let sheetsInstance: any = null;
 
-console.log('[GoogleSheets] Loading credentials...');
-console.log(`[GoogleSheets] Email present: ${!!SERVICE_ACCOUNT_EMAIL}`);
-console.log(`[GoogleSheets] Private Key present: ${!!RAW_PRIVATE_KEY}, Length: ${RAW_PRIVATE_KEY.length}`);
+function getSheetsClient() {
+    if (sheetsInstance) return sheetsInstance;
 
-if (PRIVATE_KEY.startsWith('"') && PRIVATE_KEY.endsWith('"')) {
-    PRIVATE_KEY = PRIVATE_KEY.slice(1, -1);
+    const SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+    const RAW_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY || '';
+
+    if (!SERVICE_ACCOUNT_EMAIL || !RAW_PRIVATE_KEY) {
+        console.warn('[GoogleSheets] Credentials missing in environment variables.');
+        return null;
+    }
+
+    let PRIVATE_KEY = RAW_PRIVATE_KEY;
+    if (PRIVATE_KEY.startsWith('"') && PRIVATE_KEY.endsWith('"')) {
+        PRIVATE_KEY = PRIVATE_KEY.slice(1, -1);
+    }
+    PRIVATE_KEY = PRIVATE_KEY.replace(/\\n/g, '\n');
+
+    try {
+        const auth = new google.auth.GoogleAuth({
+            credentials: {
+                client_email: SERVICE_ACCOUNT_EMAIL,
+                private_key: PRIVATE_KEY,
+            },
+            scopes: SCOPES,
+        });
+
+        sheetsInstance = google.sheets({ version: 'v4', auth });
+        return sheetsInstance;
+    } catch (error) {
+        console.error('[GoogleSheets] Failed to create auth client:', error);
+        return null;
+    }
 }
-PRIVATE_KEY = PRIVATE_KEY.replace(/\\n/g, '\n');
-
-if (!PRIVATE_KEY.includes('-----BEGIN PRIVATE KEY-----')) {
-    console.warn('Warning: Private Key might be malformed or missing headers.');
-}
-const DEFAULT_SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID;
-
-// Initialize Auth
-const auth = new google.auth.GoogleAuth({
-    credentials: {
-        client_email: SERVICE_ACCOUNT_EMAIL,
-        private_key: PRIVATE_KEY,
-    },
-    scopes: SCOPES,
-});
-
-const sheets = google.sheets({ version: 'v4', auth });
 
 /**
  * Fetch data from a specific range.
  */
 export async function getData(range: string, spreadsheetId?: string) {
     try {
-        const targetSheetId = spreadsheetId || DEFAULT_SPREADSHEET_ID;
-        if (!targetSheetId || !SERVICE_ACCOUNT_EMAIL || !PRIVATE_KEY) {
-            console.warn('Google Sheets credentials are missing.');
+        const sheets = getSheetsClient();
+        if (!sheets) return null;
+
+        const targetSheetId = spreadsheetId || process.env.GOOGLE_SPREADSHEET_ID;
+        if (!targetSheetId) {
+            console.warn('Google Sheets ID missing.');
             return null;
         }
 
@@ -64,7 +73,10 @@ export async function getData(range: string, spreadsheetId?: string) {
  */
 export async function updateData(range: string, values: any[][], spreadsheetId?: string) {
     try {
-        const targetSheetId = spreadsheetId || DEFAULT_SPREADSHEET_ID;
+        const sheets = getSheetsClient();
+        if (!sheets) throw new Error('Google Sheets Client initialization failed');
+
+        const targetSheetId = spreadsheetId || process.env.GOOGLE_SPREADSHEET_ID;
         if (!targetSheetId) throw new Error('Spreadsheet ID is missing');
 
         const response = await sheets.spreadsheets.values.update({
@@ -85,7 +97,10 @@ export async function updateData(range: string, values: any[][], spreadsheetId?:
  */
 export async function appendData(range: string, values: any[][], spreadsheetId?: string) {
     try {
-        const targetSheetId = spreadsheetId || DEFAULT_SPREADSHEET_ID;
+        const sheets = getSheetsClient();
+        if (!sheets) throw new Error('Google Sheets Client initialization failed');
+
+        const targetSheetId = spreadsheetId || process.env.GOOGLE_SPREADSHEET_ID;
         if (!targetSheetId) throw new Error('Spreadsheet ID is missing');
 
         const response = await sheets.spreadsheets.values.append({
@@ -106,7 +121,10 @@ export async function appendData(range: string, values: any[][], spreadsheetId?:
  */
 export async function addSheet(title: string, spreadsheetId?: string) {
     try {
-        const targetSheetId = spreadsheetId || DEFAULT_SPREADSHEET_ID;
+        const sheets = getSheetsClient();
+        if (!sheets) throw new Error('Google Sheets Client initialization failed');
+
+        const targetSheetId = spreadsheetId || process.env.GOOGLE_SPREADSHEET_ID;
         if (!targetSheetId) throw new Error('Spreadsheet ID is missing');
 
         const response = await sheets.spreadsheets.batchUpdate({
