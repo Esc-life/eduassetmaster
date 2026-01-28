@@ -32,7 +32,7 @@ export const authOptions: NextAuthOptions = {
                     }
 
                     // Find user (Column Index 2 is Email)
-                    const userRow = rows.find(r => r[2] === credentials.email);
+                    const userRow = rows.find((r: any[]) => r[2] === credentials.email);
 
                     if (userRow) {
                         console.log(`[Auth] ✅ User found: ${userRow[2]} | SheetID: ${userRow[4]}`);

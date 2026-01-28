@@ -371,7 +371,7 @@ export async function registerBulkDevices(devices: any[]) {
         }
 
         // Prepare rows for appending
-        const newRows = devices.map(d => [
+        const newRows = devices.map((d: any) => [
             d.id || crypto.randomUUID(), // Local crypto usage requires Node 18+ (Vercel ok)
             d.category || '기타',
             d.model || '',
@@ -415,7 +415,7 @@ export async function syncZonesToSheet(zones: Location[]) {
             ['Zone ID', 'Auto Name', 'Custom Name (Edit Here)'],
         ];
 
-        zones.forEach(z => {
+        zones.forEach((z: Location) => {
             const customName = existingMap.get(z.id) || '';
             values.push([z.id, z.name, customName]);
         });

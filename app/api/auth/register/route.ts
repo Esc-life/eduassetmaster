@@ -40,7 +40,7 @@ export async function POST(req: Request) {
         }
 
         // 2. Check duplicate
-        if (rows && rows.some(r => r[2] === email)) {
+        if (rows && rows.some((r: any[]) => r[2] === email)) {
             return NextResponse.json({ message: "이미 등록된 이메일입니다." }, { status: 409 });
         }
 
