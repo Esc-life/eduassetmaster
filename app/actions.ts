@@ -105,7 +105,7 @@ export async function fetchMapConfiguration() {
         if (!rows || rows.length === 0) return { mapImage: null, zones: [] };
 
         const configMap = new Map<string, string>();
-        const configMap = new Map<string, string>();
+
         rows.forEach((row: any[]) => {
             if (row[0]) configMap.set(row[0], row[1]);
         });
@@ -136,7 +136,7 @@ export async function fetchMapConfiguration() {
             const locRows = await getData('Locations!A:C', sheetId);
             if (locRows && locRows.length > 0) {
                 const nameMap = new Map<string, string>();
-                locRows.forEach(row => {
+                locRows.forEach((row: any[]) => {
                     if (row[0] && row[2]) nameMap.set(row[0], row[2]);
                 });
 
@@ -232,7 +232,7 @@ export async function saveSoftware(item: any) {
             rows = [];
         }
 
-        const rowIndex = rows.findIndex(r => r[0] === item.id);
+        const rowIndex = rows.findIndex((r: any[]) => r[0] === item.id);
 
         const rowData = [
             item.id,
@@ -265,10 +265,10 @@ export async function deleteSoftware(id: string) {
         const rows = await getData('Software!A:A', sheetId);
         if (!rows) return { success: false, error: 'Sheet not found' };
 
-        const rowIndex = rows.findIndex(r => r[0] === id);
+        const rowIndex = rows.findIndex((r: any[]) => r[0] === id);
         if (rowIndex >= 0) {
             const allRows = await getData('Software!A:H', sheetId) || [];
-            const newRows = allRows.filter(r => r[0] !== id);
+            const newRows = allRows.filter((r: any[]) => r[0] !== id);
             await updateData('Software!A1', [['ID', 'Name', 'Type', 'Version', 'License', 'Date', 'Assigned To', 'Notes'], ...newRows.slice(1)], sheetId);
         }
         return { success: true };
@@ -317,7 +317,7 @@ export async function saveAccount(item: any) {
             rows = [];
         }
 
-        const rowIndex = rows.findIndex(r => r[0] === item.id);
+        const rowIndex = rows.findIndex((r: any[]) => r[0] === item.id);
         const rowData = [
             item.id,
             item.serviceName,
@@ -348,7 +348,7 @@ export async function deleteAccount(id: string) {
         const allRows = await getData('Accounts!A:G', sheetId);
         if (!allRows) return { success: false, error: 'Sheet not found' };
 
-        const newRows = allRows.filter(r => r[0] !== id);
+        const newRows = allRows.filter((r: any[]) => r[0] !== id);
         await updateData('Accounts!A1', newRows.length > 0 ? newRows : [['ID', 'Service', 'URL', 'Username', 'Password', 'Category', 'Notes']], sheetId);
         return { success: true };
     } catch (error) {
@@ -406,7 +406,7 @@ export async function syncZonesToSheet(zones: Location[]) {
             await addSheet('Locations', sheetId);
             rows = [];
         } else {
-            rows.forEach(row => {
+            rows.forEach((row: any[]) => {
                 if (row[0] && row[2]) existingMap.set(row[0], row[2]);
             });
         }
