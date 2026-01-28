@@ -58,7 +58,7 @@ export async function fetchAssetData() {
 
     try {
         const deviceRows = await getData('Devices!A2:H', sheetId);
-        const devices: Device[] = (deviceRows || []).map((row) => ({
+        const devices: Device[] = (deviceRows || []).map((row: any[]) => ({
             id: row[0],
             category: row[1] as any,
             model: row[2],
@@ -70,7 +70,7 @@ export async function fetchAssetData() {
         }));
 
         const swRows = await getData('Software!A2:D', sheetId);
-        const software: Software[] = (swRows || []).map((row) => ({
+        const software: Software[] = (swRows || []).map((row: any[]) => ({
             name: row[0],
             licenseKey: row[1],
             quantity: parseInt(row[2] || '0'),
@@ -78,7 +78,7 @@ export async function fetchAssetData() {
         }));
 
         const credRows = await getData('Credentials!A2:D', sheetId);
-        const credentials: Credential[] = (credRows || []).map((row) => ({
+        const credentials: Credential[] = (credRows || []).map((row: any[]) => ({
             serviceName: row[0],
             adminId: row[1],
             contact: row[2],
@@ -105,7 +105,8 @@ export async function fetchMapConfiguration() {
         if (!rows || rows.length === 0) return { mapImage: null, zones: [] };
 
         const configMap = new Map<string, string>();
-        rows.forEach(row => {
+        const configMap = new Map<string, string>();
+        rows.forEach((row: any[]) => {
             if (row[0]) configMap.set(row[0], row[1]);
         });
 
@@ -202,7 +203,7 @@ export async function getSoftwareList() {
     try {
         const rows = await getData('Software!A2:H', sheetId);
         const safeRows = rows || [];
-        return safeRows.map(row => ({
+        return safeRows.map((row: any[]) => ({
             id: row[0],
             name: row[1],
             type: row[2],
@@ -288,7 +289,7 @@ export async function getAccountList() {
     try {
         const rows = await getData('Accounts!A2:G', sheetId);
         const safeRows = rows || [];
-        return safeRows.map(row => ({
+        return safeRows.map((row: any[]) => ({
             id: row[0],
             serviceName: row[1],
             url: row[2],
