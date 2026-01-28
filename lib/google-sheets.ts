@@ -64,7 +64,7 @@ export async function getData(range: string, spreadsheetId?: string) {
             return null;
         }
         console.error('Error fetching data from Google Sheets:', error);
-        throw error;
+        return null;
     }
 }
 
@@ -88,7 +88,7 @@ export async function updateData(range: string, values: any[][], spreadsheetId?:
         return response.data;
     } catch (error) {
         console.error('Error updating data:', error);
-        throw error;
+        return { success: false, error };
     }
 }
 
@@ -112,7 +112,7 @@ export async function appendData(range: string, values: any[][], spreadsheetId?:
         return response.data;
     } catch (error) {
         console.error('Error appending data:', error);
-        throw error;
+        return { success: false, error };
     }
 }
 
@@ -141,7 +141,7 @@ export async function addSheet(title: string, spreadsheetId?: string) {
     } catch (error: any) {
         if (error.message && error.message.includes('already exists')) return;
         console.error('Error adding sheet:', error);
-        throw error;
+        return { success: false, error };
     }
 }
 
