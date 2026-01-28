@@ -8,6 +8,10 @@ const SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
 const RAW_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY || '';
 let PRIVATE_KEY = RAW_PRIVATE_KEY;
 
+console.log('[GoogleSheets] Loading credentials...');
+console.log(`[GoogleSheets] Email present: ${!!SERVICE_ACCOUNT_EMAIL}`);
+console.log(`[GoogleSheets] Private Key present: ${!!RAW_PRIVATE_KEY}, Length: ${RAW_PRIVATE_KEY.length}`);
+
 if (PRIVATE_KEY.startsWith('"') && PRIVATE_KEY.endsWith('"')) {
     PRIVATE_KEY = PRIVATE_KEY.slice(1, -1);
 }
