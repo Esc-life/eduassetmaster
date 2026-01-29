@@ -152,10 +152,12 @@ export function BulkUploadModal({ isOpen, onClose, onSave }: BulkUploadModalProp
     const autoMapColumns = (headers: string[]) => {
         const newMappings: ColumnMapping[] = [];
         TARGET_FIELDS.forEach(field => {
-            // Find best match
+            // Find best match (with null safety)
             const match = headers.find(h =>
-                h.toLowerCase().includes(field.key.toLowerCase()) ||
-                h.toLowerCase().includes(field.label.split(' (')[0].toLowerCase()) // Match Korean part
+                h && typeof h === 'string' && (
+                    h.toLowerCase().includes(field.key.toLowerCase()) ||
+                    h.toLowerCase().includes(field.label.split(' (')[0].toLowerCase())
+                )
             );
             if (match) {
                 newMappings.push({ target: field.key, source: match });
