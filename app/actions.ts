@@ -1,4 +1,4 @@
-'use server';
+﻿'use server';
 
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -157,7 +157,7 @@ export async function fetchMapConfiguration() {
 
 export async function saveMapConfiguration(mapImage: string | null, zones: Location[]) {
     const sheetId = await getUserSheetId();
-    if (sheetId === 'NO_SHEET') return { success: false, error: '스프레드시트 ID가 설정되지 않았습니다.' };
+    if (sheetId === 'NO_SHEET') return { success: false, error: '?ㅽ봽?덈뱶?쒗듃 ID媛 ?ㅼ젙?섏? ?딆븯?듬땲??' };
     if (isGlobalMockMode && !sheetId) return { success: true };
 
     try {
@@ -219,7 +219,7 @@ export async function getSoftwareList() {
 
 export async function saveSoftware(item: any) {
     const sheetId = await getUserSheetId();
-    if (sheetId === 'NO_SHEET') return { success: false, error: '스프레드시트 ID가 없습니다.' };
+    if (sheetId === 'NO_SHEET') return { success: false, error: '?ㅽ봽?덈뱶?쒗듃 ID媛 ?놁뒿?덈떎.' };
     if (isGlobalMockMode && !sheetId) return { success: true };
 
     try {
@@ -357,7 +357,7 @@ export async function deleteAccount(id: string) {
 
 export async function registerBulkDevices(devices: any[]) {
     const sheetId = await getUserSheetId();
-    if (sheetId === 'NO_SHEET') return { success: false, error: '스프레드시트가 연동되지 않았습니다.' };
+    if (sheetId === 'NO_SHEET') return { success: false, error: '?ㅽ봽?덈뱶?쒗듃媛 ?곕룞?섏? ?딆븯?듬땲??' };
     if (isGlobalMockMode && !sheetId) return { success: true };
 
     try {
@@ -372,7 +372,7 @@ export async function registerBulkDevices(devices: any[]) {
         // Prepare rows for appending
         const newRows = devices.map((d: any) => [
             d.id || crypto.randomUUID(), // Local crypto usage requires Node 18+ (Vercel ok)
-            d.category || '기타',
+            d.category || '湲고?',
             d.model || '',
             d.ip || '',
             d.status || 'Active',
@@ -426,10 +426,11 @@ export async function syncZonesToSheet(zones: Location[]) {
     }
 }
 
+
 // Device Management Functions
 export async function updateDevice(deviceId: string, updates: Partial<Device>) {
     const sheetId = await getUserSheetId();
-    if (sheetId === 'NO_SHEET') return { success: false, error: '���������Ʈ�� �������� �ʾҽ��ϴ�.' };
+    if (sheetId === 'NO_SHEET') return { success: false, error: '?ㅽ봽?덈뱶?쒗듃媛 ?곕룞?섏? ?딆븯?듬땲??' };
     if (isGlobalMockMode && !sheetId) return { success: true };
 
     try {
@@ -453,7 +454,7 @@ export async function updateDevice(deviceId: string, updates: Partial<Device>) {
             updates.name !== undefined ? updates.name : currentDevice[7],
         ];
 
-        await updateData(\Devices!A\:H\\, [updatedRow], sheetId);
+        await updateData(`Devices!A${rowNumber}:H${rowNumber}`, [updatedRow], sheetId);
         return { success: true };
     } catch (error) {
         console.error('Update Device Error:', error);
@@ -463,7 +464,7 @@ export async function updateDevice(deviceId: string, updates: Partial<Device>) {
 
 export async function deleteDevice(deviceId: string) {
     const sheetId = await getUserSheetId();
-    if (sheetId === 'NO_SHEET') return { success: false, error: '���������Ʈ�� �������� �ʾҽ��ϴ�.' };
+    if (sheetId === 'NO_SHEET') return { success: false, error: '?ㅽ봽?덈뱶?쒗듃媛 ?곕룞?섏? ?딆븯?듬땲??' };
     if (isGlobalMockMode && !sheetId) return { success: true };
 
     try {
@@ -481,7 +482,7 @@ export async function deleteDevice(deviceId: string) {
 
 export async function deleteAllDevices() {
     const sheetId = await getUserSheetId();
-    if (sheetId === 'NO_SHEET') return { success:false, error: '���������Ʈ�� �������� �ʾҽ��ϴ�.' };
+    if (sheetId === 'NO_SHEET') return { success: false, error: '?ㅽ봽?덈뱶?쒗듃媛 ?곕룞?섏? ?딆븯?듬땲??' };
     if (isGlobalMockMode && !sheetId) return { success: true };
 
     try {
