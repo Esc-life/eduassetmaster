@@ -482,11 +482,12 @@ export async function deleteDevice(deviceId: string) {
 
 export async function deleteAllDevices() {
     const sheetId = await getUserSheetId();
-    if (sheetId === 'NO_SHEET') return { success: false, error: '?ㅽ봽?덈뱶?쒗듃媛 ?곕룞?섏? ?딆븯?듬땲??' };
+    if (sheetId === 'NO_SHEET') return { success: false, error: '스프레드시트가 연동되지 않았습니다.' };
     if (isGlobalMockMode && !sheetId) return { success: true };
 
     try {
-        await updateData('Devices!A2:H', [[]], sheetId);
+        // Clear all rows from A2 onwards
+        await updateData('Devices!A2:H', [], sheetId);
         return { success: true };
     } catch (error) {
         console.error('Delete All Devices Error:', error);

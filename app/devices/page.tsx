@@ -18,6 +18,7 @@ export default function DevicesPage() {
     const [isBulkOpen, setIsBulkOpen] = useState(false);
     const [editDevice, setEditDevice] = useState<Device | null>(null);
     const [deleteModal, setDeleteModal] = useState<{ open: boolean; type: 'single' | 'all'; device?: Device }>({ open: false, type: 'single' });
+    const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
 
     useEffect(() => {
         const loadData = async () => {
@@ -80,6 +81,28 @@ export default function DevicesPage() {
         }
     };
 
+    const toggleDeviceSelection = (deviceId: string) => {
+        setSelectedDevices(prev =>
+            prev.includes(deviceId)
+                ? prev.filter(id => id !== deviceId)
+                : [...prev, deviceId]
+        );
+    };
+
+    const toggleSelectAll = () => {
+        setSelectedDevices(prev =>
+            prev.length === filteredDevices.length ? [] : filteredDevices.map(d => d.id)
+        );
+    };
+
+    const handleDeleteSelected = async () => {
+        for (const deviceId of selectedDevices) {
+            await deleteDevice(deviceId);
+        }
+        alert(`${selectedDevices.length}개 기기가 삭제되었습니다.`);
+        window.location.reload();
+    };
+
     const filteredDevices = useMemo(() => {
         return devices.filter((device) => {
             const matchesStatus = filterStatus === 'All' || device.status === filterStatus;
@@ -140,12 +163,9 @@ export default function DevicesPage() {
                     <p className="text-gray-500 dark:text-gray-400 text-sm">전체 자산 목록 및 상태를 관리합니다.</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => setDeleteModal({ open: true, type: 'all' })}
-                        className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors shadow-sm text-sm font-medium"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                        전체 삭제
+                    <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm">
+                        <Plus className="w-4 h-4" />
+                        기기 추가
                     </button>
                     <button
                         onClick={() => setIsBulkOpen(true)}
@@ -154,9 +174,21 @@ export default function DevicesPage() {
                         <FileSpreadsheet className="w-4 h-4" />
                         일괄 등록 (엑셀)
                     </button>
-                    <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm">
-                        <Plus className="w-4 h-4" />
-                        기기 추가
+                    {selectedDevices.length > 0 && (
+                        <button
+                            onClick={handleDeleteSelected}
+                            className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors shadow-sm text-sm font-medium"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                            선택 삭제 ({selectedDevices.length})
+                        </button>
+                    )}
+                    <button
+                        onClick={() => setDeleteModal({ open: true, type: 'all' })}
+                        className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors shadow-sm text-sm font-medium"
+                    >
+                        <Trash2 className="w-4 h-4" />
+                        전체 삭제
                     </button>
                 </div>
             </div>
@@ -196,6 +228,14 @@ export default function DevicesPage() {
                     <table className="w-full text-sm text-left">
                         <thead className="bg-gray-50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-800">
                             <tr>
+                                <th className="px-6 py-4 w-12">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedDevices.length === filteredDevices.length && filteredDevices.length > 0}
+                                        onChange={toggleSelectAll}
+                                        className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 cursor-pointer"
+                                    />
+                                </th>
                                 <th className="px-6 py-4 font-medium">자산 정보</th>
                                 <th className="px-6 py-4 font-medium">상태</th>
                                 <th className="px-6 py-4 font-medium">위치/그룹</th>
@@ -207,7 +247,7 @@ export default function DevicesPage() {
                         <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
                             {isLoading ? (
                                 <tr>
-                                    <td colSpan={6} className="px-6 py-20 text-center text-gray-500">
+                                    <td colSpan={7} className="px-6 py-20 text-center text-gray-500">
                                         <div className="flex flex-col items-center justify-center gap-2">
                                             <Loader2 className="w-8 h-8 animate-spin text-primary" />
                                             <span className="text-sm">데이터를 불러오는 중입니다...</span>
@@ -218,6 +258,14 @@ export default function DevicesPage() {
                                 <>
                                     {filteredDevices.map((device) => (
                                         <tr key={device.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group">
+                                            <td className="px-6 py-4">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedDevices.includes(device.id)}
+                                                    onChange={() => toggleDeviceSelection(device.id)}
+                                                    className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 cursor-pointer"
+                                                />
+                                            </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-primary dark:text-blue-400">
@@ -272,7 +320,7 @@ export default function DevicesPage() {
                                     ))}
                                     {filteredDevices.length === 0 && (
                                         <tr>
-                                            <td colSpan={6} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                                            <td colSpan={7} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                                                 등록된 기기가 없습니다. '일괄 등록' 버튼을 눌러 데이터를 추가해보세요!
                                             </td>
                                         </tr>
@@ -283,6 +331,6 @@ export default function DevicesPage() {
                     </table>
                 </div>
             </div>
-        </div>
+        </div >
     );
 }
