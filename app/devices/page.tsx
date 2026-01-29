@@ -17,9 +17,15 @@ export default function DevicesPage() {
 
     useEffect(() => {
         const loadData = async () => {
-            const data = await fetchAssetData();
-            setDevices(data.devices);
-            setIsLoading(false);
+            try {
+                const data = await fetchAssetData();
+                setDevices(data.devices);
+            } catch (error) {
+                console.warn('[Devices] Server data fetch failed:', error);
+                setDevices([]);
+            } finally {
+                setIsLoading(false);
+            }
         };
         loadData();
     }, []);
