@@ -19,13 +19,13 @@ interface ColumnMapping {
 }
 
 const TARGET_FIELDS = [
-    { key: 'name', label: '기기명 (Name)', required: true },
-    { key: 'model', label: '모델명 (Model)', required: true },
-    { key: 'category', label: '카테고리 (Category)', required: true },
+    { key: 'name', label: '품명/규격', required: true },
+    { key: 'model', label: '물품목록번호', required: false },
+    { key: 'category', label: '물품분류명', required: true },
     { key: 'ip', label: 'IP 주소', required: false },
-    { key: 'status', label: '상태 (Status)', required: false },
-    { key: 'purchaseDate', label: '구매일 (Purchase Date)', required: false },
-    { key: 'groupId', label: '위치/그룹 (Location)', required: false },
+    { key: 'status', label: '상태', required: false },
+    { key: 'purchaseDate', label: '취듽일', required: false },
+    { key: 'groupId', label: '운용부서', required: false },
 ];
 
 export function BulkUploadModal({ isOpen, onClose, onSave }: BulkUploadModalProps) {
