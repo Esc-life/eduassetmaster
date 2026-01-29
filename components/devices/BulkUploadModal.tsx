@@ -85,19 +85,39 @@ export function BulkUploadModal({ isOpen, onClose, onSave }: BulkUploadModalProp
                     const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
                     if (json && json.length > 0) {
-                        const headerRow = json[0] as string[];
-                        const dataRows = json.slice(1);
+                        // Smart Header Detection
+                        let headerIndex = 0;
+                        const keywords = ['품명', '규격', '모델', '번호', '수량', '단가', '금액', '부서', '취득'];
+
+                        // Find the row that contains the most keywords
+                        let maxMatchCount = 0;
+                        for (let i = 0; i < Math.min(json.length, 10); i++) { // Check first 10 rows
+                            const row = json[i] as any[];
+                            let matchCount = 0;
+                            row.forEach(cell => {
+                                if (cell && typeof cell === 'string') {
+                                    if (keywords.some(k => cell.includes(k))) matchCount++;
+                                }
+                            });
+                            if (matchCount > maxMatchCount) {
+                                maxMatchCount = matchCount;
+                                headerIndex = i;
+                            }
+                        }
+
+                        const headerRow = (json[headerIndex] as any[]).map(h => h ? String(h).trim() : '');
+                        const dataRows = json.slice(headerIndex + 1);
 
                         // Convert to array of objects based on index
                         const objects = dataRows.map((row: any) => {
                             const obj: any = {};
                             headerRow.forEach((h, i) => {
-                                obj[h] = row[i];
+                                if (h) obj[h] = row[i];
                             });
                             return obj;
                         });
 
-                        setHeaders(headerRow);
+                        setHeaders(headerRow.filter(h => h !== ''));
                         setParsedData(objects);
                         autoMapColumns(headerRow);
                         setStep('mapping');
