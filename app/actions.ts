@@ -43,56 +43,60 @@ async function getUserSheetId() {
 }
 
 export async function fetchAssetData() {
-    const sheetId = await getUserSheetId();
-
-    // 1. Logged in but no sheet -> Empty Data (Don't show Admin data)
-    if (sheetId === 'NO_SHEET') {
-        return { devices: [], software: [], credentials: [] };
-    }
-
-    // 2. Global Mock (No creds at all)
-    if (isGlobalMockMode && !sheetId) {
-        return {
-            devices: MOCK_DEVICES,
-            software: MOCK_SOFTWARE,
-            credentials: MOCK_CREDENTIALS,
-        };
-    }
-
     try {
-        const deviceRows = await getData('Devices!A2:H', sheetId);
-        const devices: Device[] = (deviceRows || []).map((row: any[]) => ({
-            id: row[0],
-            category: row[1] as any,
-            model: row[2],
-            ip: row[3],
-            status: row[4] as any,
-            purchaseDate: row[5],
-            groupId: row[6],
-            name: row[7],
-        }));
+        const sheetId = await getUserSheetId();
 
-        const swRows = await getData('Software!A2:D', sheetId);
-        const software: Software[] = (swRows || []).map((row: any[]) => ({
-            name: row[0],
-            licenseKey: row[1],
-            quantity: parseInt(row[2] || '0'),
-            expiryDate: row[3],
-        }));
+        // 1. Logged in but no sheet -> Empty Data (Don't show Admin data)
+        if (sheetId === 'NO_SHEET') {
+            return { devices: [], software: [], credentials: [] };
+        }
 
-        const credRows = await getData('Credentials!A2:D', sheetId);
-        const credentials: Credential[] = (credRows || []).map((row: any[]) => ({
-            serviceName: row[0],
-            adminId: row[1],
-            contact: row[2],
-            note: row[3],
-        }));
+        // 2. Global Mock (No creds at all)
+        if (isGlobalMockMode && !sheetId) {
+            return {
+                devices: MOCK_DEVICES,
+                software: MOCK_SOFTWARE,
+                credentials: MOCK_CREDENTIALS,
+            };
+        }
 
-        return { devices, software, credentials };
+        try {
+            const deviceRows = await getData('Devices!A2:H', sheetId);
+            const devices: Device[] = (deviceRows || []).map((row: any[]) => ({
+                id: row[0],
+                category: row[1] as any,
+                model: row[2],
+                ip: row[3],
+                status: row[4] as any,
+                purchaseDate: row[5],
+                groupId: row[6],
+                name: row[7],
+            }));
 
-    } catch (error) {
-        console.error('Fetch Error:', error);
-        // On error, return empty, not mock
+            const swRows = await getData('Software!A2:D', sheetId);
+            const software: Software[] = (swRows || []).map((row: any[]) => ({
+                name: row[0],
+                licenseKey: row[1],
+                quantity: parseInt(row[2] || '0'),
+                expiryDate: row[3],
+            }));
+
+            const credRows = await getData('Credentials!A2:D', sheetId);
+            const credentials: Credential[] = (credRows || []).map((row: any[]) => ({
+                serviceName: row[0],
+                adminId: row[1],
+                contact: row[2],
+                note: row[3],
+            }));
+
+            return { devices, software, credentials };
+
+        } catch (error) {
+            console.error('[fetchAssetData] Error:', error);
+            return { devices: [], software: [], credentials: [] };
+        }
+    } catch (outerError) {
+        console.error('[fetchAssetData] Critical error:', outerError);
         return { devices: [], software: [], credentials: [] };
     }
 }
