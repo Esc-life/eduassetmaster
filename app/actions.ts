@@ -5,22 +5,14 @@ import { authOptions } from "@/lib/auth";
 import { getData, updateData, appendData, addSheet } from '@/lib/google-sheets';
 import { MOCK_DEVICES, MOCK_SOFTWARE, MOCK_CREDENTIALS } from '@/lib/mock-data';
 import { Device, Software, Credential, Location } from '@/types';
-import { PDFParse } from 'pdf-parse';
+// PDF parsing removed due to Vercel serverless environment incompatibility
 
 export async function parsePdfAction(formData: FormData) {
-    try {
-        const file = formData.get('file') as File;
-        if (!file) return { success: false, error: 'No file uploaded' };
-
-        const buffer = await file.arrayBuffer();
-        const parser = new PDFParse({ data: buffer });
-        const result = await parser.getText();
-
-        return { success: true, text: result.text };
-    } catch (error: any) {
-        console.error('PDF Parse Action Error:', error);
-        return { success: false, error: error.message || 'Server error during PDF parsing' };
-    }
+    // PDF parsing disabled on server due to Vercel compatibility issues
+    return {
+        success: false,
+        error: 'PDF parsing is not available in the current deployment. Please use manual entry.'
+    };
 }
 
 // Helper to check if we are in Mock Mode 
