@@ -27,16 +27,19 @@ export async function parsePdfAction(formData: FormData) {
 const isGlobalMockMode = !process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
 
 async function getUserSheetId() {
-    const session = await getServerSession(authOptions);
-    const id = (session?.user as any)?.spreadsheetId;
+    try {
+        const session = await getServerSession(authOptions);
+        const id = (session?.user as any)?.spreadsheetId;
 
-    if (session?.user && !id) {
-        // User logged in but has no sheet configured -> Return special flag
-        return 'NO_SHEET';
+        if (session?.user && !id) {
+            return 'NO_SHEET';
+        }
+
+        return id || undefined;
+    } catch (error) {
+        console.error('[getUserSheetId] Error:', error);
+        return undefined;
     }
-
-    // If ID exists, return it. If no session, return undefined (will fallback to Default env sheet)
-    return id || undefined;
 }
 
 export async function fetchAssetData() {
