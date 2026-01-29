@@ -7,7 +7,7 @@ import { MOCK_DEVICES, MOCK_SOFTWARE, MOCK_CREDENTIALS } from '@/lib/mock-data';
 import { Device, Software, Credential, Location } from '@/types';
 // PDF parsing removed due to Vercel serverless environment incompatibility
 
-export async function parsePdfAction(formData: FormData) {
+export async function parsePdfAction(formData: FormData): Promise<{ success: boolean; text?: string; error?: string }> {
     // PDF parsing disabled on server due to Vercel compatibility issues
     return {
         success: false,
