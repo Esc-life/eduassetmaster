@@ -94,6 +94,28 @@ export async function updateData(range: string, values: any[][], spreadsheetId?:
 }
 
 /**
+ * Clear data in a specific range.
+ */
+export async function clearData(range: string, spreadsheetId?: string) {
+    try {
+        const sheets = getSheetsClient();
+        if (!sheets) throw new Error('Google Sheets Client initialization failed');
+
+        const targetSheetId = spreadsheetId || process.env.GOOGLE_SPREADSHEET_ID;
+        if (!targetSheetId) throw new Error('Spreadsheet ID is missing');
+
+        const response = await sheets.spreadsheets.values.clear({
+            spreadsheetId: targetSheetId,
+            range,
+        });
+        return response.data;
+    } catch (error) {
+        console.error('Error clearing data:', error);
+        return { success: false, error };
+    }
+}
+
+/**
  * Append data to a sheet.
  */
 export async function appendData(range: string, values: any[][], spreadsheetId?: string) {
@@ -152,7 +174,7 @@ export async function addSheet(title: string, spreadsheetId?: string) {
  */
 export async function initializeUserSheet(spreadsheetId: string) {
     const REQUIRED_SHEETS = [
-        { title: 'Devices', header: ['ID', 'Category', 'Model', 'IP', 'Status', 'PurchaseDate', 'Location', 'Name'] },
+        { title: 'Devices', header: ['ID', 'Category', 'Model', 'IP', 'Status', 'PurchaseDate', 'Location', 'Name', 'AcquisitionDivision', 'Quantity', 'UnitPrice', 'TotalAmount'] },
         { title: 'Software', header: ['ID', 'Name', 'Type', 'Version', 'License', 'Date', 'Assigned To', 'Notes'] },
         { title: 'Accounts', header: ['ID', 'Service', 'URL', 'Username', 'Password', 'Category', 'Notes'] },
         { title: 'Config', header: ['Key', 'Value'] },

@@ -2,13 +2,17 @@ export type DeviceStatus = 'Available' | 'In Use' | 'Maintenance' | 'Lost' | 'Br
 
 export interface Device {
     id: string;          // Columns: ID
-    category: string;    // Columns: Category
-    model: string;       // Columns: Model
+    category: string;    // Columns: Category (물품분류명)
+    model: string;       // Columns: Model (물품목록번호)
     ip: string;          // Columns: IP
-    status: DeviceStatus;// Columns: Status
+    status: DeviceStatus | string;// Columns: Status
     purchaseDate: string;// Columns: PurchaseDate (YYYY-MM-DD)
-    groupId: string;     // Columns: GroupID (LocationID or CartID)
-    name?: string;       // Managed internally or aliases
+    groupId: string;     // Columns: GroupID (Location/운용부서)
+    name?: string;       // Columns: Name (품명/규격)
+    acquisitionDivision?: string; // 취득구분
+    quantity?: number | string;   // 수량
+    unitPrice?: number | string;  // 단가
+    totalAmount?: number | string;// 취득금액
 }
 
 export interface Location {

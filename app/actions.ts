@@ -2,7 +2,7 @@
 
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getData, updateData, appendData, addSheet } from '@/lib/google-sheets';
+import { getData, updateData, appendData, addSheet, clearData } from '@/lib/google-sheets';
 import { MOCK_DEVICES, MOCK_SOFTWARE, MOCK_CREDENTIALS } from '@/lib/mock-data';
 import { Device, Software, Credential, Location } from '@/types';
 // PDF parsing removed due to Vercel serverless environment incompatibility
@@ -53,7 +53,7 @@ export async function fetchAssetData() {
         }
 
         try {
-            const deviceRows = await getData('Devices!A2:H', sheetId);
+            const deviceRows = await getData('Devices!A2:L', sheetId);
             const devices: Device[] = (deviceRows || []).map((row: any[]) => ({
                 id: row[0],
                 category: row[1] as any,
@@ -63,6 +63,10 @@ export async function fetchAssetData() {
                 purchaseDate: row[5],
                 groupId: row[6],
                 name: row[7],
+                acquisitionDivision: row[8],
+                quantity: row[9],
+                unitPrice: row[10],
+                totalAmount: row[11],
             }));
 
             const swRows = await getData('Software!A2:D', sheetId);
@@ -365,20 +369,24 @@ export async function registerBulkDevices(devices: any[]) {
 
         if (rows === null) {
             await addSheet('Devices', sheetId);
-            await updateData('Devices!A1', [['ID', 'Category', 'Model', 'IP', 'Status', 'PurchaseDate', 'Location', 'Name']], sheetId);
+            await updateData('Devices!A1', [['ID', 'Category', 'Model', 'IP', 'Status', 'PurchaseDate', 'Location', 'Name', 'AcquisitionDivision', 'Quantity', 'UnitPrice', 'TotalAmount']], sheetId);
             rows = [];
         }
 
         // Prepare rows for appending
         const newRows = devices.map((d: any) => [
             d.id || crypto.randomUUID(), // Local crypto usage requires Node 18+ (Vercel ok)
-            d.category || '湲고?',
+            d.category || '기타',
             d.model || '',
             d.ip || '',
             d.status || 'Active',
             d.purchaseDate || '',
             d.groupId || '', // This is technically Location/Zone ID
-            d.name || ''
+            d.name || '',
+            d.acquisitionDivision || '전체',
+            d.quantity || '1',
+            d.unitPrice || '0',
+            d.totalAmount || '0'
         ]);
 
         await appendData('Devices!A1', newRows, sheetId);
@@ -428,13 +436,15 @@ export async function syncZonesToSheet(zones: Location[]) {
 
 
 // Device Management Functions
+
+// Device Management Functions
 export async function updateDevice(deviceId: string, updates: Partial<Device>) {
     const sheetId = await getUserSheetId();
     if (sheetId === 'NO_SHEET') return { success: false, error: '?ㅽ봽?덈뱶?쒗듃媛 ?곕룞?섏? ?딆븯?듬땲??' };
     if (isGlobalMockMode && !sheetId) return { success: true };
 
     try {
-        const rows = await getData('Devices!A2:H', sheetId);
+        const rows = await getData('Devices!A2:L', sheetId);
         if (!rows) return { success: false, error: 'No devices found' };
 
         const deviceIndex = rows.findIndex((row: any[]) => row[0] === deviceId);
@@ -452,9 +462,13 @@ export async function updateDevice(deviceId: string, updates: Partial<Device>) {
             updates.purchaseDate !== undefined ? updates.purchaseDate : currentDevice[5],
             updates.groupId !== undefined ? updates.groupId : currentDevice[6],
             updates.name !== undefined ? updates.name : currentDevice[7],
+            updates.acquisitionDivision !== undefined ? updates.acquisitionDivision : currentDevice[8],
+            updates.quantity !== undefined ? updates.quantity : currentDevice[9],
+            updates.unitPrice !== undefined ? updates.unitPrice : currentDevice[10],
+            updates.totalAmount !== undefined ? updates.totalAmount : currentDevice[11],
         ];
 
-        await updateData(`Devices!A${rowNumber}:H${rowNumber}`, [updatedRow], sheetId);
+        await updateData(`Devices!A${rowNumber}:L${rowNumber}`, [updatedRow], sheetId);
         return { success: true };
     } catch (error) {
         console.error('Update Device Error:', error);
@@ -468,11 +482,15 @@ export async function deleteDevice(deviceId: string) {
     if (isGlobalMockMode && !sheetId) return { success: true };
 
     try {
-        const rows = await getData('Devices!A2:H', sheetId);
+        const rows = await getData('Devices!A2:L', sheetId);
         if (!rows) return { success: false, error: 'No devices found' };
 
         const filteredRows = rows.filter((row: any[]) => row[0] !== deviceId);
-        await updateData('Devices!A2:H', filteredRows, sheetId);
+
+        await clearData('Devices!A2:L', sheetId);
+        if (filteredRows.length > 0) {
+            await updateData('Devices!A2', filteredRows, sheetId);
+        }
         return { success: true };
     } catch (error) {
         console.error('Delete Device Error:', error);
@@ -482,15 +500,36 @@ export async function deleteDevice(deviceId: string) {
 
 export async function deleteAllDevices() {
     const sheetId = await getUserSheetId();
-    if (sheetId === 'NO_SHEET') return { success: false, error: '스프레드시트가 연동되지 않았습니다.' };
+    if (sheetId === 'NO_SHEET') return { success: false, error: '?ㅽ봽?덈뱶?쒗듃媛 ?곕룞?섏? ?딆븯?듬땲??' };
     if (isGlobalMockMode && !sheetId) return { success: true };
 
     try {
-        // Clear all rows from A2 onwards
-        await updateData('Devices!A2:H', [], sheetId);
+        await clearData('Devices!A2:L', sheetId);
         return { success: true };
     } catch (error) {
         console.error('Delete All Devices Error:', error);
+        return { success: false, error: String(error) };
+    }
+}
+
+export async function deleteBulkDevices(deviceIds: string[]) {
+    const sheetId = await getUserSheetId();
+    if (sheetId === 'NO_SHEET') return { success: false, error: '?ㅽ봽?덈뱶?쒗듃媛 ?곕룞?섏? ?딆븯?듬땲??' };
+    if (isGlobalMockMode && !sheetId) return { success: true };
+
+    try {
+        const rows = await getData('Devices!A2:L', sheetId);
+        if (!rows) return { success: true };
+
+        const filteredRows = rows.filter((row: any[]) => !deviceIds.includes(row[0]));
+
+        await clearData('Devices!A2:L', sheetId);
+        if (filteredRows.length > 0) {
+            await updateData('Devices!A2', filteredRows, sheetId);
+        }
+        return { success: true };
+    } catch (error) {
+        console.error('Delete Bulk Devices Error:', error);
         return { success: false, error: String(error) };
     }
 }

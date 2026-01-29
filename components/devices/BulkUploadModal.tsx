@@ -19,13 +19,15 @@ interface ColumnMapping {
 }
 
 const TARGET_FIELDS = [
-    { key: 'name', label: '품명/규격', required: true },
-    { key: 'model', label: '물품목록번호', required: false },
     { key: 'category', label: '물품분류명', required: true },
-    { key: 'ip', label: 'IP 주소', required: false },
-    { key: 'status', label: '상태', required: false },
-    { key: 'purchaseDate', label: '취듽일', required: false },
+    { key: 'model', label: '물품목록번호', required: false },
+    { key: 'name', label: '품명/규격', required: true },
+    { key: 'purchaseDate', label: '취득일', required: false },
+    { key: 'acquisitionDivision', label: '취득구분', required: false },
     { key: 'groupId', label: '운용부서', required: false },
+    { key: 'quantity', label: '수량', required: false },
+    { key: 'unitPrice', label: '단가', required: false },
+    { key: 'totalAmount', label: '취득금액', required: false },
 ];
 
 export function BulkUploadModal({ isOpen, onClose, onSave }: BulkUploadModalProps) {
