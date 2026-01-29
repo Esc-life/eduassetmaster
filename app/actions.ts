@@ -425,3 +425,70 @@ export async function syncZonesToSheet(zones: Location[]) {
         return { success: false, error };
     }
 }
+
+// Device Management Functions
+export async function updateDevice(deviceId: string, updates: Partial<Device>) {
+    const sheetId = await getUserSheetId();
+    if (sheetId === 'NO_SHEET') return { success: false, error: '스프레드시트가 연동되지 않았습니다.' };
+    if (isGlobalMockMode && !sheetId) return { success: true };
+
+    try {
+        const rows = await getData('Devices!A2:H', sheetId);
+        if (!rows) return { success: false, error: 'No devices found' };
+
+        const deviceIndex = rows.findIndex((row: any[]) => row[0] === deviceId);
+        if (deviceIndex === -1) return { success: false, error: 'Device not found' };
+
+        const rowNumber = deviceIndex + 2;
+        const currentDevice = rows[deviceIndex];
+
+        const updatedRow = [
+            currentDevice[0],
+            updates.category !== undefined ? updates.category : currentDevice[1],
+            updates.model !== undefined ? updates.model : currentDevice[2],
+            updates.ip !== undefined ? updates.ip : currentDevice[3],
+            updates.status !== undefined ? updates.status : currentDevice[4],
+            updates.purchaseDate !== undefined ? updates.purchaseDate : currentDevice[5],
+            updates.groupId !== undefined ? updates.groupId : currentDevice[6],
+            updates.name !== undefined ? updates.name : currentDevice[7],
+        ];
+
+        await updateData(\Devices!A\:H\\, [updatedRow], sheetId);
+        return { success: true };
+    } catch (error) {
+        console.error('Update Device Error:', error);
+        return { success: false, error: String(error) };
+    }
+}
+
+export async function deleteDevice(deviceId: string) {
+    const sheetId = await getUserSheetId();
+    if (sheetId === 'NO_SHEET') return { success: false, error: '스프레드시트가 연동되지 않았습니다.' };
+    if (isGlobalMockMode && !sheetId) return { success: true };
+
+    try {
+        const rows = await getData('Devices!A2:H', sheetId);
+        if (!rows) return { success: false, error: 'No devices found' };
+
+        const filteredRows = rows.filter((row: any[]) => row[0] !== deviceId);
+        await updateData('Devices!A2:H', filteredRows, sheetId);
+        return { success: true };
+    } catch (error) {
+        console.error('Delete Device Error:', error);
+        return { success: false, error: String(error) };
+    }
+}
+
+export async function deleteAllDevices() {
+    const sheetId = await getUserSheetId();
+    if (sheetId === 'NO_SHEET') return { success:false, error: '스프레드시트가 연동되지 않았습니다.' };
+    if (isGlobalMockMode && !sheetId) return { success: true };
+
+    try {
+        await updateData('Devices!A2:H', [[]], sheetId);
+        return { success: true };
+    } catch (error) {
+        console.error('Delete All Devices Error:', error);
+        return { success: false, error: String(error) };
+    }
+}

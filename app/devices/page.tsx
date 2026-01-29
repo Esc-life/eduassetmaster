@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { fetchAssetData, registerBulkDevices } from '@/app/actions';
+import { fetchAssetData, registerBulkDevices, updateDevice, deleteDevice, deleteAllDevices } from '@/app/actions';
 import { Device, DeviceStatus } from '@/types';
-import { Search, Filter, MoreHorizontal, Laptop, Tablet, Smartphone, Monitor, Loader2, FileSpreadsheet, Plus } from 'lucide-react';
+import { Search, Filter, MoreHorizontal, Laptop, Tablet, Smartphone, Monitor, Loader2, FileSpreadsheet, Plus, Edit, Trash2 } from 'lucide-react';
 import { BulkUploadModal } from '@/components/devices/BulkUploadModal';
+import { DeviceEditModal } from '@/components/devices/DeviceEditModal';
+import { DeleteConfirmModal } from '@/components/devices/DeleteConfirmModal';
 import { useRouter } from 'next/navigation';
 
 export default function DevicesPage() {
@@ -14,6 +16,8 @@ export default function DevicesPage() {
     const [filterStatus, setFilterStatus] = useState<DeviceStatus | 'All'>('All');
     const [searchTerm, setSearchTerm] = useState('');
     const [isBulkOpen, setIsBulkOpen] = useState(false);
+    const [editDevice, setEditDevice] = useState<Device | null>(null);
+    const [deleteModal, setDeleteModal] = useState<{ open: boolean; type: 'single' | 'all'; device?: Device }>({ open: false, type: 'single' });
 
     useEffect(() => {
         const loadData = async () => {
@@ -40,6 +44,39 @@ export default function DevicesPage() {
         } else {
             alert('등록 실패: ' + result.error);
             setIsLoading(false);
+        }
+    };
+
+    const handleUpdateDevice = async (deviceId: string, updates: Partial<Device>) => {
+        setIsLoading(true);
+        const result = await updateDevice(deviceId, updates);
+        if (result.success) {
+            alert('수정이 저장되었습니다.');
+            window.location.reload();
+        } else {
+            alert('수정 실패: ' + result.error);
+            setIsLoading(false);
+        }
+    };
+
+    const handleDeleteDevice = async () => {
+        if (!deleteModal.device) return;
+        const result = await deleteDevice(deleteModal.device.id);
+        if (result.success) {
+            alert('삭제되었습니다.');
+            window.location.reload();
+        } else {
+            alert('삭제 실패: ' + result.error);
+        }
+    };
+
+    const handleDeleteAll = async () => {
+        const result = await deleteAllDevices();
+        if (result.success) {
+            alert('모든 기기가 삭제되었습니다.');
+            window.location.reload();
+        } else {
+            alert('전체 삭제 실패: ' + result.error);
         }
     };
 
@@ -81,6 +118,21 @@ export default function DevicesPage() {
                 onSave={handleBulkSave}
             />
 
+            <DeviceEditModal
+                isOpen={!!editDevice}
+                device={editDevice}
+                onClose={() => setEditDevice(null)}
+                onSave={handleUpdateDevice}
+            />
+
+            <DeleteConfirmModal
+                isOpen={deleteModal.open}
+                type={deleteModal.type}
+                deviceName={deleteModal.device?.name}
+                onClose={() => setDeleteModal({ open: false, type: 'single' })}
+                onConfirm={deleteModal.type === 'all' ? handleDeleteAll : handleDeleteDevice}
+            />
+
             {/* Header Section */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -88,6 +140,13 @@ export default function DevicesPage() {
                     <p className="text-gray-500 dark:text-gray-400 text-sm">전체 자산 목록 및 상태를 관리합니다.</p>
                 </div>
                 <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => setDeleteModal({ open: true, type: 'all' })}
+                        className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors shadow-sm text-sm font-medium"
+                    >
+                        <Trash2 className="w-4 h-4" />
+                        전체 삭제
+                    </button>
                     <button
                         onClick={() => setIsBulkOpen(true)}
                         className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm text-sm font-medium"
@@ -192,9 +251,22 @@ export default function DevicesPage() {
                                                 {device.purchaseDate}
                                             </td>
                                             <td className="px-6 py-4 text-right">
-                                                <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
-                                                    <MoreHorizontal className="w-4 h-4" />
-                                                </button>
+                                                <div className="flex justify-end gap-2">
+                                                    <button
+                                                        onClick={() => setEditDevice(device)}
+                                                        className="p-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md text-blue-600 dark:text-blue-400 hover:text-blue-700 transition-colors"
+                                                        title="수정"
+                                                    >
+                                                        <Edit className="w-4 h-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setDeleteModal({ open: true, type: 'single', device })}
+                                                        className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md text-red-600 dark:text-red-400 hover:text-red-700 transition-colors"
+                                                        title="삭제"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
