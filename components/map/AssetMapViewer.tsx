@@ -8,7 +8,7 @@ interface AssetMapViewerProps {
     imageSrc: string;
     zoom: number;
     pins: Location[];
-    selectedPin: Location | null;
+    highlightedZoneIds: string[];
     isEditing: boolean;
     selectedZoneIds: Set<string>;
     onPinClick: (pin: Location, e: React.MouseEvent) => void;
@@ -22,7 +22,7 @@ export function AssetMapViewer({
     imageSrc,
     zoom,
     pins,
-    selectedPin,
+    highlightedZoneIds,
     isEditing,
     selectedZoneIds,
     onPinClick,
@@ -109,7 +109,7 @@ export function AssetMapViewer({
                             location={pin}
                             device={undefined} // Mock data handling moved to parent or simplified
                             onClick={(e) => onPinClick(pin, e)}
-                            isSelected={selectedPin?.id === pin.id || selectedZoneIds.has(pin.id)}
+                            isSelected={highlightedZoneIds.includes(pin.id) || selectedZoneIds.has(pin.id)}
                             isSelectMode={isEditing} // Reuse style logic
                         />
                     ))}

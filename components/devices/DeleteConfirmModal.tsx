@@ -5,13 +5,14 @@ import { X, Trash2, AlertTriangle } from 'lucide-react';
 
 interface DeleteConfirmModalProps {
     isOpen: boolean;
-    type: 'single' | 'all';
+    type: 'single' | 'all' | 'selected';
     onClose: () => void;
     onConfirm: () => Promise<void>;
     deviceName?: string;
+    count?: number;
 }
 
-export function DeleteConfirmModal({ isOpen, type, onClose, onConfirm, deviceName }: DeleteConfirmModalProps) {
+export function DeleteConfirmModal({ isOpen, type, onClose, onConfirm, deviceName, count }: DeleteConfirmModalProps) {
     const [confirmText, setConfirmText] = useState('');
     const [isDeleting, setIsDeleting] = useState(false);
 
@@ -41,7 +42,7 @@ export function DeleteConfirmModal({ isOpen, type, onClose, onConfirm, deviceNam
                 <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
                     <h2 className="text-xl font-bold text-red-600 flex items-center gap-2">
                         <AlertTriangle className="w-5 h-5" />
-                        {type === 'all' ? '전체 삭제 확인' : '삭제 확인'}
+                        {type === 'all' ? '전체 삭제 확인' : type === 'selected' ? '선택 삭제 확인' : '삭제 확인'}
                     </h2>
                     <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
                         <X className="w-5 h-5" />
@@ -57,6 +58,13 @@ export function DeleteConfirmModal({ isOpen, type, onClose, onConfirm, deviceNam
                             <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg">
                                 <p className="font-medium text-red-700 dark:text-red-300">{deviceName}</p>
                             </div>
+                            <p className="text-sm text-gray-500">이 작업은 되돌릴 수 없습니다.</p>
+                        </div>
+                    ) : type === 'selected' ? (
+                        <div className="space-y-3">
+                            <p className="text-gray-700 dark:text-gray-300">
+                                선택한 {count}개의 기기를 삭제하시겠습니까?
+                            </p>
                             <p className="text-sm text-gray-500">이 작업은 되돌릴 수 없습니다.</p>
                         </div>
                     ) : (

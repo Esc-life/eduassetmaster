@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { fetchAssetData, registerBulkDevices, updateDevice, deleteDevice, deleteAllDevices, deleteBulkDevices } from '@/app/actions';
 import { Device, DeviceStatus } from '@/types';
-import { Search, Filter, MoreHorizontal, Laptop, Tablet, Smartphone, Monitor, Loader2, FileSpreadsheet, Plus, Edit, Trash2 } from 'lucide-react';
+import { Search, Filter, MoreHorizontal, Laptop, Tablet, Smartphone, Monitor, Loader2, FileSpreadsheet, Plus, Edit, Trash2, ChevronDown, ChevronRight, Hash, User, Lock, Info } from 'lucide-react';
 import { BulkUploadModal } from '@/components/devices/BulkUploadModal';
 import { DeviceEditModal } from '@/components/devices/DeviceEditModal';
 import { DeleteConfirmModal } from '@/components/devices/DeleteConfirmModal';
@@ -17,8 +17,9 @@ export default function DevicesPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [isBulkOpen, setIsBulkOpen] = useState(false);
     const [editDevice, setEditDevice] = useState<Device | null>(null);
-    const [deleteModal, setDeleteModal] = useState<{ open: boolean; type: 'single' | 'all'; device?: Device }>({ open: false, type: 'single' });
+    const [deleteModal, setDeleteModal] = useState<{ open: boolean; type: 'single' | 'all' | 'selected'; device?: Device }>({ open: false, type: 'single' });
     const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
+    const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
     useEffect(() => {
         const loadData = async () => {
@@ -95,7 +96,19 @@ export default function DevicesPage() {
         );
     };
 
-    const handleDeleteSelected = async () => {
+    const toggleRow = (deviceId: string) => {
+        setExpandedRows(prev => {
+            const next = new Set(prev);
+            if (next.has(deviceId)) {
+                next.delete(deviceId);
+            } else {
+                next.add(deviceId);
+            }
+            return next;
+        });
+    };
+
+    const executeDeleteSelected = async () => {
         const result = await deleteBulkDevices(selectedDevices);
         if (result.success) {
             alert(`${selectedDevices.length}개 기기가 삭제되었습니다.`);
@@ -103,6 +116,11 @@ export default function DevicesPage() {
         } else {
             alert('일괄 삭제 실패: ' + result.error);
         }
+    };
+
+    const confirmDeleteSelected = () => {
+        if (selectedDevices.length === 0) return;
+        setDeleteModal({ open: true, type: 'selected' });
     };
 
     const filteredDevices = useMemo(() => {
@@ -178,11 +196,11 @@ export default function DevicesPage() {
                     </button>
                     {selectedDevices.length > 0 && (
                         <button
-                            onClick={handleDeleteSelected}
-                            className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors shadow-sm text-sm font-medium"
+                            onClick={confirmDeleteSelected}
+                            className="bg-red-50 text-red-600 px-4 py-2 rounded-lg hover:bg-red-100 transition-colors flex items-center gap-2"
                         >
                             <Trash2 className="w-4 h-4" />
-                            선택 삭제 ({selectedDevices.length})
+                            {selectedDevices.length}개 삭제
                         </button>
                     )}
                     <button
@@ -238,6 +256,7 @@ export default function DevicesPage() {
                                         className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 cursor-pointer"
                                     />
                                 </th>
+                                <th className="w-10"></th> {/* Expand Button Column */}
                                 <th className="px-6 py-4 font-medium">물품목록번호</th>
                                 <th className="px-6 py-4 font-medium">물품분류명</th>
                                 <th className="px-6 py-4 font-medium">품명/규격</th>
@@ -255,7 +274,7 @@ export default function DevicesPage() {
                         <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
                             {isLoading ? (
                                 <tr>
-                                    <td colSpan={13} className="px-6 py-20 text-center text-gray-500">
+                                    <td colSpan={14} className="px-6 py-20 text-center text-gray-500">
                                         <div className="flex flex-col items-center justify-center gap-2">
                                             <Loader2 className="w-8 h-8 animate-spin text-primary" />
                                             <span className="text-sm">데이터를 불러오는 중입니다...</span>
@@ -265,49 +284,122 @@ export default function DevicesPage() {
                             ) : (
                                 <>
                                     {filteredDevices.map((device) => (
-                                        <tr key={device.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group">
-                                            <td className="px-6 py-4">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedDevices.includes(device.id)}
-                                                    onChange={() => toggleDeviceSelection(device.id)}
-                                                    className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 cursor-pointer"
-                                                />
-                                            </td>
-                                            <td className="px-6 py-4 text-gray-900 dark:text-white font-medium">{device.model}</td>
-                                            <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.category}</td>
-                                            <td className="px-6 py-4 text-gray-900 dark:text-white">{device.name}</td>
-                                            <td className="px-6 py-4 text-gray-600 dark:text-gray-300 whitespace-nowrap">{device.purchaseDate}</td>
-                                            <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.acquisitionDivision}</td>
-                                            <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.groupId}</td>
-                                            <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.quantity}</td>
-                                            <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.unitPrice}</td>
-                                            <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.totalAmount}</td>
-                                            <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.usefulLife}</td>
-                                            <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.installationLocation}</td>
-                                            <td className="px-6 py-4 text-right relative">
-                                                <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <>
+                                            <tr key={device.id} className={`hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group ${expandedRows.has(device.id) ? 'bg-gray-50 dark:bg-gray-800/50' : ''}`}>
+                                                <td className="px-6 py-4">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedDevices.includes(device.id)}
+                                                        onChange={() => toggleDeviceSelection(device.id)}
+                                                        className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 cursor-pointer"
+                                                    />
+                                                </td>
+                                                <td className="px-2 py-4 text-center">
                                                     <button
-                                                        onClick={() => setEditDevice(device)}
-                                                        className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-                                                        title="수정"
+                                                        onClick={() => toggleRow(device.id)}
+                                                        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors text-gray-500"
                                                     >
-                                                        <Edit className="w-4 h-4" />
+                                                        {expandedRows.has(device.id) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                                                     </button>
-                                                    <button
-                                                        onClick={() => setDeleteModal({ open: true, type: 'single', device })}
-                                                        className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                                                        title="삭제"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
+                                                </td>
+                                                <td className="px-6 py-4 text-gray-900 dark:text-white font-medium cursor-pointer" onClick={() => toggleRow(device.id)}>{device.model}</td>
+                                                <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.category}</td>
+                                                <td className="px-6 py-4 text-gray-900 dark:text-white">{device.name}</td>
+                                                <td className="px-6 py-4 text-gray-600 dark:text-gray-300 whitespace-nowrap">{device.purchaseDate}</td>
+                                                <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.acquisitionDivision}</td>
+                                                <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.groupId}</td>
+                                                <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.quantity}</td>
+                                                <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.unitPrice}</td>
+                                                <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.totalAmount}</td>
+                                                <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.usefulLife}</td>
+                                                <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.installationLocation}</td>
+                                                <td className="px-6 py-4 text-right relative">
+                                                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button
+                                                            onClick={() => setEditDevice(device)}
+                                                            className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                                                            title="수정"
+                                                        >
+                                                            <Edit className="w-4 h-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setDeleteModal({ open: true, type: 'single', device })}
+                                                            className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                                            title="삭제"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            {expandedRows.has(device.id) && (
+                                                <tr className="bg-gray-50/50 dark:bg-gray-800/30">
+                                                    <td colSpan={14} className="px-6 py-4">
+                                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm p-2">
+                                                            <div>
+                                                                <h4 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                                                                    <Monitor className="w-4 h-4 text-primary" />
+                                                                    시스템 정보
+                                                                </h4>
+                                                                <div className="space-y-2 text-gray-600 dark:text-gray-400">
+                                                                    <div className="flex justify-between border-b border-gray-200 dark:border-gray-700 pb-1">
+                                                                        <span>OS 버전</span>
+                                                                        <span className="font-medium text-gray-900 dark:text-gray-200">{device.osVersion || '-'}</span>
+                                                                    </div>
+                                                                    <div className="flex justify-between border-b border-gray-200 dark:border-gray-700 pb-1">
+                                                                        <span>IP 주소</span>
+                                                                        <span className="font-medium text-gray-900 dark:text-gray-200 font-mono">{device.ip || '-'}</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div>
+                                                                <h4 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                                                                    <User className="w-4 h-4 text-primary" />
+                                                                    사용자 및 계정
+                                                                </h4>
+                                                                <div className="space-y-2 text-gray-600 dark:text-gray-400">
+                                                                    <div className="flex justify-between border-b border-gray-200 dark:border-gray-700 pb-1">
+                                                                        <span>사용자</span>
+                                                                        <span className="font-medium text-gray-900 dark:text-gray-200">{device.deviceUser || '-'}</span>
+                                                                    </div>
+                                                                    <div className="flex justify-between border-b border-gray-200 dark:border-gray-700 pb-1">
+                                                                        <span>비밀번호</span>
+                                                                        <span className="font-medium text-gray-900 dark:text-gray-200 font-mono flex items-center gap-1">
+                                                                            <Lock className="w-3 h-3" />
+                                                                            {device.password || '-'}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div>
+                                                                <h4 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                                                                    <Hash className="w-4 h-4 text-primary" />
+                                                                    기타 정보
+                                                                </h4>
+                                                                <div className="space-y-2 text-gray-600 dark:text-gray-400">
+                                                                    <div className="flex justify-between border-b border-gray-200 dark:border-gray-700 pb-1">
+                                                                        <span>고유 ID</span>
+                                                                        <span className="font-mono text-xs">{device.id}</span>
+                                                                    </div>
+                                                                    <div className="flex justify-between border-b border-gray-200 dark:border-gray-700 pb-1">
+                                                                        <span>상태</span>
+                                                                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${getStatusColor(device.status as DeviceStatus)}`}>
+                                                                            {device.status}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </>
                                     ))}
                                     {filteredDevices.length === 0 && (
                                         <tr>
-                                            <td colSpan={7} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                                            <td colSpan={14} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                                                 등록된 기기가 없습니다. '일괄 등록' 버튼을 눌러 데이터를 추가해보세요!
                                             </td>
                                         </tr>
@@ -318,6 +410,28 @@ export default function DevicesPage() {
                     </table>
                 </div>
             </div>
-        </div >
+            {/* Modals */}
+            <BulkUploadModal isOpen={isBulkOpen} onClose={() => setIsBulkOpen(false)} onSave={handleBulkSave} />
+            {editDevice && (
+                <DeviceEditModal
+                    isOpen={true}
+                    device={editDevice}
+                    onClose={() => setEditDevice(null)}
+                    onSave={(id, updates) => handleUpdateDevice(id, updates)}
+                />
+            )}
+            <DeleteConfirmModal
+                isOpen={deleteModal.open}
+                type={deleteModal.type}
+                deviceName={deleteModal.device?.name}
+                count={selectedDevices.length}
+                onClose={() => setDeleteModal({ open: false, type: 'single' })}
+                onConfirm={
+                    deleteModal.type === 'single' ? handleDeleteDevice :
+                        deleteModal.type === 'all' ? handleDeleteAll :
+                            executeDeleteSelected
+                }
+            />
+        </div>
     );
 }

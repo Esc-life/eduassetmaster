@@ -18,32 +18,9 @@ interface AssetZoneProps {
 export function AssetZone({ location, device, onClick, isSelected, isSelectMode }: AssetZoneProps) {
     const isMaintenance = device?.status === 'Maintenance' || device?.status === 'Broken';
 
-    // If no width/height, fallback to Pin (Legacy)
-    if (!location.width || !location.height) {
-        return (
-            <div
-                className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer group z-10 hover:z-20"
-                style={{ left: `${location.pinX}%`, top: `${location.pinY}%` }}
-                onMouseDown={(e) => e.stopPropagation()}
-                onClick={(e) => { e.stopPropagation(); onClick(e); }}
-            >
-                <motion.div
-                    whileHover={{ scale: 1.2 }}
-                    whileTap={{ scale: 0.9 }}
-                    className={`w-8 h-8 rounded-full shadow-lg flex items-center justify-center border-2 transition-colors ${isMaintenance ? 'bg-red-500 border-white' : 'bg-blue-600 border-white'
-                        } ${isSelected ? 'ring-4 ring-yellow-400' : ''}`}
-                >
-                    {isMaintenance ? (
-                        <span className="text-white font-bold text-xs">!</span>
-                    ) : (
-                        <Monitor className="w-4 h-4 text-white" />
-                    )}
-                </motion.div>
-                <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap pointer-events-none">
-                    {location.name}
-                </div>
-            </div>
-        );
+    // If no width/height, fallback to Pin (Legacy support or migrate)
+    if (location.w === undefined) { // Check w instead of width
+        return null; // Or handle legacy pin if needed
     }
 
     // Render Rectangular Zone
@@ -56,10 +33,10 @@ export function AssetZone({ location, device, onClick, isSelected, isSelectMode 
             className={`absolute cursor-pointer group transition-all border-2 ${selectModeStyle} ${!isSelectMode && isMaintenance ? 'bg-red-500/20 border-red-500/50' : ''
                 }`}
             style={{
-                left: `${location.pinX}%`,
-                top: `${location.pinY}%`,
-                width: `${location.width}%`,
-                height: `${location.height}%`
+                left: `${location.x}%`,
+                top: `${location.y}%`,
+                width: `${location.w}%`,
+                height: `${location.h}%`
             }}
             onMouseDown={(e) => e.stopPropagation()} // Prevent background clearing selection
             onClick={(e) => { e.stopPropagation(); onClick(e); }}

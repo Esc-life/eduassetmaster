@@ -90,10 +90,10 @@ export const useOCR = (): UseOCRResult => {
                         newZones.push({
                             id: `zone-${Date.now()}-${i}`,
                             name: `구역 ${newZones.length + 1}`, // Default name
-                            pinX: (rect.x / scaleFactor / naturalW) * 100,
-                            pinY: (rect.y / scaleFactor / naturalH) * 100,
-                            width: (rect.width / scaleFactor / naturalW) * 100,
-                            height: (rect.height / scaleFactor / naturalH) * 100,
+                            x: (rect.x / scaleFactor / naturalW) * 100,
+                            y: (rect.y / scaleFactor / naturalH) * 100,
+                            w: (rect.width / scaleFactor / naturalW) * 100,
+                            h: (rect.height / scaleFactor / naturalH) * 100,
                             type: 'Classroom'
                         });
                     }
@@ -159,10 +159,10 @@ export const useOCR = (): UseOCRResult => {
                 const zone = updatedZones[i];
 
                 // Calculate ROI in the upscaled image coordinates
-                const x = (zone.pinX / 100) * naturalW * scaleFactor;
-                const y = (zone.pinY / 100) * naturalH * scaleFactor;
-                const w = (zone.width! / 100) * naturalW * scaleFactor;
-                const h = (zone.height! / 100) * naturalH * scaleFactor;
+                const x = (zone.x / 100) * naturalW * scaleFactor;
+                const y = (zone.y / 100) * naturalH * scaleFactor;
+                const w = (zone.w! / 100) * naturalW * scaleFactor;
+                const h = (zone.h! / 100) * naturalH * scaleFactor;
 
                 // Safety check for bounds
                 if (x < 0 || y < 0 || x + w > srcResized.cols || y + h > srcResized.rows) continue;

@@ -23,13 +23,13 @@ export interface Device {
 
 export interface Location {
     id: string;          // Columns: LocationID
-    name: string;        // Columns: Name
-    mapImageUrl?: string;// Columns: MapImageURL
-    pinX: number;        // Columns: PinX (%)
-    pinY: number;        // Columns: PinY (%)
-    width?: number;      // Width in % (for Zones)
-    height?: number;     // Height in % (for Zones)
-    type: 'Classroom' | 'Cart' | 'Office'; // Implicit type for filtering
+    name: string;        // Columns: LocationName
+    type: 'Classroom' | 'Office' | 'Lab' | 'Other' | 'Corridor'; // Columns: Type
+    description?: string; // Columns: Description
+    x: number;
+    y: number;
+    w: number;
+    h: number;
 }
 
 export interface Software {
