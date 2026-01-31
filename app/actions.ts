@@ -53,7 +53,7 @@ export async function fetchAssetData() {
         }
 
         try {
-            const deviceRows = await getData('Devices!A2:L', sheetId);
+            const deviceRows = await getData('Devices!A2:Q', sheetId);
             const devices: Device[] = (deviceRows || []).map((row: any[]) => ({
                 id: row[0],
                 category: row[1] as any,
@@ -67,6 +67,11 @@ export async function fetchAssetData() {
                 quantity: row[9],
                 unitPrice: row[10],
                 totalAmount: row[11],
+                usefulLife: row[12],
+                installationLocation: row[13],
+                osVersion: row[14],
+                password: row[15],
+                deviceUser: row[16],
             }));
 
             const swRows = await getData('Software!A2:D', sheetId);
@@ -369,7 +374,7 @@ export async function registerBulkDevices(devices: any[]) {
 
         if (rows === null) {
             await addSheet('Devices', sheetId);
-            await updateData('Devices!A1', [['ID', 'Category', 'Model', 'IP', 'Status', 'PurchaseDate', 'Location', 'Name', 'AcquisitionDivision', 'Quantity', 'UnitPrice', 'TotalAmount']], sheetId);
+            await updateData('Devices!A1', [['ID', 'Category', 'Model', 'IP', 'Status', 'PurchaseDate', 'Location', 'Name', 'AcquisitionDivision', 'Quantity', 'UnitPrice', 'TotalAmount', 'UsefulLife', 'InstallationLocation', 'OSVersion', 'Password', 'DeviceUser']], sheetId);
             rows = [];
         }
 
@@ -386,7 +391,12 @@ export async function registerBulkDevices(devices: any[]) {
             d.acquisitionDivision || '전체',
             d.quantity || '1',
             d.unitPrice || '0',
-            d.totalAmount || '0'
+            d.totalAmount || '0',
+            d.usefulLife || '',
+            d.installationLocation || '',
+            d.osVersion || '',
+            d.password || '',
+            d.deviceUser || ''
         ]);
 
         await appendData('Devices!A1', newRows, sheetId);
@@ -444,7 +454,7 @@ export async function updateDevice(deviceId: string, updates: Partial<Device>) {
     if (isGlobalMockMode && !sheetId) return { success: true };
 
     try {
-        const rows = await getData('Devices!A2:L', sheetId);
+        const rows = await getData('Devices!A2:Q', sheetId);
         if (!rows) return { success: false, error: 'No devices found' };
 
         const deviceIndex = rows.findIndex((row: any[]) => row[0] === deviceId);
@@ -466,9 +476,14 @@ export async function updateDevice(deviceId: string, updates: Partial<Device>) {
             updates.quantity !== undefined ? updates.quantity : currentDevice[9],
             updates.unitPrice !== undefined ? updates.unitPrice : currentDevice[10],
             updates.totalAmount !== undefined ? updates.totalAmount : currentDevice[11],
+            updates.usefulLife !== undefined ? updates.usefulLife : currentDevice[12],
+            updates.installationLocation !== undefined ? updates.installationLocation : currentDevice[13],
+            updates.osVersion !== undefined ? updates.osVersion : currentDevice[14],
+            updates.password !== undefined ? updates.password : currentDevice[15],
+            updates.deviceUser !== undefined ? updates.deviceUser : currentDevice[16],
         ];
 
-        await updateData(`Devices!A${rowNumber}:L${rowNumber}`, [updatedRow], sheetId);
+        await updateData(`Devices!A${rowNumber}:Q${rowNumber}`, [updatedRow], sheetId);
         return { success: true };
     } catch (error) {
         console.error('Update Device Error:', error);
@@ -482,12 +497,12 @@ export async function deleteDevice(deviceId: string) {
     if (isGlobalMockMode && !sheetId) return { success: true };
 
     try {
-        const rows = await getData('Devices!A2:L', sheetId);
+        const rows = await getData('Devices!A2:Q', sheetId);
         if (!rows) return { success: false, error: 'No devices found' };
 
         const filteredRows = rows.filter((row: any[]) => row[0] !== deviceId);
 
-        await clearData('Devices!A2:L', sheetId);
+        await clearData('Devices!A2:Q', sheetId);
         if (filteredRows.length > 0) {
             await updateData('Devices!A2', filteredRows, sheetId);
         }
@@ -504,7 +519,7 @@ export async function deleteAllDevices() {
     if (isGlobalMockMode && !sheetId) return { success: true };
 
     try {
-        await clearData('Devices!A2:L', sheetId);
+        await clearData('Devices!A2:Q', sheetId);
         return { success: true };
     } catch (error) {
         console.error('Delete All Devices Error:', error);
@@ -518,12 +533,12 @@ export async function deleteBulkDevices(deviceIds: string[]) {
     if (isGlobalMockMode && !sheetId) return { success: true };
 
     try {
-        const rows = await getData('Devices!A2:L', sheetId);
+        const rows = await getData('Devices!A2:Q', sheetId);
         if (!rows) return { success: true };
 
         const filteredRows = rows.filter((row: any[]) => !deviceIds.includes(row[0]));
 
-        await clearData('Devices!A2:L', sheetId);
+        await clearData('Devices!A2:Q', sheetId);
         if (filteredRows.length > 0) {
             await updateData('Devices!A2', filteredRows, sheetId);
         }

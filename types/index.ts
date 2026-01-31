@@ -13,6 +13,12 @@ export interface Device {
     quantity?: number | string;   // 수량
     unitPrice?: number | string;  // 단가
     totalAmount?: number | string;// 취득금액
+    usefulLife?: string;          // 내용연수(변경)
+    installationLocation?: string;// 설치장소 (e.g. 교무실, 전산실)
+    // IT Specific Fields
+    osVersion?: string;
+    password?: string;
+    deviceUser?: string;
 }
 
 export interface Location {

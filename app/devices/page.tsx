@@ -247,13 +247,15 @@ export default function DevicesPage() {
                                 <th className="px-6 py-4 font-medium">수량</th>
                                 <th className="px-6 py-4 font-medium">단가</th>
                                 <th className="px-6 py-4 font-medium">취득금액</th>
+                                <th className="px-6 py-4 font-medium">내용연수(변경)</th>
+                                <th className="px-6 py-4 font-medium">설치장소</th>
                                 <th className="px-6 py-4 font-medium text-right">관리</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
                             {isLoading ? (
                                 <tr>
-                                    <td colSpan={11} className="px-6 py-20 text-center text-gray-500">
+                                    <td colSpan={13} className="px-6 py-20 text-center text-gray-500">
                                         <div className="flex flex-col items-center justify-center gap-2">
                                             <Loader2 className="w-8 h-8 animate-spin text-primary" />
                                             <span className="text-sm">데이터를 불러오는 중입니다...</span>
@@ -281,6 +283,8 @@ export default function DevicesPage() {
                                             <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.quantity}</td>
                                             <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.unitPrice}</td>
                                             <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.totalAmount}</td>
+                                            <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.usefulLife}</td>
+                                            <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.installationLocation}</td>
                                             <td className="px-6 py-4 text-right relative">
                                                 <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <button

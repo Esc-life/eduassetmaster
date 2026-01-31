@@ -28,6 +28,11 @@ const TARGET_FIELDS = [
     { key: 'quantity', label: '수량', required: false },
     { key: 'unitPrice', label: '단가', required: false },
     { key: 'totalAmount', label: '취득금액', required: false },
+    { key: 'usefulLife', label: '내용연수(변경)', required: false },
+    { key: 'installationLocation', label: '설치장소', required: false },
+    { key: 'osVersion', label: 'OS 버전', required: false },
+    { key: 'password', label: '비밀번호', required: false },
+    { key: 'deviceUser', label: '사용자', required: false },
 ];
 
 export function BulkUploadModal({ isOpen, onClose, onSave }: BulkUploadModalProps) {
@@ -87,7 +92,7 @@ export function BulkUploadModal({ isOpen, onClose, onSave }: BulkUploadModalProp
                     if (json && json.length > 0) {
                         // Smart Header Detection
                         let headerIndex = 0;
-                        const keywords = ['품명', '규격', '모델', '번호', '수량', '단가', '금액', '부서', '취득'];
+                        const keywords = ['품명', '규격', '모델', '번호', '수량', '단가', '금액', '부서', '취득', '설치장소', '내용연수'];
 
                         // Find the row that contains the most keywords
                         let maxMatchCount = 0;
