@@ -9,7 +9,8 @@ import { MOCK_DEVICES, MOCK_SOFTWARE } from '@/lib/mock-data';
 import { useOCR } from '@/hooks/useOCR';
 import { Image as ImageIcon, PlusCircle, Check, Trash2, MousePointer2, ScanSearch, Loader2, Save, Minus, RotateCcw, FileSpreadsheet } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { fetchMapConfiguration, saveMapConfiguration, syncZonesToSheet } from '@/app/actions';
+import { fetchMapConfiguration, saveMapConfiguration, syncZonesToSheet, fetchAssetData, updateDevice } from '@/app/actions';
+import { DeviceEditModal } from '@/components/devices/DeviceEditModal';
 
 // Mock pin locations linked to mock devices (Initial State) by default empty
 const INITIAL_PINS: Location[] = [];
@@ -21,6 +22,8 @@ export default function Home() {
   const [selectedPin, setSelectedPin] = useState<Location | null>(null);
   const [zoom, setZoom] = useState(100);
   const [isEditing, setIsEditing] = useState(false);
+  const [devices, setDevices] = useState<Device[]>([]); // Real devices
+  const [editDevice, setEditDevice] = useState<Device | null>(null); // For editing
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const uploaderRef = useRef<ImageUploaderHandle>(null);
@@ -52,10 +55,11 @@ export default function Home() {
     };
   }, [pins]);
 
-  // 2. Load Map Image & Zones (Server + Local Fallback)
+  // 2. Load Map Image, Zones, and Devices (Server + Local Fallback)
   useEffect(() => {
     const loadMapData = async () => {
       const { mapImage: serverImage, zones: serverZones } = await fetchMapConfiguration();
+      const { devices: serverDevices } = await fetchAssetData();
 
       const localImage = localStorage.getItem('school_map_image');
       const localZones = localStorage.getItem('school_map_zones');
@@ -65,6 +69,8 @@ export default function Home() {
 
       if (serverZones.length > 0) setPins(serverZones);
       else if (localZones) setPins(JSON.parse(localZones));
+
+      if (serverDevices) setDevices(serverDevices);
     };
     loadMapData();
   }, []);
@@ -441,13 +447,36 @@ export default function Home() {
         <AnimatePresence>
           {selectedPin && !isEditing && (
             <AssetDetailModal
-              title={selectedPin.name}
               isOpen={!!selectedPin}
               onClose={() => setSelectedPin(null)}
-              data={MOCK_DEVICES.find(d => d.groupId === selectedPin.id)}
+              zone={selectedPin}
+              devices={devices.filter(d => d.groupId === selectedPin.id)}
+              onEditDevice={(device) => {
+                setEditDevice(device);
+                setSelectedPin(null);
+              }}
             />
           )}
         </AnimatePresence>
+
+        {/* Device Edit Modal (from map) */}
+        <DeviceEditModal
+          isOpen={!!editDevice}
+          device={editDevice}
+          onClose={() => setEditDevice(null)}
+          onSave={async (updates) => {
+            if (!editDevice) return;
+            const result = await updateDevice(editDevice.id, updates);
+            if (result.success) {
+              alert('수정이 저장되었습니다.');
+              setEditDevice(null);
+              const { devices: updatedDevices } = await fetchAssetData();
+              if (updatedDevices) setDevices(updatedDevices);
+            } else {
+              alert('수정 실패: ' + result.error);
+            }
+          }}
+        />
 
         {/* AI Result Confirmation Modal (Structure) */}
         {showOCRModal && (

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Device, Location } from '@/types';
-import { X, Monitor, Info, CheckCircle2, AlertCircle } from 'lucide-react';
+import { X, Monitor, Info, CheckCircle2, AlertCircle, Edit } from 'lucide-react';
 import { PropsWithChildren } from 'react';
 
 interface AssetZoneProps {
@@ -48,26 +48,26 @@ export function AssetZone({ location, device, onClick, isSelected, isSelectMode 
 
     // Render Rectangular Zone
     const selectModeStyle = isSelectMode
-        ? (isSelected ? 'bg-red-500/40 border-red-500 z-20' : 'bg-gray-400/10 border-gray-400/30 hover:bg-red-500/10 hover:border-red-400 border-dashed')
-        : (isSelected ? 'bg-primary/40 border-yellow-400 z-10' : 'bg-primary/20 border-primary/50 hover:bg-primary/30 dark:bg-primary/30 dark:border-primary/50');
+        ? isSelected
+            ? 'bg-yellow-400/30 border-yellow-500 border-4'
+            : 'bg-blue-500/10 border-blue-300 border-2 hover:bg-blue-500/20'
+        : 'bg-blue-500/10 hover:bg-blue-500/20';
 
     return (
         <div
-            className={`absolute cursor-pointer group transition-all border-2 ${selectModeStyle} ${!isSelectMode && isMaintenance ? 'bg-red-500/20 border-red-500/50' : ''
+            className={`absolute cursor-pointer rounded-lg border transition-all ${selectModeStyle} ${isSelected && !isSelectMode ? 'ring-4 ring-yellow-400' : ''
                 }`}
             style={{
                 left: `${location.pinX}%`,
                 top: `${location.pinY}%`,
                 width: `${location.width}%`,
-                height: `${location.height}%`
+                height: `${location.height}%`,
             }}
-            onMouseDown={(e) => e.stopPropagation()} // Prevent background clearing selection
+            onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => { e.stopPropagation(); onClick(e); }}
         >
-            {/* Center Icon/Label */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                {isMaintenance && <AlertCircle className="w-6 h-6 text-red-600 drop-shadow-md mb-1" />}
-                <span className="bg-black/70 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">
+            <div className="p-2 flex flex-col items-center justify-center h-full">
+                <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 text-center">
                     {location.name}
                 </span>
             </div>
@@ -78,15 +78,12 @@ export function AssetZone({ location, device, onClick, isSelected, isSelectMode 
 interface AssetDetailModalProps {
     isOpen: boolean;
     onClose: () => void;
-    title: string;
-    data: any; // Flexible data for now
+    zone: Location; // Zone 정보
+    devices: Device[]; // 해당 구역의 모든 기기들
+    onEditDevice?: (device: Device) => void; // 기기 수정 콜백
 }
 
-export function AssetDetailModal({ isOpen, onClose, title, data, children }: PropsWithChildren<AssetDetailModalProps>) {
-    // Prevent rendering if not open
-    // However, AnimatePresence needs the component to be mounted (but conditionally rendered inside)
-    // or wrapped by AnimatePresence in the parent.
-    // Here we assume parent wraps it or we only render content when isOpen is true.
+export function AssetDetailModal({ isOpen, onClose, zone, devices, onEditDevice, children }: PropsWithChildren<AssetDetailModalProps>) {
     if (!isOpen) return null;
 
     return (
@@ -105,21 +102,17 @@ export function AssetDetailModal({ isOpen, onClose, title, data, children }: Pro
                         initial={{ scale: 0.9, y: 20, opacity: 0 }}
                         animate={{ scale: 1, y: 0, opacity: 1 }}
                         exit={{ scale: 0.9, y: 20, opacity: 0 }}
-                        className="relative bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100 dark:border-gray-800"
+                        className="relative bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden border border-gray-100 dark:border-gray-800"
                     >
                         {/* Header */}
                         <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between bg-gray-50 dark:bg-gray-800/50">
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                                {title}
-                                {data?.status && (
-                                    <span className={`text-[10px] px-2 py-0.5 rounded-full border ${data.status === 'Available' ? 'bg-green-50 text-green-600 border-green-200' :
-                                        data.status === 'In Use' ? 'bg-orange-50 text-orange-600 border-orange-200' :
-                                            'bg-red-50 text-red-600 border-red-200'
-                                        }`}>
-                                        {data.status}
-                                    </span>
-                                )}
-                            </h3>
+                            <div>
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                    {zone.name}
+                                    <span className="text-xs text-gray-500 font-normal">({devices.length}대)</span>
+                                </h3>
+                                <p className="text-xs text-gray-500 mt-0.5">Zone ID: {zone.id}</p>
+                            </div>
                             <button
                                 onClick={onClose}
                                 className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
@@ -128,35 +121,76 @@ export function AssetDetailModal({ isOpen, onClose, title, data, children }: Pro
                             </button>
                         </div>
 
-                        {/* Content */}
-                        <div className="p-6 space-y-4">
-                            <div className="flex items-start gap-4">
-                                <div className="w-16 h-16 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center shrink-0">
-                                    <Monitor className="w-8 h-8 text-gray-400" />
+                        {/* Content - Device List */}
+                        <div className="p-6 overflow-auto max-h-[60vh]">
+                            {devices.length === 0 ? (
+                                <div className="text-center py-12">
+                                    <Monitor className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+                                    <p className="text-gray-500 dark:text-gray-400">이 구역에 배치된 기기가 없습니다.</p>
                                 </div>
-                                <div>
-                                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">대표 기기 정보</p>
-                                    <h4 className="text-base font-semibold text-gray-900 dark:text-white mt-0.5">{data?.model || '배치된 기기 없음'}</h4>
-                                    <p className="text-xs text-gray-400 mt-1">{data?.id || '-'}</p>
+                            ) : (
+                                <div className="space-y-3">
+                                    {devices.map((device) => (
+                                        <div
+                                            key={device.id}
+                                            className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group cursor-pointer"
+                                            onClick={() => onEditDevice?.(device)}
+                                        >
+                                            <div className="flex items-start justify-between">
+                                                <div className="flex items-start gap-3 flex-1">
+                                                    <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                                                        <Monitor className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <h4 className="font-semibold text-gray-900 dark:text-white">{device.name || '이름 없음'}</h4>
+                                                        <p className="text-sm text-gray-600 dark:text-gray-400">{device.model}</p>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            <span className={`text-xs px-2 py-0.5 rounded-full ${device.status === 'Active' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                                                                device.status === 'In Use' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
+                                                                    'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                                                }`}>
+                                                                {device.status}
+                                                            </span>
+                                                            {device.installLocation && (
+                                                                <span className="text-xs text-gray-500">📍 {device.installLocation}</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onEditDevice?.(device);
+                                                    }}
+                                                    className="opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg"
+                                                    title="수정"
+                                                >
+                                                    <Edit className="w-4 h-4 text-blue-600" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
-                            </div>
+                            )}
 
                             {children}
+                        </div>
 
-                            <div className="pt-4 flex gap-2">
-                                <Link
-                                    href={`/devices`}
-                                    className="flex-1 px-4 py-2 bg-primary hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center"
-                                >
-                                    기기 상세보기
-                                </Link>
-                                <button
-                                    onClick={() => alert(`Zone ID: ${data?.id}\nCustom Name 설정을 위해 이 ID를 Locations 시트에 입력하세요.`)}
-                                    className="px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg transition-colors"
-                                >
-                                    <Info className="w-5 h-5" />
-                                </button>
-                            </div>
+                        {/* Footer */}
+                        <div className="px-6 py-4 border-t border-gray-100 dark:border-gray-800 flex gap-2 justify-between bg-gray-50 dark:bg-gray-800/50">
+                            <button
+                                onClick={() => alert(`이 구역 ID를 복사하여 기기 관리 페이지에서\n"운용부서" 또는 "설치장소" 필드에 입력하면\n해당 구역에 기기가 배치됩니다.\n\nZone ID: ${zone.id}`)}
+                                className="px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
+                            >
+                                <Info className="w-4 h-4" />
+                                사용 방법
+                            </button>
+                            <Link
+                                href={`/devices`}
+                                className="px-4 py-2 bg-primary hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                            >
+                                기기 관리로 이동
+                            </Link>
                         </div>
                     </motion.div>
                 </div>

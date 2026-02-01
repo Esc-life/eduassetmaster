@@ -174,7 +174,7 @@ export async function addSheet(title: string, spreadsheetId?: string) {
  */
 export async function initializeUserSheet(spreadsheetId: string) {
     const REQUIRED_SHEETS = [
-        { title: 'Devices', header: ['ID', 'Category', 'Model', 'IP', 'Status', 'PurchaseDate', 'Location', 'Name', 'AcquisitionDivision', 'Quantity', 'UnitPrice', 'TotalAmount', 'ServiceLifeChange', 'InstallLocation'] },
+        { title: 'Devices', header: ['ID', 'Category', 'Model', 'IP', 'Status', 'PurchaseDate', 'Location', 'Name', 'AcquisitionDivision', 'Quantity', 'UnitPrice', 'TotalAmount', 'ServiceLifeChange', 'InstallLocation', 'OSVersion', 'WindowsPassword', 'UserName', 'PCName'] },
         { title: 'Software', header: ['ID', 'Name', 'Type', 'Version', 'License', 'Date', 'Assigned To', 'Notes'] },
         { title: 'Accounts', header: ['ID', 'Service', 'URL', 'Username', 'Password', 'Category', 'Notes'] },
         { title: 'Config', header: ['Key', 'Value'] },

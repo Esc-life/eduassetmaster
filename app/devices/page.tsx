@@ -49,9 +49,10 @@ export default function DevicesPage() {
         }
     };
 
-    const handleUpdateDevice = async (deviceId: string, updates: Partial<Device>) => {
+    const handleUpdateDevice = async (updates: Partial<Device>) => {
+        if (!editDevice) return;
         setIsLoading(true);
-        const result = await updateDevice(deviceId, updates);
+        const result = await updateDevice(editDevice.id, updates);
         if (result.success) {
             alert('수정이 저장되었습니다.');
             window.location.reload();

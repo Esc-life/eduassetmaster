@@ -53,7 +53,7 @@ export async function fetchAssetData() {
         }
 
         try {
-            const deviceRows = await getData('Devices!A2:N', sheetId);
+            const deviceRows = await getData('Devices!A2:R', sheetId);
             const devices: Device[] = (deviceRows || []).map((row: any[]) => ({
                 id: row[0],
                 category: row[1] as any,
@@ -69,6 +69,10 @@ export async function fetchAssetData() {
                 totalAmount: row[11],
                 serviceLifeChange: row[12],
                 installLocation: row[13],
+                osVersion: row[14],
+                windowsPassword: row[15],
+                userName: row[16],
+                pcName: row[17],
             }));
 
             const swRows = await getData('Software!A2:D', sheetId);
@@ -371,26 +375,30 @@ export async function registerBulkDevices(devices: any[]) {
 
         if (rows === null) {
             await addSheet('Devices', sheetId);
-            await updateData('Devices!A1', [['ID', 'Category', 'Model', 'IP', 'Status', 'PurchaseDate', 'Location', 'Name', 'AcquisitionDivision', 'Quantity', 'UnitPrice', 'TotalAmount', 'ServiceLifeChange', 'InstallLocation']], sheetId);
+            await updateData('Devices!A1', [['ID', 'Category', 'Model', 'IP', 'Status', 'PurchaseDate', 'Location', 'Name', 'AcquisitionDivision', 'Quantity', 'UnitPrice', 'TotalAmount', 'ServiceLifeChange', 'InstallLocation', 'OSVersion', 'WindowsPassword', 'UserName', 'PCName']], sheetId);
             rows = [];
         }
 
         // Prepare rows for appending
         const newRows = devices.map((d: any) => [
-            d.id || crypto.randomUUID(), // Local crypto usage requires Node 18+ (Vercel ok)
+            d.id || crypto.randomUUID(),
             d.category || '기타',
             d.model || '',
             d.ip || '',
             d.status || 'Active',
             d.purchaseDate || '',
-            d.groupId || '', // This is technically Location/Zone ID
+            d.groupId || '',
             d.name || '',
             d.acquisitionDivision || '전체',
             d.quantity || '1',
             d.unitPrice || '0',
             d.totalAmount || '0',
             d.serviceLifeChange || '',
-            d.installLocation || ''
+            d.installLocation || '',
+            d.osVersion || '',
+            d.windowsPassword || '',
+            d.userName || '',
+            d.pcName || ''
         ]);
 
         await appendData('Devices!A1', newRows, sheetId);
@@ -448,7 +456,7 @@ export async function updateDevice(deviceId: string, updates: Partial<Device>) {
     if (isGlobalMockMode && !sheetId) return { success: true };
 
     try {
-        const rows = await getData('Devices!A2:N', sheetId);
+        const rows = await getData('Devices!A2:R', sheetId);
         if (!rows) return { success: false, error: 'No devices found' };
 
         const deviceIndex = rows.findIndex((row: any[]) => row[0] === deviceId);
@@ -472,9 +480,13 @@ export async function updateDevice(deviceId: string, updates: Partial<Device>) {
             updates.totalAmount !== undefined ? updates.totalAmount : currentDevice[11],
             updates.serviceLifeChange !== undefined ? updates.serviceLifeChange : currentDevice[12],
             updates.installLocation !== undefined ? updates.installLocation : currentDevice[13],
+            updates.osVersion !== undefined ? updates.osVersion : currentDevice[14],
+            updates.windowsPassword !== undefined ? updates.windowsPassword : currentDevice[15],
+            updates.userName !== undefined ? updates.userName : currentDevice[16],
+            updates.pcName !== undefined ? updates.pcName : currentDevice[17],
         ];
 
-        await updateData(`Devices!A${rowNumber}:N${rowNumber}`, [updatedRow], sheetId);
+        await updateData(`Devices!A${rowNumber}:R${rowNumber}`, [updatedRow], sheetId);
         return { success: true };
     } catch (error) {
         console.error('Update Device Error:', error);
@@ -488,12 +500,12 @@ export async function deleteDevice(deviceId: string) {
     if (isGlobalMockMode && !sheetId) return { success: true };
 
     try {
-        const rows = await getData('Devices!A2:N', sheetId);
+        const rows = await getData('Devices!A2:R', sheetId);
         if (!rows) return { success: false, error: 'No devices found' };
 
         const filteredRows = rows.filter((row: any[]) => row[0] !== deviceId);
 
-        await clearData('Devices!A2:N', sheetId);
+        await clearData('Devices!A2:R', sheetId);
         if (filteredRows.length > 0) {
             await updateData('Devices!A2', filteredRows, sheetId);
         }
@@ -510,7 +522,7 @@ export async function deleteAllDevices() {
     if (isGlobalMockMode && !sheetId) return { success: true };
 
     try {
-        await clearData('Devices!A2:N', sheetId);
+        await clearData('Devices!A2:R', sheetId);
         return { success: true };
     } catch (error) {
         console.error('Delete All Devices Error:', error);
@@ -524,12 +536,12 @@ export async function deleteBulkDevices(deviceIds: string[]) {
     if (isGlobalMockMode && !sheetId) return { success: true };
 
     try {
-        const rows = await getData('Devices!A2:N', sheetId);
+        const rows = await getData('Devices!A2:R', sheetId);
         if (!rows) return { success: true };
 
         const filteredRows = rows.filter((row: any[]) => !deviceIds.includes(row[0]));
 
-        await clearData('Devices!A2:N', sheetId);
+        await clearData('Devices!A2:R', sheetId);
         if (filteredRows.length > 0) {
             await updateData('Devices!A2', filteredRows, sheetId);
         }

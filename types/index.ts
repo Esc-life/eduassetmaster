@@ -15,6 +15,11 @@ export interface Device {
     totalAmount?: number | string;// 취득금액
     serviceLifeChange?: string;   // 내용연수 중 변경 (R열)
     installLocation?: string;     // 설치장소 (S열)
+    // PC 상세 정보 (노트북컴퓨터, 데스크톱컴퓨터용)
+    osVersion?: string;          // OS 버전
+    windowsPassword?: string;    // 윈도우 비밀번호
+    userName?: string;           // 사용자명
+    pcName?: string;             // PC 이름
 }
 
 export interface Location {
