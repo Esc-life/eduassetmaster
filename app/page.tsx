@@ -26,6 +26,7 @@ export default function Home() {
   const [devices, setDevices] = useState<Device[]>([]); // Real devices
   const [deviceInstances, setDeviceInstances] = useState<DeviceInstance[]>([]); // Device instances
   const [editDevice, setEditDevice] = useState<Device | null>(null); // For editing
+  const [isLoadingMap, setIsLoadingMap] = useState(false); // Loading state for map data
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const uploaderRef = useRef<ImageUploaderHandle>(null);
@@ -61,20 +62,27 @@ export default function Home() {
   // 2. Load Map Image, Zones, and Devices (Server + Local Fallback)
   useEffect(() => {
     const loadMapData = async () => {
-      const { mapImage: serverImage, zones: serverZones } = await fetchMapConfiguration();
-      const { devices: serverDevices, deviceInstances: serverInstances } = await fetchAssetData();
+      setIsLoadingMap(true);
+      try {
+        const { mapImage: serverImage, zones: serverZones } = await fetchMapConfiguration();
+        const { devices: serverDevices, deviceInstances: serverInstances } = await fetchAssetData();
 
-      const localImage = localStorage.getItem('school_map_image');
-      const localZones = localStorage.getItem('school_map_zones');
+        const localImage = localStorage.getItem('school_map_image');
+        const localZones = localStorage.getItem('school_map_zones');
 
-      if (serverImage) setMapImage(serverImage);
-      else if (localImage) setMapImage(localImage);
+        if (serverImage) setMapImage(serverImage);
+        else if (localImage) setMapImage(localImage);
 
-      if (serverZones && serverZones.length > 0) setPins(serverZones);
-      else if (localZones) setPins(JSON.parse(localZones));
+        if (serverZones && serverZones.length > 0) setPins(serverZones);
+        else if (localZones) setPins(JSON.parse(localZones));
 
-      if (serverDevices) setDevices(serverDevices);
-      if (serverInstances) setDeviceInstances(serverInstances);
+        if (serverDevices) setDevices(serverDevices);
+        if (serverInstances) setDeviceInstances(serverInstances);
+      } catch (error) {
+        console.error('Error loading map data:', error);
+      } finally {
+        setIsLoadingMap(false);
+      }
     };
     loadMapData();
   }, []);
@@ -413,40 +421,51 @@ export default function Home() {
         {!mapImage ? (
           <ImageUploader ref={uploaderRef} currentImage={mapImage} onImageUpload={handleImageUpload} />
         ) : (
-          <AssetMapViewer
-            imageSrc={mapImage}
-            zoom={zoom}
-            pins={pins}
-            selectedPin={selectedPin}
-            isEditing={isEditing}
-            selectedZoneIds={selectedZoneIds}
-            onPinClick={handleZoneClick}
-            onBgClick={() => {
-              setSelectedPin(null);
-              if (isEditing) setSelectedZoneIds(new Set());
-            }}
-            onPinMove={(id: string, x: number, y: number) => {
-              const newPins = pins.map(p => p.id === id ? { ...p, pinX: x, pinY: y } : p);
-              savePins(newPins);
-            }}
-            onPinResize={(id: string, w: number, h: number) => {
-              const newPins = pins.map(p => p.id === id ? { ...p, width: w, height: h } : p);
-              savePins(newPins);
-            }}
-            onZoneCreate={(rect: { x: number, y: number, w: number, h: number }) => {
-              const newPin: Location = {
-                id: `zone-${Date.now()}`,
-                name: `구역 ${pins.length + 1}`,
-                pinX: rect.x,
-                pinY: rect.y,
-                width: rect.w,
-                height: rect.h,
-                type: 'Classroom'
-              };
-              savePins([...pins, newPin]);
-            }}
-            onZoneDoubleClick={handleZoneDoubleClick}
-          />
+          <>
+            {isLoadingMap && (
+              <div className="absolute inset-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm z-50 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                  <p className="text-gray-900 dark:text-white font-medium">배치도와 구역을 불러오는 중입니다...</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">잠시만 기다려주세요</p>
+                </div>
+              </div>
+            )}
+            <AssetMapViewer
+              imageSrc={mapImage}
+              zoom={zoom}
+              pins={pins}
+              selectedPin={selectedPin}
+              isEditing={isEditing}
+              selectedZoneIds={selectedZoneIds}
+              onPinClick={handleZoneClick}
+              onBgClick={() => {
+                setSelectedPin(null);
+                if (isEditing) setSelectedZoneIds(new Set());
+              }}
+              onPinMove={(id: string, x: number, y: number) => {
+                const newPins = pins.map(p => p.id === id ? { ...p, pinX: x, pinY: y } : p);
+                savePins(newPins);
+              }}
+              onPinResize={(id: string, w: number, h: number) => {
+                const newPins = pins.map(p => p.id === id ? { ...p, width: w, height: h } : p);
+                savePins(newPins);
+              }}
+              onZoneCreate={(rect: { x: number, y: number, w: number, h: number }) => {
+                const newPin: Location = {
+                  id: `zone-${Date.now()}`,
+                  name: `구역 ${pins.length + 1}`,
+                  pinX: rect.x,
+                  pinY: rect.y,
+                  width: rect.w,
+                  height: rect.h,
+                  type: 'Classroom'
+                };
+                savePins([...pins, newPin]);
+              }}
+              onZoneDoubleClick={handleZoneDoubleClick}
+            />
+          </>
         )}
 
         {/* Zoom Controls */}

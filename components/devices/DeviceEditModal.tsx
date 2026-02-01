@@ -79,6 +79,14 @@ export function DeviceEditModal({ isOpen, device, onClose, onSave, zones = [] }:
         }
     }, [device, isOpen]);
 
+    // Format number with commas for display
+    const formatNumber = (value: string | number | undefined): string => {
+        if (!value) return '';
+        const num = typeof value === 'string' ? parseFloat(value.replace(/,/g, '')) : value;
+        if (isNaN(num)) return '';
+        return num.toLocaleString('ko-KR');
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSaving(true);
@@ -200,20 +208,32 @@ export function DeviceEditModal({ isOpen, device, onClose, onSave, zones = [] }:
                                 <div>
                                     <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">단가</label>
                                     <input
-                                        type="number"
-                                        value={formData.unitPrice}
-                                        onChange={(e) => setFormData({ ...formData, unitPrice: e.target.value })}
+                                        type="text"
+                                        value={formatNumber(formData.unitPrice)}
+                                        onChange={(e) => {
+                                            const rawValue = e.target.value.replace(/,/g, '');
+                                            if (rawValue === '' || /^\d+$/.test(rawValue)) {
+                                                setFormData({ ...formData, unitPrice: rawValue });
+                                            }
+                                        }}
                                         className="w-full px-4 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700"
+                                        placeholder="0"
                                     />
                                 </div>
 
                                 <div>
                                     <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">취득금액</label>
                                     <input
-                                        type="number"
-                                        value={formData.totalAmount}
-                                        onChange={(e) => setFormData({ ...formData, totalAmount: e.target.value })}
+                                        type="text"
+                                        value={formatNumber(formData.totalAmount)}
+                                        onChange={(e) => {
+                                            const rawValue = e.target.value.replace(/,/g, '');
+                                            if (rawValue === '' || /^\d+$/.test(rawValue)) {
+                                                setFormData({ ...formData, totalAmount: rawValue });
+                                            }
+                                        }}
                                         className="w-full px-4 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700"
+                                        placeholder="0"
                                     />
                                 </div>
 

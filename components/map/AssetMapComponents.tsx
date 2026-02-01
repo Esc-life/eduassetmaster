@@ -361,21 +361,42 @@ export function AssetDetailModal({
                                         {availableDevices.length === 0 ? (
                                             <p className="text-center text-gray-500 py-8">검색 결과가 없습니다.</p>
                                         ) : (
-                                            availableDevices.map(device => (
-                                                <div
-                                                    key={device.id}
-                                                    className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer transition-colors"
-                                                    onClick={() => handleSelectDevice(device)}
-                                                >
-                                                    <div className="flex items-center justify-between">
-                                                        <div>
-                                                            <p className="font-medium text-gray-900 dark:text-white text-sm">{device.name}</p>
-                                                            <p className="text-xs text-gray-500">{device.category} - {device.model}</p>
+                                            availableDevices.map(device => {
+                                                // Check if this device is already deployed anywhere
+                                                const deployedInstances = deviceInstances.filter(inst => inst.deviceId === device.id);
+                                                const totalDeployed = deployedInstances.reduce((sum, inst) => sum + inst.quantity, 0);
+                                                const isDeployed = deployedInstances.length > 0;
+
+                                                return (
+                                                    <div
+                                                        key={device.id}
+                                                        className={`p-3 border rounded-lg cursor-pointer transition-colors ${isDeployed
+                                                                ? 'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/30 hover:bg-gray-100 dark:hover:bg-gray-800/50'
+                                                                : 'border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20'
+                                                            }`}
+                                                        onClick={() => handleSelectDevice(device)}
+                                                    >
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex-1">
+                                                                <div className="flex items-center gap-2">
+                                                                    <p className={`font-medium text-sm ${isDeployed ? 'text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-white'}`}>
+                                                                        {device.name}
+                                                                    </p>
+                                                                    {isDeployed && (
+                                                                        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                                                                            {totalDeployed}대 배치됨
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <p className={`text-xs ${isDeployed ? 'text-gray-400 dark:text-gray-500' : 'text-gray-500'}`}>
+                                                                    {device.category} - {device.model}
+                                                                </p>
+                                                            </div>
+                                                            <Plus className={`w-4 h-4 ${isDeployed ? 'text-gray-400' : 'text-blue-600'}`} />
                                                         </div>
-                                                        <Plus className="w-4 h-4 text-blue-600" />
                                                     </div>
-                                                </div>
-                                            ))
+                                                );
+                                            })
                                         )}
                                     </div>
                                 </div>
