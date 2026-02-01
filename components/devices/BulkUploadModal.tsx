@@ -28,6 +28,8 @@ const TARGET_FIELDS = [
     { key: 'quantity', label: '수량', required: false },
     { key: 'unitPrice', label: '단가', required: false },
     { key: 'totalAmount', label: '취득금액', required: false },
+    { key: 'serviceLifeChange', label: '내용연수 중 변경', required: false },
+    { key: 'installLocation', label: '설치장소', required: false },
 ];
 
 export function BulkUploadModal({ isOpen, onClose, onSave }: BulkUploadModalProps) {

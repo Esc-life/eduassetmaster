@@ -13,6 +13,8 @@ export interface Device {
     quantity?: number | string;   // 수량
     unitPrice?: number | string;  // 단가
     totalAmount?: number | string;// 취득금액
+    serviceLifeChange?: string;   // 내용연수 중 변경 (R열)
+    installLocation?: string;     // 설치장소 (S열)
 }
 
 export interface Location {

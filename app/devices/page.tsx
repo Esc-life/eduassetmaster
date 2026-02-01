@@ -16,6 +16,7 @@ export default function DevicesPage() {
     const [filterStatus, setFilterStatus] = useState<DeviceStatus | 'All'>('All');
     const [searchTerm, setSearchTerm] = useState('');
     const [isBulkOpen, setIsBulkOpen] = useState(false);
+    const [isAddDeviceOpen, setIsAddDeviceOpen] = useState(false);
     const [editDevice, setEditDevice] = useState<Device | null>(null);
     const [deleteModal, setDeleteModal] = useState<{ open: boolean; type: 'single' | 'all'; device?: Device }>({ open: false, type: 'single' });
     const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
@@ -116,6 +117,13 @@ export default function DevicesPage() {
         });
     }, [devices, filterStatus, searchTerm]);
 
+    const formatNumber = (value: number | string | undefined) => {
+        if (!value) return '0';
+        const num = typeof value === 'string' ? parseFloat(value) : value;
+        if (isNaN(num)) return '0';
+        return num.toLocaleString('ko-KR');
+    };
+
     const getStatusColor = (status: DeviceStatus) => {
         switch (status) {
             case 'Available': return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
@@ -144,6 +152,17 @@ export default function DevicesPage() {
             />
 
             <DeviceEditModal
+                isOpen={isAddDeviceOpen}
+                device={null}
+                onClose={() => setIsAddDeviceOpen(false)}
+                onSave={async (device) => {
+                    await registerBulkDevices([device]);
+                    setIsAddDeviceOpen(false);
+                    window.location.reload();
+                }}
+            />
+
+            <DeviceEditModal
                 isOpen={!!editDevice}
                 device={editDevice}
                 onClose={() => setEditDevice(null)}
@@ -165,7 +184,10 @@ export default function DevicesPage() {
                     <p className="text-gray-500 dark:text-gray-400 text-sm">전체 자산 목록 및 상태를 관리합니다.</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm">
+                    <button
+                        onClick={() => setIsAddDeviceOpen(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
+                    >
                         <Plus className="w-4 h-4" />
                         기기 추가
                     </button>
@@ -247,13 +269,15 @@ export default function DevicesPage() {
                                 <th className="px-6 py-4 font-medium">수량</th>
                                 <th className="px-6 py-4 font-medium">단가</th>
                                 <th className="px-6 py-4 font-medium">취득금액</th>
+                                <th className="px-6 py-4 font-medium">내용연수 중 변경</th>
+                                <th className="px-6 py-4 font-medium">설치장소</th>
                                 <th className="px-6 py-4 font-medium text-right">관리</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
                             {isLoading ? (
                                 <tr>
-                                    <td colSpan={11} className="px-6 py-20 text-center text-gray-500">
+                                    <td colSpan={13} className="px-6 py-20 text-center text-gray-500">
                                         <div className="flex flex-col items-center justify-center gap-2">
                                             <Loader2 className="w-8 h-8 animate-spin text-primary" />
                                             <span className="text-sm">데이터를 불러오는 중입니다...</span>
@@ -278,9 +302,11 @@ export default function DevicesPage() {
                                             <td className="px-6 py-4 text-gray-600 dark:text-gray-300 whitespace-nowrap">{device.purchaseDate}</td>
                                             <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.acquisitionDivision}</td>
                                             <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.groupId}</td>
-                                            <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.quantity}</td>
-                                            <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.unitPrice}</td>
-                                            <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.totalAmount}</td>
+                                            <td className="px-6 py-4 text-gray-600 dark:text-gray-300 text-right">{formatNumber(device.quantity)}</td>
+                                            <td className="px-6 py-4 text-gray-600 dark:text-gray-300 text-right">{formatNumber(device.unitPrice)}</td>
+                                            <td className="px-6 py-4 text-gray-600 dark:text-gray-300 text-right">{formatNumber(device.totalAmount)}</td>
+                                            <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.serviceLifeChange}</td>
+                                            <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.installLocation}</td>
                                             <td className="px-6 py-4 text-right relative">
                                                 <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <button
