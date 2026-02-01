@@ -4,13 +4,14 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { AssetMapViewer } from '@/components/map/AssetMapViewer';
 import { AssetDetailModal } from '@/components/map/AssetMapComponents';
 import { ImageUploader, ImageUploaderHandle } from '@/components/map/ImageUploader';
-import { Device, Location } from '@/types';
+import { Device, Location, DeviceInstance } from '@/types';
 import { MOCK_DEVICES, MOCK_SOFTWARE } from '@/lib/mock-data';
 import { useOCR } from '@/hooks/useOCR';
 import { Image as ImageIcon, PlusCircle, Check, Trash2, MousePointer2, ScanSearch, Loader2, Save, Minus, RotateCcw, FileSpreadsheet } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { fetchMapConfiguration, saveMapConfiguration, syncZonesToSheet, fetchAssetData, updateDevice } from '@/app/actions';
+import { fetchMapConfiguration, saveMapConfiguration, syncZonesToSheet, fetchAssetData, updateDevice, createDeviceInstance, deleteDeviceInstance } from '@/app/actions';
 import { DeviceEditModal } from '@/components/devices/DeviceEditModal';
+import { ZoneEditModal } from '@/components/map/ZoneEditModal';
 
 // Mock pin locations linked to mock devices (Initial State) by default empty
 const INITIAL_PINS: Location[] = [];
@@ -23,6 +24,7 @@ export default function Home() {
   const [zoom, setZoom] = useState(100);
   const [isEditing, setIsEditing] = useState(false);
   const [devices, setDevices] = useState<Device[]>([]); // Real devices
+  const [deviceInstances, setDeviceInstances] = useState<DeviceInstance[]>([]); // Device instances
   const [editDevice, setEditDevice] = useState<Device | null>(null); // For editing
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -36,6 +38,7 @@ export default function Home() {
 
   // Multi-Selection State (Merged into Editing Mode)
   const [selectedZoneIds, setSelectedZoneIds] = useState<Set<string>>(new Set());
+  const [editingZone, setEditingZone] = useState<Location | null>(null); // For zone editing
 
   // 1. Statistics Calculation
   const stats = useMemo(() => {
@@ -59,7 +62,7 @@ export default function Home() {
   useEffect(() => {
     const loadMapData = async () => {
       const { mapImage: serverImage, zones: serverZones } = await fetchMapConfiguration();
-      const { devices: serverDevices } = await fetchAssetData();
+      const { devices: serverDevices, deviceInstances: serverInstances } = await fetchAssetData();
 
       const localImage = localStorage.getItem('school_map_image');
       const localZones = localStorage.getItem('school_map_zones');
@@ -67,10 +70,11 @@ export default function Home() {
       if (serverImage) setMapImage(serverImage);
       else if (localImage) setMapImage(localImage);
 
-      if (serverZones.length > 0) setPins(serverZones);
+      if (serverZones && serverZones.length > 0) setPins(serverZones);
       else if (localZones) setPins(JSON.parse(localZones));
 
       if (serverDevices) setDevices(serverDevices);
+      if (serverInstances) setDeviceInstances(serverInstances);
     };
     loadMapData();
   }, []);
@@ -132,6 +136,20 @@ export default function Home() {
       // In View Mode, show details
       setSelectedPin(pin);
     }
+  };
+
+  const handleZoneDoubleClick = (pin: Location) => {
+    if (isEditing) {
+      setEditingZone(pin);
+    }
+  };
+
+  const handleZoneSave = (zoneId: string, updates: Partial<Location>) => {
+    const newPins = pins.map(p =>
+      p.id === zoneId ? { ...p, ...updates } : p
+    );
+    savePins(newPins);
+    setEditingZone(null);
   };
 
   const deleteSelectedZones = () => {
@@ -427,6 +445,7 @@ export default function Home() {
               };
               savePins([...pins, newPin]);
             }}
+            onZoneDoubleClick={handleZoneDoubleClick}
           />
         )}
 
@@ -450,10 +469,35 @@ export default function Home() {
               isOpen={!!selectedPin}
               onClose={() => setSelectedPin(null)}
               zone={selectedPin}
-              devices={devices.filter(d => d.groupId === selectedPin.id)}
+              deviceInstances={deviceInstances.filter(inst => inst.locationId === selectedPin.id)}
+              allDevices={devices}
               onEditDevice={(device) => {
                 setEditDevice(device);
                 setSelectedPin(null);
+              }}
+              onAssignDevice={async (deviceId, zoneId, zoneName, quantity) => {
+                const result = await createDeviceInstance({
+                  deviceId,
+                  locationId: zoneId,
+                  locationName: zoneName,
+                  quantity,
+                  notes: ''
+                });
+                if (result.success) {
+                  const { deviceInstances: updatedInstances } = await fetchAssetData();
+                  if (updatedInstances) setDeviceInstances(updatedInstances);
+                } else {
+                  throw new Error(result.error);
+                }
+              }}
+              onRemoveInstance={async (instanceId) => {
+                const result = await deleteDeviceInstance(instanceId);
+                if (result.success) {
+                  const { deviceInstances: updatedInstances } = await fetchAssetData();
+                  if (updatedInstances) setDeviceInstances(updatedInstances);
+                } else {
+                  throw new Error(result.error || 'Failed to remove instance');
+                }
               }}
             />
           )}
@@ -476,6 +520,15 @@ export default function Home() {
               alert('수정 실패: ' + result.error);
             }
           }}
+          zones={pins}
+        />
+
+        {/* Zone Edit Modal */}
+        <ZoneEditModal
+          isOpen={!!editingZone}
+          zone={editingZone}
+          onClose={() => setEditingZone(null)}
+          onSave={handleZoneSave}
         />
 
         {/* AI Result Confirmation Modal (Structure) */}

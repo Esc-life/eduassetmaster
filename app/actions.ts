@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getData, updateData, appendData, addSheet, clearData } from '@/lib/google-sheets';
 import { MOCK_DEVICES, MOCK_SOFTWARE, MOCK_CREDENTIALS } from '@/lib/mock-data';
-import { Device, Software, Credential, Location } from '@/types';
+import { Device, Software, Credential, Location, DeviceInstance } from '@/types';
 // PDF parsing removed due to Vercel serverless environment incompatibility
 
 export async function parsePdfAction(formData: FormData): Promise<{ success: boolean; text?: string; error?: string }> {
@@ -83,6 +83,7 @@ export async function fetchAssetData() {
                 expiryDate: row[3],
             }));
 
+
             const credRows = await getData('Credentials!A2:D', sheetId);
             const credentials: Credential[] = (credRows || []).map((row: any[]) => ({
                 serviceName: row[0],
@@ -91,11 +92,22 @@ export async function fetchAssetData() {
                 note: row[3],
             }));
 
-            return { devices, software, credentials };
+            // Fetch DeviceInstances
+            const instanceRows = await getData('DeviceInstances!A2:F', sheetId);
+            const deviceInstances: DeviceInstance[] = (instanceRows || []).map((row: any[]) => ({
+                id: row[0],
+                deviceId: row[1],
+                locationId: row[2],
+                locationName: row[3],
+                quantity: parseInt(row[4] || '0'),
+                notes: row[5],
+            }));
+
+            return { devices, software, credentials, deviceInstances };
 
         } catch (error) {
             console.error('[fetchAssetData] Error:', error);
-            return { devices: [], software: [], credentials: [] };
+            return { devices: [], software: [], credentials: [], deviceInstances: [] };
         }
     } catch (outerError) {
         console.error('[fetchAssetData] Critical error:', outerError);
@@ -548,6 +560,114 @@ export async function deleteBulkDevices(deviceIds: string[]) {
         return { success: true };
     } catch (error) {
         console.error('Delete Bulk Devices Error:', error);
+        return { success: false, error: String(error) };
+    }
+}
+
+// ==================== DeviceInstance CRUD ====================
+
+/**
+ * Create a new DeviceInstance (deploy device to a location)
+ */
+export async function createDeviceInstance(instance: Omit<DeviceInstance, 'id'>) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email) {
+        return { success: false, error: 'Unauthorized' };
+    }
+
+    try {
+        const sheetId = await getUserSheetId();
+        if (sheetId === 'NO_SHEET') return { success: false, error: 'No spreadsheet configured' };
+        if (isGlobalMockMode && !sheetId) return { success: true, id: 'mock-inst-' + Date.now() };
+
+        const existingData = await getData('DeviceInstances!A1', sheetId);
+        if (existingData === null) {
+            await addSheet('DeviceInstances', sheetId);
+            await updateData('DeviceInstances!A1', [['ID', 'DeviceID', 'LocationID', 'LocationName', 'Quantity', 'Notes']], sheetId);
+        }
+
+        const instanceId = `inst-${Date.now()}`;
+        const newRow = [
+            instanceId,
+            instance.deviceId,
+            instance.locationId,
+            instance.locationName,
+            instance.quantity,
+            instance.notes || ''
+        ];
+
+        await appendData('DeviceInstances!A1', [newRow], sheetId);
+        return { success: true, id: instanceId };
+    } catch (error) {
+        console.error('Create DeviceInstance Error:', error);
+        return { success: false, error: String(error) };
+    }
+}
+
+/**
+ * Update an existing DeviceInstance
+ */
+export async function updateDeviceInstance(instanceId: string, updates: Partial<DeviceInstance>) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email) {
+        return { success: false, error: 'Unauthorized' };
+    }
+
+    try {
+        const sheetId = await getUserSheetId();
+        if (sheetId === 'NO_SHEET') return { success: false, error: 'No spreadsheet configured' };
+        if (isGlobalMockMode && !sheetId) return { success: true };
+
+        const rows = await getData('DeviceInstances!A2:F', sheetId);
+        if (!rows) return { success: false, error: 'No instances found' };
+
+        const rowIndex = rows.findIndex((row: any[]) => row[0] === instanceId);
+        if (rowIndex === -1) return { success: false, error: 'Instance not found' };
+
+        const existing = rows[rowIndex];
+        const updated = [
+            existing[0], // ID (unchanged)
+            updates.deviceId ?? existing[1],
+            updates.locationId ?? existing[2],
+            updates.locationName ?? existing[3],
+            updates.quantity ?? existing[4],
+            updates.notes ?? existing[5],
+        ];
+
+        await updateData(`DeviceInstances!A${rowIndex + 2}`, [updated], sheetId);
+        return { success: true };
+    } catch (error) {
+        console.error('Update DeviceInstance Error:', error);
+        return { success: false, error: String(error) };
+    }
+}
+
+/**
+ * Delete a DeviceInstance
+ */
+export async function deleteDeviceInstance(instanceId: string) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email) {
+        return { success: false, error: 'Unauthorized' };
+    }
+
+    try {
+        const sheetId = await getUserSheetId();
+        if (sheetId === 'NO_SHEET') return { success: false, error: 'No spreadsheet configured' };
+        if (isGlobalMockMode && !sheetId) return { success: true };
+
+        const rows = await getData('DeviceInstances!A2:F', sheetId);
+        if (!rows) return { success: true };
+
+        const filteredRows = rows.filter((row: any[]) => row[0] !== instanceId);
+
+        await clearData('DeviceInstances!A2:F', sheetId);
+        if (filteredRows.length > 0) {
+            await updateData('DeviceInstances!A2', filteredRows, sheetId);
+        }
+        return { success: true };
+    } catch (error) {
+        console.error('Delete DeviceInstance Error:', error);
         return { success: false, error: String(error) };
     }
 }

@@ -31,6 +31,17 @@ export interface Location {
     width?: number;      // Width in % (for Zones)
     height?: number;     // Height in % (for Zones)
     type: 'Classroom' | 'Cart' | 'Office'; // Implicit type for filtering
+    color?: string;      // Background color (hex or preset name)
+}
+
+// DeviceInstance: Represents a deployed instance of a device at a specific location
+export interface DeviceInstance {
+    id: string;              // Unique instance ID
+    deviceId: string;        // Reference to master Device
+    locationId: string;      // Zone ID where this instance is deployed
+    locationName: string;    // Zone name (for display)
+    quantity: number;        // Quantity at this location
+    notes?: string;          // Optional notes for this deployment
 }
 
 export interface Software {

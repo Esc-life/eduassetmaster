@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { fetchAssetData, registerBulkDevices, updateDevice, deleteDevice, deleteAllDevices, deleteBulkDevices } from '@/app/actions';
-import { Device, DeviceStatus } from '@/types';
+import { fetchAssetData, registerBulkDevices, updateDevice, deleteDevice, deleteAllDevices, deleteBulkDevices, fetchMapConfiguration } from '@/app/actions';
+import { Device, DeviceStatus, Location } from '@/types';
 import { Search, Filter, MoreHorizontal, Laptop, Tablet, Smartphone, Monitor, Loader2, FileSpreadsheet, Plus, Edit, Trash2 } from 'lucide-react';
 import { BulkUploadModal } from '@/components/devices/BulkUploadModal';
 import { DeviceEditModal } from '@/components/devices/DeviceEditModal';
@@ -20,12 +20,17 @@ export default function DevicesPage() {
     const [editDevice, setEditDevice] = useState<Device | null>(null);
     const [deleteModal, setDeleteModal] = useState<{ open: boolean; type: 'single' | 'all'; device?: Device }>({ open: false, type: 'single' });
     const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
+    const [zones, setZones] = useState<Location[]>([]); // Available zones
 
     useEffect(() => {
         const loadData = async () => {
             try {
                 const data = await fetchAssetData();
                 setDevices(data.devices);
+
+                // Load zones for dropdown
+                const mapConfig = await fetchMapConfiguration();
+                setZones(mapConfig.zones);
             } catch (error) {
                 console.warn('[Devices] Server data fetch failed:', error);
                 setDevices([]);
@@ -161,6 +166,7 @@ export default function DevicesPage() {
                     setIsAddDeviceOpen(false);
                     window.location.reload();
                 }}
+                zones={zones}
             />
 
             <DeviceEditModal
@@ -168,6 +174,7 @@ export default function DevicesPage() {
                 device={editDevice}
                 onClose={() => setEditDevice(null)}
                 onSave={handleUpdateDevice}
+                zones={zones}
             />
 
             <DeleteConfirmModal

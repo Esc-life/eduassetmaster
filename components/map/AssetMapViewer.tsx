@@ -16,6 +16,7 @@ interface AssetMapViewerProps {
     onPinMove: (id: string, x: number, y: number) => void;
     onPinResize: (id: string, w: number, h: number) => void;
     onZoneCreate: (rect: { x: number, y: number, w: number, h: number }) => void;
+    onZoneDoubleClick?: (pin: Location) => void;
 }
 
 export function AssetMapViewer({
@@ -29,7 +30,8 @@ export function AssetMapViewer({
     onBgClick,
     onPinMove,
     onPinResize,
-    onZoneCreate
+    onZoneCreate,
+    onZoneDoubleClick,
 }: AssetMapViewerProps) {
     const mapWrapperRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<HTMLDivElement>(null);
@@ -109,6 +111,7 @@ export function AssetMapViewer({
                             location={pin}
                             device={undefined} // Mock data handling moved to parent or simplified
                             onClick={(e) => onPinClick(pin, e)}
+                            onDoubleClick={() => onZoneDoubleClick?.(pin)}
                             isSelected={selectedPin?.id === pin.id || selectedZoneIds.has(pin.id)}
                             isSelectMode={isEditing} // Reuse style logic
                         />

@@ -2,16 +2,17 @@
 
 import { useState, useEffect } from 'react';
 import { X, Save } from 'lucide-react';
-import { Device } from '@/types';
+import { Device, Location } from '@/types';
 
 interface DeviceEditModalProps {
     isOpen: boolean;
     device: Device | null;
     onClose: () => void;
     onSave: (updates: Partial<Device>) => Promise<void>;
+    zones?: Location[]; // Available zones for dropdown
 }
 
-export function DeviceEditModal({ isOpen, device, onClose, onSave }: DeviceEditModalProps) {
+export function DeviceEditModal({ isOpen, device, onClose, onSave, zones = [] }: DeviceEditModalProps) {
     const [formData, setFormData] = useState<Partial<Device>>({
         name: '',
         model: '',
@@ -245,13 +246,28 @@ export function DeviceEditModal({ isOpen, device, onClose, onSave }: DeviceEditM
 
                                 <div>
                                     <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">설치장소</label>
-                                    <input
-                                        type="text"
-                                        value={formData.installLocation}
-                                        onChange={(e) => setFormData({ ...formData, installLocation: e.target.value })}
-                                        className="w-full px-4 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700"
-                                        placeholder="상세 위치 입력"
-                                    />
+                                    {zones.length > 0 ? (
+                                        <select
+                                            value={formData.installLocation}
+                                            onChange={(e) => setFormData({ ...formData, installLocation: e.target.value })}
+                                            className="w-full px-4 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700"
+                                        >
+                                            <option value="">-- 구역 선택 --</option>
+                                            {zones.map((zone) => (
+                                                <option key={zone.id} value={zone.name}>
+                                                    {zone.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        <input
+                                            type="text"
+                                            value={formData.installLocation}
+                                            onChange={(e) => setFormData({ ...formData, installLocation: e.target.value })}
+                                            className="w-full px-4 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700"
+                                            placeholder="상세 위치 입력"
+                                        />
+                                    )}
                                 </div>
                             </div>
                         </div>
