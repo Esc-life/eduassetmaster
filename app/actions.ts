@@ -397,7 +397,7 @@ export async function registerBulkDevices(devices: any[]) {
             d.category || '기타',
             d.model || '',
             d.ip || '',
-            d.status || 'Active',
+            d.status || '사용 가능',
             d.purchaseDate || '',
             d.groupId || '',
             d.name || '',

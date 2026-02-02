@@ -7,7 +7,7 @@ export const MOCK_DEVICES: Device[] = [
         category: 'Laptop',
         model: 'Galaxy Book 3',
         ip: '192.168.1.101',
-        status: 'Available',
+        status: '사용 가능',
         purchaseDate: '2023-03-01',
         groupId: 'ROOM-301',
         name: '3-1반 선생님용'
@@ -17,7 +17,7 @@ export const MOCK_DEVICES: Device[] = [
         category: 'Tablet',
         model: 'iPad 9th Gen',
         ip: '192.168.1.201',
-        status: 'In Use',
+        status: '사용 중',
         purchaseDate: '2023-03-15',
         groupId: 'CART-A',
         name: '학생용 태블릿 #1'
@@ -27,7 +27,7 @@ export const MOCK_DEVICES: Device[] = [
         category: 'Tablet',
         model: 'iPad 9th Gen',
         ip: '192.168.1.202',
-        status: 'Maintenance',
+        status: '수리/점검',
         purchaseDate: '2023-03-15',
         groupId: 'CART-A',
         name: '학생용 태블릿 #2 (액정 파손)'
@@ -37,7 +37,7 @@ export const MOCK_DEVICES: Device[] = [
         category: 'PC',
         model: 'Dell OptiPlex',
         ip: '192.168.0.50',
-        status: 'Available',
+        status: '사용 가능',
         purchaseDate: '2022-01-10',
         groupId: 'ADMIN-OFFICE',
         name: '행정실 공용 PC'

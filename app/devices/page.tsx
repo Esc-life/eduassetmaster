@@ -132,11 +132,11 @@ export default function DevicesPage() {
 
     const getStatusColor = (status: DeviceStatus) => {
         switch (status) {
-            case 'Available': return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
-            case 'In Use': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
-            case 'Maintenance': return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400';
-            case 'Broken': return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
-            case 'Lost': return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400';
+            case '사용 가능': return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
+            case '사용 중': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
+            case '수리/점검': return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400';
+            case '고장/폐기': return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
+            case '분실': return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400';
             default: return 'bg-gray-100 text-gray-700';
         }
     };
@@ -239,7 +239,7 @@ export default function DevicesPage() {
                 </div>
 
                 <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto">
-                    {(['All', 'Available', 'In Use', 'Maintenance', 'Broken'] as const).map((status) => (
+                    {(['All', '사용 가능', '사용 중', '수리/점검', '고장/폐기', '분실'] as const).map((status) => (
                         <button
                             key={status}
                             onClick={() => setFilterStatus(status)}

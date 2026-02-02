@@ -18,7 +18,7 @@ export function DeviceEditModal({ isOpen, device, onClose, onSave, zones = [] }:
         model: '',
         category: '',
         ip: '',
-        status: 'Active',
+        status: '사용 가능',
         purchaseDate: '',
         groupId: '',
         acquisitionDivision: '',
@@ -41,7 +41,7 @@ export function DeviceEditModal({ isOpen, device, onClose, onSave, zones = [] }:
                 model: device.model || '',
                 category: device.category || '',
                 ip: device.ip || '',
-                status: device.status || 'Active',
+                status: device.status || '사용 가능',
                 purchaseDate: device.purchaseDate || '',
                 groupId: device.groupId || '',
                 acquisitionDivision: device.acquisitionDivision || '',
@@ -62,7 +62,7 @@ export function DeviceEditModal({ isOpen, device, onClose, onSave, zones = [] }:
                 model: '',
                 category: '',
                 ip: '',
-                status: 'Active',
+                status: '사용 가능',
                 purchaseDate: '',
                 groupId: '',
                 acquisitionDivision: '',
@@ -162,10 +162,11 @@ export function DeviceEditModal({ isOpen, device, onClose, onSave, zones = [] }:
                                         onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
                                         className="w-full px-4 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700"
                                     >
-                                        <option value="Active">Active</option>
-                                        <option value="In Use">In Use</option>
-                                        <option value="Maintenance">Maintenance</option>
-                                        <option value="Broken">Broken</option>
+                                        <option value="사용 가능">사용 가능</option>
+                                        <option value="사용 중">사용 중</option>
+                                        <option value="수리/점검">수리/점검</option>
+                                        <option value="고장/폐기">고장/폐기</option>
+                                        <option value="분실">분실</option>
                                     </select>
                                 </div>
                             </div>

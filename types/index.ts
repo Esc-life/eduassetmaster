@@ -1,4 +1,4 @@
-export type DeviceStatus = 'Available' | 'In Use' | 'Maintenance' | 'Lost' | 'Broken';
+export type DeviceStatus = '사용 가능' | '사용 중' | '수리/점검' | '고장/폐기' | '분실';
 
 export interface Device {
     id: string;          // Columns: ID
