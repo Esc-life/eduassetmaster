@@ -498,7 +498,55 @@ export async function updateDevice(deviceId: string, updates: Partial<Device>) {
             updates.pcName !== undefined ? updates.pcName : currentDevice[17],
         ];
 
-        await updateData(`Devices!A${rowNumber}:R${rowNumber}`, [updatedRow], sheetId);
+        await updateData(`Devices!A${rowNumber}`, [updatedRow], sheetId);
+
+        // --- SYNC DeviceInstance if installLocation changed ---
+        if (updates.installLocation !== undefined) {
+            try {
+                const newLocation = updates.installLocation;
+                const instanceRows = await getData('DeviceInstances!A2:F', sheetId);
+                // instanceRows could be null if sheet doesn't exist
+                const existingInstanceRow = instanceRows ? instanceRows.find((r: any[]) => r[1] === deviceId) : null;
+
+                if (newLocation && newLocation.trim() !== '') {
+                    const mapConfig = await fetchMapConfiguration();
+                    const targetZone = mapConfig.zones.find(z => z.name === newLocation);
+
+                    if (targetZone) {
+                        if (existingInstanceRow) {
+                            // Update existing if location changed
+                            if (existingInstanceRow[2] !== targetZone.id) {
+                                const instanceId = existingInstanceRow[0];
+                                const rowIndex = instanceRows!.findIndex((r: any[]) => r[0] === instanceId) + 2;
+                                const updatedInstanceRow = [...existingInstanceRow];
+                                updatedInstanceRow[2] = targetZone.id;
+                                updatedInstanceRow[3] = targetZone.name;
+                                await updateData(`DeviceInstances!A${rowIndex}`, [updatedInstanceRow], sheetId);
+                            }
+                        } else {
+                            // Create new instance
+                            // Check if sheet exists first, if not create
+                            if (!instanceRows) {
+                                await addSheet('DeviceInstances', sheetId);
+                                await updateData('DeviceInstances!A1', [['ID', 'DeviceID', 'LocationID', 'LocationName', 'Quantity', 'Notes']], sheetId);
+                            }
+                            const newId = `inst-${Date.now()}`;
+                            await appendData('DeviceInstances!A1', [[newId, deviceId, targetZone.id, targetZone.name, 1, '']], sheetId);
+                        }
+                    }
+                } else {
+                    // Location cleared -> Delete instance
+                    if (existingInstanceRow) {
+                        const instanceId = existingInstanceRow[0];
+                        await deleteDeviceInstance(instanceId);
+                    }
+                }
+            } catch (syncError) {
+                console.warn('Failed to sync DeviceInstance:', syncError);
+                // Don't fail the main update
+            }
+        }
+
         return { success: true };
     } catch (error) {
         console.error('Update Device Error:', error);
