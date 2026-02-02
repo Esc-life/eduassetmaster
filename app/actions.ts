@@ -34,9 +34,9 @@ async function getUserSheetId() {
     }
 }
 
-export async function fetchAssetData() {
+export async function fetchAssetData(overrideSheetId?: string) {
     try {
-        const sheetId = await getUserSheetId();
+        const sheetId = overrideSheetId || await getUserSheetId();
 
         // 1. Logged in but no sheet -> Empty Data (Don't show Admin data)
         if (sheetId === 'NO_SHEET') {
@@ -115,8 +115,8 @@ export async function fetchAssetData() {
     }
 }
 
-export async function fetchMapConfiguration() {
-    const sheetId = await getUserSheetId();
+export async function fetchMapConfiguration(overrideSheetId?: string) {
+    const sheetId = overrideSheetId || await getUserSheetId();
 
     if (sheetId === 'NO_SHEET') return { mapImage: null, zones: [] };
     if (isGlobalMockMode && !sheetId) return { mapImage: null, zones: [] };
@@ -462,8 +462,8 @@ export async function syncZonesToSheet(zones: Location[]) {
 // Device Management Functions
 
 // Device Management Functions
-export async function updateDevice(deviceId: string, updates: Partial<Device>) {
-    const sheetId = await getUserSheetId();
+export async function updateDevice(deviceId: string, updates: Partial<Device>, overrideSheetId?: string) {
+    const sheetId = overrideSheetId || await getUserSheetId();
     if (sheetId === 'NO_SHEET') return { success: false, error: '?ㅽ봽?덈뱶?쒗듃媛 ?곕룞?섏? ?딆븯?듬땲??' };
     if (isGlobalMockMode && !sheetId) return { success: true };
 
@@ -509,7 +509,7 @@ export async function updateDevice(deviceId: string, updates: Partial<Device>) {
                 const existingInstanceRow = instanceRows ? instanceRows.find((r: any[]) => r[1] === deviceId) : null;
 
                 if (newLocation && newLocation.trim() !== '') {
-                    const mapConfig = await fetchMapConfiguration();
+                    const mapConfig = await fetchMapConfiguration(sheetId);
                     const targetZone = mapConfig.zones.find(z => z.name === newLocation);
 
                     if (targetZone) {
@@ -717,5 +717,108 @@ export async function deleteDeviceInstance(instanceId: string) {
     } catch (error) {
         console.error('Delete DeviceInstance Error:', error);
         return { success: false, error: String(error) };
+    }
+}
+
+// --- OCR & Auto Assign ---
+
+export async function processScannedImage(imageBase64: string, locationName: string, overrideSheetId?: string) {
+    const apiKey = process.env.GOOGLE_VISION_KEY;
+
+    if (!apiKey) {
+        // Fallback for demo/mock mode if no key provided, or return error
+        // For now, return error to encourage setup
+        return { success: false, error: '서버 환경 변수(GOOGLE_VISION_KEY)가 설정되지 않았습니다.' };
+    }
+
+    try {
+        // 1. Google Vision API Call
+        const response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                requests: [{
+                    image: { content: imageBase64 },
+                    features: [{ type: 'TEXT_DETECTION' }]
+                }]
+            })
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            return { success: false, error: err.error?.message || 'Vision API call failed' };
+        }
+
+        const data = await response.json();
+        const fullText = data.responses[0]?.fullTextAnnotation?.text || '';
+
+        if (!fullText) {
+            return { success: false, error: '이미지에서 텍스트를 찾을 수 없습니다.' };
+        }
+
+        // 2. Fetch Devices to match
+        // Need to import fetchAssetData or define it here? It's exported in this file.
+        // Since we are inside the module, we can call fetchAssetData directly if it's defined in scope.
+        // It is exported, so it's available.
+        const { devices } = await fetchAssetData(overrideSheetId);
+
+        if (!devices || devices.length === 0) {
+            return { success: false, error: '매칭할 기기 데이터가 없습니다. 엑셀 데이터를 먼저 확인해주세요.', text: fullText };
+        }
+
+        // 3. Smart Matching Logic
+        // Clean text: Remove whitespace to handle formatting differences
+        const cleanText = fullText.replace(/\s+/g, '').toUpperCase();
+        let matchedDevice = null;
+
+        for (const device of devices) {
+            if (!device) continue;
+
+            // Priority 1: Model / ID (High confidence)
+            // Example: '43211507-23728367' or 'KKR-GAE-...'
+            if (device.model && device.model.length > 5) {
+                const cleanModel = device.model.replace(/\s+/g, '').toUpperCase();
+                if (cleanText.includes(cleanModel)) {
+                    matchedDevice = device;
+                    break;
+                }
+            }
+
+            // Priority 2: ID (If ID is meaningful string)
+            if (device.id && device.id.length > 5 && cleanText.includes(device.id.replace(/\s+/g, '').toUpperCase())) {
+                matchedDevice = device;
+                break;
+            }
+
+            // Priority 3: Name + Spec (Lower confidence, maybe risky?)
+            // If name is very specific, might work. Skipped for safety to avoid false positives.
+        }
+
+        if (matchedDevice) {
+            // 4. Update Location
+            if (matchedDevice.installLocation === locationName) {
+                return { success: true, message: '이미 해당 장소에 등록된 기기입니다.', device: matchedDevice, text: fullText };
+            }
+
+            // We use updateDevice which handles DeviceInstance sync internally now!
+            await updateDevice(matchedDevice.id, { installLocation: locationName }, overrideSheetId);
+
+            return {
+                success: true,
+                message: '기기 위치가 업데이트되었습니다.',
+                device: matchedDevice,
+                text: fullText
+            };
+        } else {
+            return {
+                success: false,
+                error: '일치하는 기기를 찾을 수 없습니다. (OCR 텍스트에 기기 정보가 없거나 엑셀과 일치하지 않음)',
+                text: fullText
+            };
+        }
+
+    } catch (e) {
+        console.error('OCR Process Error:', e);
+        return { success: false, error: '처리 중 오류가 발생했습니다: ' + String(e) };
     }
 }

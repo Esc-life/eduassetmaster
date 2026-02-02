@@ -7,7 +7,8 @@ import { ImageUploader, ImageUploaderHandle } from '@/components/map/ImageUpload
 import { Device, Location, DeviceInstance } from '@/types';
 import { MOCK_DEVICES, MOCK_SOFTWARE } from '@/lib/mock-data';
 import { useOCR } from '@/hooks/useOCR';
-import { Image as ImageIcon, PlusCircle, Check, Trash2, MousePointer2, ScanSearch, Loader2, Save, Minus, RotateCcw, FileSpreadsheet } from 'lucide-react';
+import Link from 'next/link';
+import { Image as ImageIcon, PlusCircle, Check, Trash2, MousePointer2, ScanSearch, Loader2, Save, Minus, RotateCcw, FileSpreadsheet, ScanLine } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { fetchMapConfiguration, saveMapConfiguration, syncZonesToSheet, fetchAssetData, updateDevice, createDeviceInstance, deleteDeviceInstance } from '@/app/actions';
 import { DeviceEditModal } from '@/components/devices/DeviceEditModal';
@@ -372,6 +373,14 @@ export default function Home() {
                 <ImageIcon className="w-4 h-4" />
                 배치도 변경
               </button>
+
+              <Link
+                href="/scan"
+                className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-bold rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md active:scale-95"
+              >
+                <ScanLine className="w-4 h-4" />
+                스캔 등록
+              </Link>
             </>
           ) : null}
         </div>
