@@ -26,7 +26,7 @@ export default function Home() {
   const [devices, setDevices] = useState<Device[]>([]); // Real devices
   const [deviceInstances, setDeviceInstances] = useState<DeviceInstance[]>([]); // Device instances
   const [editDevice, setEditDevice] = useState<Device | null>(null); // For editing
-  const [isLoadingMap, setIsLoadingMap] = useState(false); // Loading state for map data
+  const [isLoadingMap, setIsLoadingMap] = useState(true); // Start with loading state
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const uploaderRef = useRef<ImageUploaderHandle>(null);
@@ -418,54 +418,51 @@ export default function Home() {
       </AnimatePresence>
 
       <div className="flex-1 w-full max-w-7xl bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden relative" ref={mapContainerRef}>
-        {!mapImage ? (
+        {isLoadingMap ? (
+          <div className="absolute inset-0 bg-white dark:bg-gray-900 z-50 flex items-center justify-center">
+            <div className="text-center">
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+              <p className="text-gray-900 dark:text-white font-medium">배치도와 구역을 불러오는 중입니다...</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">잠시만 기다려주세요</p>
+            </div>
+          </div>
+        ) : !mapImage ? (
           <ImageUploader ref={uploaderRef} currentImage={mapImage} onImageUpload={handleImageUpload} />
         ) : (
-          <>
-            {isLoadingMap && (
-              <div className="absolute inset-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm z-50 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-                  <p className="text-gray-900 dark:text-white font-medium">배치도와 구역을 불러오는 중입니다...</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">잠시만 기다려주세요</p>
-                </div>
-              </div>
-            )}
-            <AssetMapViewer
-              imageSrc={mapImage}
-              zoom={zoom}
-              pins={pins}
-              selectedPin={selectedPin}
-              isEditing={isEditing}
-              selectedZoneIds={selectedZoneIds}
-              onPinClick={handleZoneClick}
-              onBgClick={() => {
-                setSelectedPin(null);
-                if (isEditing) setSelectedZoneIds(new Set());
-              }}
-              onPinMove={(id: string, x: number, y: number) => {
-                const newPins = pins.map(p => p.id === id ? { ...p, pinX: x, pinY: y } : p);
-                savePins(newPins);
-              }}
-              onPinResize={(id: string, w: number, h: number) => {
-                const newPins = pins.map(p => p.id === id ? { ...p, width: w, height: h } : p);
-                savePins(newPins);
-              }}
-              onZoneCreate={(rect: { x: number, y: number, w: number, h: number }) => {
-                const newPin: Location = {
-                  id: `zone-${Date.now()}`,
-                  name: `구역 ${pins.length + 1}`,
-                  pinX: rect.x,
-                  pinY: rect.y,
-                  width: rect.w,
-                  height: rect.h,
-                  type: 'Classroom'
-                };
-                savePins([...pins, newPin]);
-              }}
-              onZoneDoubleClick={handleZoneDoubleClick}
-            />
-          </>
+          <AssetMapViewer
+            imageSrc={mapImage}
+            zoom={zoom}
+            pins={pins}
+            selectedPin={selectedPin}
+            isEditing={isEditing}
+            selectedZoneIds={selectedZoneIds}
+            onPinClick={handleZoneClick}
+            onBgClick={() => {
+              setSelectedPin(null);
+              if (isEditing) setSelectedZoneIds(new Set());
+            }}
+            onPinMove={(id: string, x: number, y: number) => {
+              const newPins = pins.map(p => p.id === id ? { ...p, pinX: x, pinY: y } : p);
+              savePins(newPins);
+            }}
+            onPinResize={(id: string, w: number, h: number) => {
+              const newPins = pins.map(p => p.id === id ? { ...p, width: w, height: h } : p);
+              savePins(newPins);
+            }}
+            onZoneCreate={(rect: { x: number, y: number, w: number, h: number }) => {
+              const newPin: Location = {
+                id: `zone-${Date.now()}`,
+                name: `구역 ${pins.length + 1}`,
+                pinX: rect.x,
+                pinY: rect.y,
+                width: rect.w,
+                height: rect.h,
+                type: 'Classroom'
+              };
+              savePins([...pins, newPin]);
+            }}
+            onZoneDoubleClick={handleZoneDoubleClick}
+          />
         )}
 
         {/* Zoom Controls */}

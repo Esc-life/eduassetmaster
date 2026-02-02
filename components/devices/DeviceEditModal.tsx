@@ -42,7 +42,7 @@ export function DeviceEditModal({ isOpen, device, onClose, onSave, zones = [] }:
                 category: device.category || '',
                 ip: device.ip || '',
                 status: device.status || '사용 가능',
-                purchaseDate: device.purchaseDate || '',
+                purchaseDate: device.purchaseDate ? device.purchaseDate.replace(/\./g, '-') : '',
                 groupId: device.groupId || '',
                 acquisitionDivision: device.acquisitionDivision || '',
                 quantity: device.quantity || '',
@@ -274,7 +274,7 @@ export function DeviceEditModal({ isOpen, device, onClose, onSave, zones = [] }:
                                             className="w-full px-4 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700"
                                         >
                                             <option value="">-- 구역 선택 --</option>
-                                            {zones.map((zone) => (
+                                            {[...zones].sort((a, b) => a.name.localeCompare(b.name, 'ko')).map((zone) => (
                                                 <option key={zone.id} value={zone.name}>
                                                     {zone.name}
                                                 </option>

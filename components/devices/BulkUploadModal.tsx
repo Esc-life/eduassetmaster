@@ -116,6 +116,7 @@ export function BulkUploadModal({ isOpen, onClose, onSave }: BulkUploadModalProp
                             headerRow.forEach((h, i) => {
                                 if (h) obj[h] = row[i];
                             });
+                            obj._raw = row; // Store raw row for index-based access
                             return obj;
                         });
 
@@ -204,6 +205,26 @@ export function BulkUploadModal({ isOpen, onClose, onSave }: BulkUploadModalProp
             mappings.forEach(m => {
                 newRow[m.target] = row[m.source];
             });
+
+            // Special Logic for '내용연수 중 변경' (Service Life Change)
+            // User Request: Use R column (index 17) if exists, otherwise Q column (index 16)
+            // This is based on 0-based index from the raw excel row
+            if (row._raw) {
+                const qVal = row._raw[16];
+                const rVal = row._raw[17];
+                let serviceLife = '';
+
+                if (rVal !== undefined && rVal !== null && String(rVal).trim() !== '') {
+                    serviceLife = String(rVal).trim();
+                } else if (qVal !== undefined && qVal !== null && String(qVal).trim() !== '') {
+                    serviceLife = String(qVal).trim();
+                }
+
+                if (serviceLife) {
+                    newRow.serviceLifeChange = serviceLife;
+                }
+            }
+
             return newRow;
         });
     };

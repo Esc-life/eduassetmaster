@@ -258,9 +258,9 @@ export default function DevicesPage() {
             <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
-                        <thead className="bg-gray-50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-800">
+                        <thead className="bg-gray-50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400">
                             <tr>
-                                <th className="px-6 py-4 w-12">
+                                <th className="px-6 py-4 w-12 text-center">
                                     <input
                                         type="checkbox"
                                         checked={selectedDevices.length === filteredDevices.length && filteredDevices.length > 0}
@@ -268,18 +268,18 @@ export default function DevicesPage() {
                                         className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 cursor-pointer"
                                     />
                                 </th>
-                                <th className="px-6 py-4 font-medium">물품목록번호</th>
-                                <th className="px-6 py-4 font-medium">물품분류명</th>
-                                <th className="px-6 py-4 font-medium">품명/규격</th>
-                                <th className="px-6 py-4 font-medium">취득일</th>
-                                <th className="px-6 py-4 font-medium">취득구분</th>
-                                <th className="px-6 py-4 font-medium">운용부서</th>
-                                <th className="px-6 py-4 font-medium">수량</th>
-                                <th className="px-6 py-4 font-medium">단가</th>
-                                <th className="px-6 py-4 font-medium">취득금액</th>
-                                <th className="px-6 py-4 font-medium">내용연수 중 변경</th>
-                                <th className="px-6 py-4 font-medium">설치장소</th>
-                                <th className="px-6 py-4 font-medium text-right">관리</th>
+                                <th className="px-6 py-4 font-medium whitespace-nowrap">물품목록번호</th>
+                                <th className="px-6 py-4 font-medium whitespace-nowrap">물품분류명</th>
+                                <th className="px-6 py-4 font-medium whitespace-nowrap">품명/규격</th>
+                                <th className="px-6 py-4 font-medium whitespace-nowrap">취득일</th>
+                                <th className="px-6 py-4 font-medium whitespace-nowrap">취득구분</th>
+                                <th className="px-6 py-4 font-medium whitespace-nowrap">운용부서</th>
+                                <th className="px-6 py-4 font-medium whitespace-nowrap">수량</th>
+                                <th className="px-6 py-4 font-medium whitespace-nowrap">단가</th>
+                                <th className="px-6 py-4 font-medium whitespace-nowrap">취득금액</th>
+                                <th className="px-6 py-4 font-medium whitespace-nowrap">내용연수 중 변경</th>
+                                <th className="px-6 py-4 font-medium whitespace-nowrap">설치장소</th>
+                                <th className="px-6 py-4 font-medium whitespace-nowrap text-right">관리</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200 dark:divide-gray-800">

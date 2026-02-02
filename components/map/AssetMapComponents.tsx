@@ -129,7 +129,7 @@ export function AssetDetailModal({
         (categoryFilter === '' || d.category === categoryFilter)
     );
 
-    const categories = Array.from(new Set(allDevices.map(d => d.category).filter(Boolean)));
+    const categories = Array.from(new Set(allDevices.map(d => d.category).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'ko'));
 
     const handleSelectDevice = (device: Device) => {
         setSelectedDevice(device);
@@ -371,8 +371,8 @@ export function AssetDetailModal({
                                                     <div
                                                         key={device.id}
                                                         className={`p-3 border rounded-lg cursor-pointer transition-colors ${isDeployed
-                                                                ? 'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/30 hover:bg-gray-100 dark:hover:bg-gray-800/50'
-                                                                : 'border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20'
+                                                            ? 'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/30 hover:bg-gray-100 dark:hover:bg-gray-800/50'
+                                                            : 'border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20'
                                                             }`}
                                                         onClick={() => handleSelectDevice(device)}
                                                     >
