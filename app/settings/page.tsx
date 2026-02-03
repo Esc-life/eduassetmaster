@@ -1,8 +1,63 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Save, RefreshCw, Database, Key, User, Copy, Check, Link as LinkIcon, Server } from 'lucide-react';
+import { Save, RefreshCw, Database, Key, User, Copy, Check, Link as LinkIcon, Server, HelpCircle, X, ExternalLink } from 'lucide-react';
 import { fetchSystemConfig, saveSystemConfig, getMySheetId } from '@/app/actions';
+
+function GuideModal({ onClose }: { onClose: () => void }) {
+    return (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-200 dark:border-gray-700 animate-in zoom-in-95">
+                <div className="flex justify-between items-start mb-4 pb-3 border-b border-gray-100 dark:border-gray-700">
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        <Key className="w-5 h-5 text-purple-500" />
+                        Vision API 키 발급 가이드
+                    </h3>
+                    <button onClick={onClose} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors">
+                        <X className="w-5 h-5 text-gray-500" />
+                    </button>
+                </div>
+
+                <div className="space-y-4 text-sm text-gray-700 dark:text-gray-300 overflow-y-auto max-h-[60vh] pr-2">
+                    <div className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-xl border border-orange-100 dark:border-orange-800 text-orange-800 dark:text-orange-200 mb-4">
+                        <p className="font-bold flex items-center gap-2 mb-1">
+                            <span className="text-lg">✋</span> 잠깐!
+                        </p>
+                        JSON 파일(서비스 계정)이 아닙니다. <br />
+                        <strong>AIza...</strong> 로 시작하는 <strong>API 키(문자열)</strong>가 필요합니다.
+                    </div>
+
+                    <ol className="list-decimal pl-5 space-y-3 marker:text-gray-400 marker:font-medium">
+                        <li>
+                            <a href="https://console.cloud.google.com/apis/credentials" target="_blank" className="text-blue-600 hover:underline inline-flex items-center gap-1 font-medium">
+                                Google Cloud Console 접속 <ExternalLink className="w-3 h-3" />
+                            </a>
+                        </li>
+                        <li>상단 프로젝트 목록에서 사용 중인 프로젝트 선택</li>
+                        <li>
+                            좌측 메뉴 <strong>[사용자 인증 정보]</strong> &rarr; 상단 <strong>[+ 사용자 인증 정보 만들기]</strong> 클릭
+                        </li>
+                        <li>
+                            메뉴에서 <strong>[API 키]</strong> 선택 (서비스 계정 X)
+                        </li>
+                        <li>
+                            생성된 키 복사 (예: <code>AIzaSyD...</code>)
+                        </li>
+                        <li>이곳 설정 페이지 입력창에 붙여넣기</li>
+                    </ol>
+
+                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 text-xs text-gray-500">
+                        * <strong>Cloud Vision API</strong>가 '사용 설정' 되어 있어야 합니다. (라이브러리 메뉴에서 검색)
+                    </div>
+                </div>
+
+                <button onClick={onClose} className="w-full mt-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold transition-all active:scale-95 shadow-lg shadow-purple-200 dark:shadow-none">
+                    확인했습니다
+                </button>
+            </div>
+        </div>
+    );
+}
 
 export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState<'account' | 'system'>('account');
@@ -17,6 +72,9 @@ export default function SettingsPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [scanLink, setScanLink] = useState('');
     const [copied, setCopied] = useState(false);
+
+    // Guide Modal
+    const [showGuide, setShowGuide] = useState(false);
 
     useEffect(() => {
         const load = async () => {
@@ -69,6 +127,8 @@ export default function SettingsPage() {
 
     return (
         <div className="max-w-4xl mx-auto py-6 px-4 space-y-6 animate-in fade-in pb-20">
+            {showGuide && <GuideModal onClose={() => setShowGuide(false)} />}
+
             <div>
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white">설정</h1>
                 <p className="text-gray-500 mt-1">계정 정보 및 시스템 데이터를 관리합니다.</p>
@@ -114,16 +174,25 @@ export default function SettingsPage() {
                     <Section title="API 키 설정 (BYOK)" icon={<Key className="w-5 h-5 text-purple-500" />} color="bg-purple-50 dark:bg-purple-900/20">
                         <div className="space-y-4">
                             <div>
-                                <label className="label">Google Cloud Vision API Key</label>
+                                <label className="label flex items-center gap-2">
+                                    Google Cloud Vision API Key
+                                    <button
+                                        onClick={() => setShowGuide(true)}
+                                        className="text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 inline-flex items-center gap-1 text-xs font-normal border border-purple-200 dark:border-purple-800 rounded-full px-2 py-0.5 bg-purple-50 dark:bg-purple-900/30 transition-colors"
+                                    >
+                                        <HelpCircle className="w-3 h-3" />
+                                        발급 방법 확인
+                                    </button>
+                                </label>
                                 <input
                                     type="password"
                                     value={visionKey}
                                     onChange={e => setVisionKey(e.target.value)}
-                                    className="input-field"
-                                    placeholder="AIzaSy..."
+                                    className="input-field font-mono text-sm"
+                                    placeholder="AIzaSyD..."
                                 />
                                 <p className="help-text">
-                                    이미지 텍스트 인식(OCR)을 위해 필요합니다. (서비스 계정 권한과는 별개입니다)<br />
+                                    이미지 텍스트 인식(OCR)을 위해 필요합니다. (서비스 계정 JSON X, API Key O)<br />
                                     <span className="text-blue-600 dark:text-blue-400 font-medium">* 서버 환경 변수에 키가 있다면 입력하지 않아도 자동 적용됩니다.</span>
                                 </p>
                             </div>
