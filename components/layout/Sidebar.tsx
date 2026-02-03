@@ -21,8 +21,12 @@ export function Sidebar({ onItemClick }: SidebarProps) {
             <div className="p-6 text-2xl font-bold border-b border-blue-800 flex items-center justify-between">
                 <span>EduAsset</span>
                 <button
-                    onClick={onItemClick}
-                    className="md:hidden p-1 text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                    type="button"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onItemClick?.();
+                    }}
+                    className="md:hidden p-2 text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
                     aria-label="메뉴 닫기"
                 >
                     <X className="w-6 h-6" />
