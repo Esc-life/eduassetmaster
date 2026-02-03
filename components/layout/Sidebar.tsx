@@ -9,7 +9,7 @@ export function Sidebar() {
         { name: '기기 관리', href: '/devices', icon: MonitorSmartphone },
         { name: 'SW/계정 관리', href: '/software', icon: Key },
         { name: '대여/반납', href: '/loans', icon: CalendarClock },
-        { name: '시스템 설정', href: '/settings', icon: Settings },
+        { name: '설정', href: '/settings', icon: Settings },
     ];
 
     return (

@@ -122,21 +122,30 @@ export default function SettingsPage() {
                                     className="input-field"
                                     placeholder="AIzaSy..."
                                 />
-                                <p className="help-text">이미지 텍스트 인식(OCR)을 위해 필요합니다.</p>
+                                <p className="help-text">
+                                    이미지 텍스트 인식(OCR)을 위해 필요합니다. (서비스 계정 권한과는 별개입니다)<br />
+                                    <span className="text-blue-600 dark:text-blue-400 font-medium">* 서버 환경 변수에 키가 있다면 입력하지 않아도 자동 적용됩니다.</span>
+                                </p>
                             </div>
                         </div>
                     </Section>
 
                     {/* 3. Server Config (Mock) */}
                     <Section title="서버 설정" icon={<Server className="w-5 h-5 text-green-500" />} color="bg-green-50 dark:bg-green-900/20">
-                        <div className="space-y-4 opacity-75">
+                        <div className="space-y-4">
                             <div>
                                 <label className="label">데이터베이스 유형</label>
-                                <select className="input-field" disabled defaultValue="google-sheets">
-                                    <option value="google-sheets">Google Sheets (현재 사용 중)</option>
-                                    <option value="firebase">Firebase (준비 중)</option>
-                                    <option value="supabase">Supabase (준비 중)</option>
-                                </select>
+                                <div className="relative">
+                                    <select className="input-field bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed" disabled defaultValue="google-sheets">
+                                        <option value="google-sheets">Google Sheets (기본)</option>
+                                        <option value="firebase">Firebase (준비 중)</option>
+                                        <option value="supabase">Supabase (준비 중)</option>
+                                    </select>
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500">
+                                        변경 불가
+                                    </div>
+                                </div>
+                                <p className="help-text">현재 버전에서는 Google Sheets만 지원합니다.</p>
                             </div>
                         </div>
                     </Section>

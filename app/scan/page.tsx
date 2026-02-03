@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, ChangeEvent, Suspense } from 'react';
-import { Camera, Upload, Check, AlertCircle, ArrowLeft, Loader2, ScanLine, MapPin, User } from 'lucide-react';
+import { Camera, Upload, Check, AlertCircle, ArrowLeft, Loader2, ScanLine, MapPin, User, ImageIcon, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { fetchMapConfiguration, processScannedImage } from '@/app/actions';
 import { Location, Device } from '@/types';
@@ -20,16 +20,20 @@ function ScanPageContent() {
     const [isZoneLoading, setIsZoneLoading] = useState(false);
 
     const [managerId, setManagerId] = useState('');
-    const [managerName, setManagerName] = useState(''); // Display name from URL
+    const [managerName, setManagerName] = useState('');
     const [isIdConfirmed, setIsIdConfirmed] = useState(false);
 
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [result, setResult] = useState<{ success: boolean; message?: string; error?: string; device?: Device; text?: string } | null>(null);
 
+    // Camera (WebRTC) States
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const [isCameraActive, setIsCameraActive] = useState(false);
+    const [cameraError, setCameraError] = useState('');
+
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Initial Load & URL Params
     useEffect(() => {
         const urlId = searchParams.get('id');
         const urlName = searchParams.get('manager');
@@ -48,6 +52,13 @@ function ScanPageContent() {
         }
     }, [searchParams]);
 
+    // Cleanup camera on unmount
+    useEffect(() => {
+        return () => {
+            stopCamera();
+        };
+    }, []);
+
     const handleConfirmId = async (overrideId?: string) => {
         const targetId = overrideId || managerId;
         if (!targetId.trim()) return;
@@ -57,38 +68,81 @@ function ScanPageContent() {
             const config = await fetchMapConfiguration(targetId);
 
             if (config && (config.zones || config.zones === undefined)) {
-                // Success (zones might be empty array)
                 const sorted = config.zones ? [...config.zones].sort((a, b) => a.name.localeCompare(b.name, 'ko')) : [];
                 setZones(sorted);
                 setIsIdConfirmed(true);
-
-                // Save to local storage for convenience
-                if (!overrideId) { // Only save if manually entered (optional preference)
-                    localStorage.setItem('edu_asset_manager_id', targetId);
-                }
-                // If fetching config was possible, we assume ID is valid.
+                if (!overrideId) localStorage.setItem('edu_asset_manager_id', targetId);
             } else {
                 alert('연결 실패: 유효하지 않은 ID이거나 접근 권한이 없습니다.');
             }
         } catch (error) {
             console.error('Config fetch error:', error);
-            // alert('서버 연결 중 오류가 발생했습니다.'); // Disable alert on auto-load to be less annoying
         } finally {
             setIsZoneLoading(false);
         }
     };
 
     const handleResetId = () => {
+        stopCamera();
         setIsIdConfirmed(false);
         setZones([]);
         setSelectedZone('');
         setResult(null);
         setImagePreview(null);
-        router.push('/scan'); // Clear URL params
+        router.push('/scan');
     };
 
-    // Handle Image Upload & Compress
-    const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    // Camera Functions
+    const startCamera = async () => {
+        setCameraError('');
+        setImagePreview(null);
+        setResult(null);
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment' }
+            });
+            setIsCameraActive(true);
+            // Small delay to ensure ref is mounted
+            setTimeout(() => {
+                if (videoRef.current) {
+                    videoRef.current.srcObject = stream;
+                }
+            }, 100);
+        } catch (err) {
+            console.error(err);
+            setCameraError('카메라 권한이 없거나 지원하지 않는 브라우저입니다. 파일 업로드를 이용해주세요.');
+        }
+    };
+
+    const stopCamera = () => {
+        if (videoRef.current && videoRef.current.srcObject) {
+            const stream = videoRef.current.srcObject as MediaStream;
+            stream.getTracks().forEach(track => track.stop());
+            videoRef.current.srcObject = null;
+        }
+        setIsCameraActive(false);
+    };
+
+    const captureImage = () => {
+        if (!videoRef.current) return;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = videoRef.current.videoWidth;
+        canvas.height = videoRef.current.videoHeight;
+        const ctx = canvas.getContext('2d');
+
+        if (ctx) {
+            ctx.drawImage(videoRef.current, 0, 0);
+            const base64 = canvas.toDataURL('image/jpeg', 0.8);
+
+            stopCamera();
+            setImagePreview(base64);
+            handleProcess(base64.split(',')[1]);
+        }
+    };
+
+    const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
@@ -100,30 +154,17 @@ function ScanPageContent() {
                 let width = img.width;
                 let height = img.height;
                 const MAX_SIZE = 1200;
-
-                if (width > height) {
-                    if (width > MAX_SIZE) {
-                        height *= MAX_SIZE / width;
-                        width = MAX_SIZE;
-                    }
-                } else {
-                    if (height > MAX_SIZE) {
-                        width *= MAX_SIZE / height;
-                        height = MAX_SIZE;
-                    }
-                }
+                if (width > height) { if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; } }
+                else { if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; } }
 
                 canvas.width = width;
                 canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx?.drawImage(img, 0, 0, width, height);
+                canvas.getContext('2d')?.drawImage(img, 0, 0, width, height);
 
                 const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
                 setImagePreview(compressedBase64);
                 setResult(null);
-
-                const base64Content = compressedBase64.split(',')[1];
-                handleProcess(base64Content);
+                handleProcess(compressedBase64.split(',')[1]);
             };
             img.src = event.target?.result as string;
         };
@@ -135,7 +176,6 @@ function ScanPageContent() {
             alert('먼저 설치할 구역을 선택해주세요.');
             return;
         }
-
         setIsProcessing(true);
         try {
             const response = await processScannedImage(base64Content, selectedZone, managerId);
@@ -150,11 +190,11 @@ function ScanPageContent() {
     const handleRetake = () => {
         setImagePreview(null);
         setResult(null);
-        if (fileInputRef.current) fileInputRef.current.value = '';
+        startCamera();
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white pb-20">
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white pb-20 select-none">
             {/* Header */}
             <div className="sticky top-0 z-20 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 px-4 py-3 flex items-center justify-between shadow-sm">
                 <div className="flex items-center gap-3">
@@ -173,9 +213,9 @@ function ScanPageContent() {
                 )}
             </div>
 
-            <div className="max-w-md mx-auto p-4 space-y-6">
+            <div className={`max-w-md mx-auto ${isCameraActive ? 'h-[calc(100vh-60px)] flex flex-col' : 'p-4 space-y-6'}`}>
 
-                {/* 1. Manager ID Input (Shown only if not confirmed) */}
+                {/* 1. Manager ID Input */}
                 {!isIdConfirmed && (
                     <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-blue-100 dark:border-blue-900/30 animate-in fade-in slide-in-from-bottom-2">
                         <div className="flex items-center gap-3 mb-4">
@@ -187,20 +227,14 @@ function ScanPageContent() {
                                 <p className="text-xs text-gray-500 break-keep">정보부장님이 공유한 스캔 링크로 접속하거나, 시트 ID를 직접 입력하세요.</p>
                             </div>
                         </div>
-
                         <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium mb-1 text-gray-600 dark:text-gray-400">
-                                    Spreadsheet ID
-                                </label>
-                                <input
-                                    type="text"
-                                    value={managerId}
-                                    onChange={(e) => setManagerId(e.target.value)}
-                                    placeholder="공유받은 ID 입력..."
-                                    className="w-full p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all font-mono text-sm"
-                                />
-                            </div>
+                            <input
+                                type="text"
+                                value={managerId}
+                                onChange={(e) => setManagerId(e.target.value)}
+                                placeholder="Spreadsheet ID 입력..."
+                                className="w-full p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all font-mono text-sm"
+                            />
                             <button
                                 onClick={() => handleConfirmId()}
                                 disabled={isZoneLoading || !managerId}
@@ -212,131 +246,156 @@ function ScanPageContent() {
                     </div>
                 )}
 
-                {/* 2. Zone Selection */}
+                {/* 2. Zone Selection & Camera */}
                 {isIdConfirmed && (
-                    <div className="animate-in fade-in slide-in-from-bottom-4 space-y-6">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                                <MapPin className="w-4 h-4 text-blue-500" />
-                                설치 구역 선택 ({zones.length}곳)
-                            </label>
-                            <select
-                                value={selectedZone}
-                                onChange={(e) => setSelectedZone(e.target.value)}
-                                disabled={isProcessing}
-                                className={`w-full p-3 rounded-xl border bg-white dark:bg-gray-800 shadow-sm focus:ring-2 focus:ring-blue-500 outline-none transition-colors text-base appearance-none ${!selectedZone ? 'border-blue-500/50 ring-2 ring-blue-500/10' : 'border-gray-200 dark:border-gray-700'}`}
-                            >
-                                <option value="">-- 구역을 선택하세요 --</option>
-                                {zones.map((zone) => (
-                                    <option key={zone.id} value={zone.name}>
-                                        {zone.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
+                    <div className={`space-y-4 ${isCameraActive ? 'flex-1 flex flex-col min-h-0' : ''}`}>
 
-                        {/* 3. Camera View */}
-                        {!imagePreview && (
-                            <div className="relative aspect-[3/4] bg-white dark:bg-gray-800 rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-700 flex flex-col items-center justify-center text-center p-6 shadow-sm touch-manipulation">
-                                <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 rounded-full flex items-center justify-center mb-4">
-                                    <Camera className="w-8 h-8 text-blue-500" />
+                        {!isCameraActive && !imagePreview && (
+                            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                                        <MapPin className="w-4 h-4 text-blue-500" />
+                                        설치 구역 선택 ({zones.length}곳)
+                                    </label>
+                                    <select
+                                        value={selectedZone}
+                                        onChange={(e) => setSelectedZone(e.target.value)}
+                                        className={`w-full p-3 rounded-xl border bg-white dark:bg-gray-800 shadow-sm focus:ring-2 focus:ring-blue-500 outline-none transition-colors text-base appearance-none ${!selectedZone ? 'border-orange-400 ring-2 ring-orange-200' : 'border-gray-200 dark:border-gray-700'}`}
+                                    >
+                                        <option value="">-- 구역을 선택하세요 --</option>
+                                        {zones.map((zone) => (
+                                            <option key={zone.id} value={zone.name}>{zone.name}</option>
+                                        ))}
+                                    </select>
                                 </div>
-                                <h3 className="font-bold text-gray-900 dark:text-white mb-2">기기 촬영</h3>
-                                <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 leading-relaxed break-keep">
-                                    물품 택(라벨)의 모델명과 번호가 잘 보이게 찍어주세요.
-                                </p>
-
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    capture="environment"
-                                    ref={fileInputRef}
-                                    onChange={handleImageUpload}
-                                    className="hidden"
-                                    disabled={!selectedZone}
-                                />
 
                                 <button
                                     onClick={() => {
-                                        if (!selectedZone) {
-                                            alert('상단의 드롭다운에서 설치할 구역을 먼저 선택해주세요!');
-                                            return;
-                                        }
+                                        if (!selectedZone) { alert('설치할 구역을 먼저 선택해주세요!'); return; }
+                                        startCamera();
+                                    }}
+                                    className={`w-full py-6 rounded-2xl font-bold shadow-lg transition-all active:scale-95 flex flex-col items-center gap-2 border-2 ${selectedZone
+                                        ? 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white border-transparent hover:shadow-blue-500/30'
+                                        : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'}`}
+                                >
+                                    <Camera className="w-8 h-8" />
+                                    <span className="text-lg">카메라 촬영 시작</span>
+                                </button>
+
+                                <div className="text-center">
+                                    <span className="text-xs text-gray-400">또는</span>
+                                </div>
+
+                                <button
+                                    onClick={() => {
+                                        if (!selectedZone) { alert('설치할 구역을 먼저 선택해주세요!'); return; }
                                         fileInputRef.current?.click();
                                     }}
-                                    className={`w-full py-4 rounded-xl font-bold shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2 ${selectedZone
-                                        ? 'bg-blue-600 text-white hover:bg-blue-700'
-                                        : 'bg-gray-200 text-gray-400 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500'}`}
+                                    className="w-full py-3 rounded-xl border border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 font-medium hover:bg-gray-50 flex items-center justify-center gap-2"
                                 >
-                                    <Camera className="w-5 h-5" />
-                                    카메라 실행
+                                    <ImageIcon className="w-4 h-4" />
+                                    갤러리에서 선택
                                 </button>
-                                <p className="text-[11px] text-gray-400 mt-3 break-keep">
-                                    * 화면을 터치하여 초점을 맞춘 뒤 촬영하세요.
-                                </p>
+                                <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
+
+                                {cameraError && (
+                                    <p className="text-xs text-red-500 text-center bg-red-50 p-2 rounded-lg">{cameraError}</p>
+                                )}
                             </div>
                         )}
 
-                        {/* Preview */}
-                        {imagePreview && (
-                            <div className="relative aspect-[3/4] bg-black rounded-2xl overflow-hidden shadow-lg border border-gray-800">
-                                <Image
-                                    src={imagePreview}
-                                    alt="Captured"
-                                    fill
-                                    className="object-contain"
+                        {/* WebRTC Camera View with Overlay */}
+                        {isCameraActive && (
+                            <div className="relative flex-1 bg-black overflow-hidden flex flex-col items-center justify-center backdrop-blur-xl">
+                                {/* Video */}
+                                <video
+                                    ref={videoRef}
+                                    autoPlay
+                                    playsInline
+                                    muted
+                                    className="absolute inset-0 w-full h-full object-cover"
                                 />
 
-                                {isProcessing && (
-                                    <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center backdrop-blur-sm z-10">
-                                        <div className="relative w-64 h-1 overflow-hidden bg-gray-700 rounded-full mb-4">
-                                            <div className="absolute inset-0 bg-green-500 animate-[scan_1.5s_ease-in-out_infinite]" />
-                                        </div>
-                                        <Loader2 className="w-8 h-8 text-white animate-spin mb-2" />
-                                        <p className="text-white font-medium animate-pulse">분석 중...</p>
+                                {/* Dark Overlay with Clear Rect in Center */}
+                                <div className="absolute inset-0 pointer-events-none">
+                                    {/* Top Shade */}
+                                    <div className="absolute top-0 left-0 right-0 h-[20%] bg-black/60 backdrop-blur-sm z-10"></div>
+                                    {/* Bottom Shade */}
+                                    <div className="absolute bottom-0 left-0 right-0 h-[35%] bg-black/60 backdrop-blur-sm z-10 flex flex-col items-center justify-start pt-6 text-white">
+                                        <p className="font-medium text-shadow">물품 라벨을 사각형 안에 맞춰주세요</p>
+                                        <p className="text-xs text-gray-300 mt-1">자동으로 초첨이 맞춰집니다</p>
                                     </div>
-                                )}
+                                    {/* Left Shade */}
+                                    <div className="absolute top-[20%] bottom-[35%] left-0 w-[10%] bg-black/60 z-10"></div>
+                                    {/* Right Shade */}
+                                    <div className="absolute top-[20%] bottom-[35%] right-0 w-[10%] bg-black/60 z-10"></div>
 
-                                {!isProcessing && result && (
-                                    <div className="absolute bottom-0 inset-x-0 bg-white dark:bg-gray-900 rounded-t-2xl p-5 shadow-2xl border-t border-gray-200 dark:border-gray-800 animate-in slide-in-from-bottom-10">
-                                        <div className="flex items-start gap-4">
-                                            {result.success ? (
-                                                <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full text-green-600 shrink-0">
-                                                    <Check className="w-6 h-6" />
-                                                </div>
-                                            ) : (
-                                                <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-full text-red-600 shrink-0">
-                                                    <AlertCircle className="w-6 h-6" />
-                                                </div>
-                                            )}
-                                            <div className="flex-1 min-w-0">
-                                                <h3 className={`font-bold text-lg ${result.success ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
-                                                    {result.success ? '등록 완료!' : '인식 실패'}
-                                                </h3>
-                                                <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 whitespace-pre-wrap break-keep leading-snug">
-                                                    {result.message || result.error}
-                                                </p>
+                                    {/* Guide Box Border */}
+                                    <div className="absolute top-[20%] bottom-[35%] left-[10%] right-[10%] border-2 border-white/80 rounded-xl shadow-[0_0_0_999px_rgba(0,0,0,0.5)] z-0">
+                                        {/* Corners */}
+                                        <div className="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-cyan-400 rounded-tl-sm -mt-0.5 -ml-0.5"></div>
+                                        <div className="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-cyan-400 rounded-tr-sm -mt-0.5 -mr-0.5"></div>
+                                        <div className="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-cyan-400 rounded-bl-sm -mb-0.5 -ml-0.5"></div>
+                                        <div className="absolute bottom-0 right-0 w-4 h-4 border-b-4 border-r-4 border-cyan-400 rounded-br-sm -mb-0.5 -mr-0.5"></div>
+                                    </div>
+                                </div>
 
-                                                {result.device && (
-                                                    <div className="mt-3 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg text-sm border border-gray-200 dark:border-gray-700">
-                                                        <div className="grid grid-cols-[60px_1fr] gap-y-1">
-                                                            <span className="text-gray-500">모델</span>
-                                                            <span className="font-medium truncate">{result.device.model}</span>
-                                                            <span className="text-gray-500">이름</span>
-                                                            <span className="font-medium truncate">{result.device.name}</span>
-                                                        </div>
-                                                    </div>
+                                {/* Controls */}
+                                <div className="absolute bottom-8 z-50 flex items-center justify-center gap-8 w-full px-8">
+                                    <button
+                                        onClick={stopCamera}
+                                        className="p-3 rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white/30"
+                                    >
+                                        <X className="w-6 h-6" />
+                                    </button>
+                                    <button
+                                        onClick={captureImage}
+                                        className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center bg-white/20 active:scale-95 transition-transform shadow-lg"
+                                    >
+                                        <div className="w-16 h-16 bg-white rounded-full"></div>
+                                    </button>
+                                    <div className="w-12"></div> {/* Spacer for center alignment */}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Result Preview (Captured) */}
+                        {!isCameraActive && imagePreview && (
+                            <div className="relative aspect-[3/4] bg-black rounded-2xl overflow-hidden shadow-lg border border-gray-800 animate-in fade-in">
+                                <Image src={imagePreview} alt="Captured" fill className="object-cover" />
+
+                                {isProcessing ? (
+                                    <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center z-10 backdrop-blur-sm">
+                                        <Loader2 className="w-10 h-10 text-cyan-400 animate-spin mb-4" />
+                                        <p className="text-white font-bold animate-pulse">이미지 분석 중...</p>
+                                    </div>
+                                ) : (
+                                    result && (
+                                        <div className="absolute bottom-0 inset-x-0 bg-white dark:bg-gray-900 rounded-t-2xl p-6 shadow-2xl border-t border-gray-200 dark:border-gray-800 animate-in slide-in-from-bottom-10">
+                                            <div className="flex items-start gap-4">
+                                                {result.success ? (
+                                                    <div className="p-3 bg-green-100 text-green-600 rounded-full"><Check className="w-6 h-6" /></div>
+                                                ) : (
+                                                    <div className="p-3 bg-red-100 text-red-600 rounded-full"><AlertCircle className="w-6 h-6" /></div>
                                                 )}
+                                                <div className="flex-1">
+                                                    <h3 className={`font-bold text-lg ${result.success ? 'text-green-700' : 'text-red-700'}`}>{result.success ? '등록 완료!' : '등록 실패'}</h3>
+                                                    <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{result.message || result.error}</p>
+                                                    {result.device && (
+                                                        <div className="mt-3 p-3 bg-gray-50 rounded-lg text-sm border">
+                                                            <div className="grid grid-cols-[50px_1fr] gap-1">
+                                                                <span className="text-gray-500">모델</span> <span className="font-bold">{result.device.model}</span>
+                                                                <span className="text-gray-500">위치</span> <span className="font-bold text-blue-600">{result.device.installLocation}</span>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
+                                            <button onClick={handleRetake} className="w-full mt-6 py-4 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors">
+                                                확인 / 다음 촬영
+                                            </button>
                                         </div>
-
-                                        <button
-                                            onClick={handleRetake}
-                                            className="w-full mt-5 py-3.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl font-bold hover:opacity-90 transition-opacity"
-                                        >
-                                            확인 / 다음 촬영
-                                        </button>
-                                    </div>
+                                    )
                                 )}
                             </div>
                         )}
@@ -345,10 +404,7 @@ function ScanPageContent() {
             </div>
 
             <style jsx global>{`
-                @keyframes scan {
-                    0% { transform: translateX(-100%); }
-                    100% { transform: translateX(100%); }
-                }
+                .text-shadow { text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
             `}</style>
         </div>
     );
@@ -356,12 +412,7 @@ function ScanPageContent() {
 
 export default function ScanPage() {
     return (
-        <Suspense fallback={<div className="min-h-screen flex items-center justify-center p-4">
-            <div className="flex flex-col items-center gap-2">
-                <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-                <p className="text-sm text-gray-500">페이지 로딩 중...</p>
-            </div>
-        </div>}>
+        <Suspense fallback={<div className="p-10 flex justify-center"><Loader2 className="animate-spin" /></div>}>
             <ScanPageContent />
         </Suspense>
     );
