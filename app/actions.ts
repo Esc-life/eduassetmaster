@@ -720,15 +720,60 @@ export async function deleteDeviceInstance(instanceId: string) {
     }
 }
 
+// --- System Configuration ---
+
+export async function fetchSystemConfig(overrideSheetId?: string) {
+    const sheetId = overrideSheetId || await getUserSheetId();
+    if (sheetId === 'NO_SHEET') return {};
+
+    try {
+        const rows = await getData('SystemConfig!A2:B', sheetId);
+        if (!rows) {
+            // Create if not exists with Header
+            await addSheet('SystemConfig', sheetId);
+            await updateData('SystemConfig!A1', [['Key', 'Value']], sheetId);
+            return {};
+        }
+        const config: Record<string, string> = {};
+        rows.forEach((r: string[]) => {
+            if (r[0]) config[r[0]] = r[1] || '';
+        });
+        return config;
+    } catch (e) {
+        return {};
+    }
+}
+
+export async function saveSystemConfig(config: Record<string, string>) {
+    const sheetId = await getUserSheetId();
+    if (sheetId === 'NO_SHEET') return { success: false, error: 'No sheet connected' };
+
+    try {
+        const current = await fetchSystemConfig(sheetId);
+        const merged = { ...current, ...config };
+
+        const rows = Object.entries(merged).map(([k, v]) => [k, v]);
+
+        if (rows.length > 0) {
+            await updateData('SystemConfig!A2', rows, sheetId);
+        }
+        return { success: true };
+    } catch (e) {
+        console.error('SystemConfig save error:', e);
+        return { success: false, error: String(e) };
+    }
+}
+
 // --- OCR & Auto Assign ---
 
 export async function processScannedImage(imageBase64: string, locationName: string, overrideSheetId?: string) {
-    const apiKey = process.env.GOOGLE_VISION_KEY;
+    // 1. Get Configuration (API Key)
+    const config = await fetchSystemConfig(overrideSheetId);
+    // Use user-provided key first, fallback to env key
+    const apiKey = config['GOOGLE_VISION_KEY'] || process.env.GOOGLE_VISION_KEY;
 
     if (!apiKey) {
-        // Fallback for demo/mock mode if no key provided, or return error
-        // For now, return error to encourage setup
-        return { success: false, error: '서버 환경 변수(GOOGLE_VISION_KEY)가 설정되지 않았습니다.' };
+        return { success: false, error: 'Google Vision API Key가 설정되지 않았습니다. 관리자 설정에서 키를 등록해주세요.' };
     }
 
     try {
@@ -821,4 +866,8 @@ export async function processScannedImage(imageBase64: string, locationName: str
         console.error('OCR Process Error:', e);
         return { success: false, error: '처리 중 오류가 발생했습니다: ' + String(e) };
     }
+}
+
+export async function getMySheetId() {
+    return await getUserSheetId();
 }
