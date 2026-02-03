@@ -812,31 +812,35 @@ export async function processScannedImage(imageBase64: string, locationName: str
         }
 
         // 3. Smart Matching Logic
-        // Clean text: Remove whitespace to handle formatting differences
-        const cleanText = fullText.replace(/\s+/g, '').toUpperCase();
+        // Clean text: Remove ALL non-alphanumeric chars (including hyphens, underscores) to handle OCR errors better
+        const normalize = (s: string) => s.replace(/[^a-zA-Z0-9가-힣]/g, '').toUpperCase();
+        const cleanText = normalize(fullText);
         let matchedDevice = null;
 
         for (const device of devices) {
             if (!device) continue;
 
-            // Priority 1: Model / ID (High confidence)
-            // Example: '43211507-23728367' or 'KKR-GAE-...'
-            if (device.model && device.model.length > 5) {
-                const cleanModel = device.model.replace(/\s+/g, '').toUpperCase();
-                if (cleanText.includes(cleanModel)) {
+            // Check Model, ID, and Name. Filter out short strings to avoid false positives.
+            // Priority: Model > ID > Name
+            const targets = [device.model, device.id];
+
+            // Name is risky if it's generic like "Monitor", so only use if it's specific (e.g. includes digits)
+            if (device.name && /\d/.test(device.name)) {
+                targets.push(device.name);
+            }
+
+            for (const target of targets) {
+                if (!target || target.length < 5) continue;
+
+                const cleanTarget = normalize(target);
+                // Ensure target is robust enough after normalization
+                if (cleanTarget.length >= 5 && cleanText.includes(cleanTarget)) {
                     matchedDevice = device;
                     break;
                 }
             }
 
-            // Priority 2: ID (If ID is meaningful string)
-            if (device.id && device.id.length > 5 && cleanText.includes(device.id.replace(/\s+/g, '').toUpperCase())) {
-                matchedDevice = device;
-                break;
-            }
-
-            // Priority 3: Name + Spec (Lower confidence, maybe risky?)
-            // If name is very specific, might work. Skipped for safety to avoid false positives.
+            if (matchedDevice) break;
         }
 
         if (matchedDevice) {
@@ -855,9 +859,10 @@ export async function processScannedImage(imageBase64: string, locationName: str
                 text: fullText
             };
         } else {
+            const debugText = fullText.length > 30 ? fullText.substring(0, 30).replace(/\n/g, ' ') + '...' : fullText.replace(/\n/g, ' ');
             return {
                 success: false,
-                error: '일치하는 기기를 찾을 수 없습니다. (OCR 텍스트에 기기 정보가 없거나 엑셀과 일치하지 않음)',
+                error: `일치하는 기기를 찾을 수 없습니다.\n[인식실패] OCR: "${debugText}"`,
                 text: fullText
             };
         }
