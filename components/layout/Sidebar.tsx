@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { LayoutDashboard, MonitorSmartphone, Key, CalendarClock, Settings } from 'lucide-react';
+import { LayoutDashboard, MonitorSmartphone, Key, CalendarClock, Settings, X } from 'lucide-react';
 
 interface SidebarProps {
     onItemClick?: () => void;
@@ -18,8 +18,15 @@ export function Sidebar({ onItemClick }: SidebarProps) {
 
     return (
         <aside className="w-64 bg-sidebar text-sidebar-fg h-screen fixed left-0 top-0 flex flex-col shadow-xl z-50">
-            <div className="p-6 text-2xl font-bold border-b border-blue-800 flex items-center gap-2">
+            <div className="p-6 text-2xl font-bold border-b border-blue-800 flex items-center justify-between">
                 <span>EduAsset</span>
+                <button
+                    onClick={onItemClick}
+                    className="md:hidden p-1 text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                    aria-label="메뉴 닫기"
+                >
+                    <X className="w-6 h-6" />
+                </button>
             </div>
             <nav className="flex-1 p-4 space-y-2">
                 {menuItems.map((item) => (
