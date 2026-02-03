@@ -319,19 +319,19 @@ function ScanPageContent() {
                                 {/* Dark Overlay with Clear Rect in Center */}
                                 <div className="absolute inset-0 pointer-events-none">
                                     {/* Top Shade */}
-                                    <div className="absolute top-0 left-0 right-0 h-[20%] bg-black/60 backdrop-blur-sm z-10"></div>
+                                    <div className="absolute top-0 left-0 right-0 h-[38%] bg-black/60 backdrop-blur-sm z-10"></div>
                                     {/* Bottom Shade */}
-                                    <div className="absolute bottom-0 left-0 right-0 h-[35%] bg-black/60 backdrop-blur-sm z-10 flex flex-col items-center justify-start pt-6 text-white">
+                                    <div className="absolute bottom-0 left-0 right-0 h-[38%] bg-black/60 backdrop-blur-sm z-10 flex flex-col items-center justify-start pt-6 text-white">
                                         <p className="font-medium text-shadow">물품 라벨을 사각형 안에 맞춰주세요</p>
-                                        <p className="text-xs text-gray-300 mt-1">자동으로 초첨이 맞춰집니다</p>
+                                        <p className="text-xs text-gray-300 mt-1">자동으로 초점이 맞춰집니다</p>
                                     </div>
                                     {/* Left Shade */}
-                                    <div className="absolute top-[20%] bottom-[35%] left-0 w-[10%] bg-black/60 z-10"></div>
+                                    <div className="absolute top-[38%] bottom-[38%] left-0 w-[5%] bg-black/60 z-10"></div>
                                     {/* Right Shade */}
-                                    <div className="absolute top-[20%] bottom-[35%] right-0 w-[10%] bg-black/60 z-10"></div>
+                                    <div className="absolute top-[38%] bottom-[38%] right-0 w-[5%] bg-black/60 z-10"></div>
 
                                     {/* Guide Box Border */}
-                                    <div className="absolute top-[20%] bottom-[35%] left-[10%] right-[10%] border-2 border-white/80 rounded-xl shadow-[0_0_0_999px_rgba(0,0,0,0.5)] z-0">
+                                    <div className="absolute top-[38%] bottom-[38%] left-[5%] right-[5%] border-2 border-white/80 rounded-xl shadow-[0_0_0_999px_rgba(0,0,0,0.5)] z-0">
                                         {/* Corners */}
                                         <div className="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-cyan-400 rounded-tl-sm -mt-0.5 -ml-0.5"></div>
                                         <div className="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-cyan-400 rounded-tr-sm -mt-0.5 -mr-0.5"></div>

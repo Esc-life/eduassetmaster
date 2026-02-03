@@ -3,7 +3,11 @@
 import Link from 'next/link';
 import { LayoutDashboard, MonitorSmartphone, Key, CalendarClock, Settings } from 'lucide-react';
 
-export function Sidebar() {
+interface SidebarProps {
+    onItemClick?: () => void;
+}
+
+export function Sidebar({ onItemClick }: SidebarProps) {
     const menuItems = [
         { name: '대시보드', href: '/', icon: LayoutDashboard },
         { name: '기기 관리', href: '/devices', icon: MonitorSmartphone },
@@ -22,6 +26,7 @@ export function Sidebar() {
                     <Link
                         key={item.href}
                         href={item.href}
+                        onClick={onItemClick}
                         className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-blue-700/50 transition-colors"
                     >
                         <item.icon className="w-5 h-5" />
