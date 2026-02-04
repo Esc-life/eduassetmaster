@@ -85,6 +85,7 @@ export function AssetMapViewer({
                 className="relative origin-top-left transition-transform duration-200 ease-out"
                 style={{
                     width: `${zoom}%`,
+                    minWidth: '800px', // Ensure map is legible on mobile
                     height: 'auto', // Image aspect ratio drives height
                     minHeight: '100%'
                 }}

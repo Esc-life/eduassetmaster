@@ -74,7 +74,7 @@ export function AssetZone({ location, device, onClick, onDoubleClick, isSelected
             onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick?.(); }}
         >
             <div className="p-2 flex flex-col items-center justify-center h-full bg-white/40 dark:bg-gray-900/40 rounded-md backdrop-blur-sm">
-                <span className="text-sm font-bold text-gray-900 dark:text-white text-center drop-shadow-md">
+                <span className="text-sm font-bold text-gray-900 dark:text-white text-center drop-shadow-md whitespace-nowrap">
                     {location.name}
                 </span>
             </div>

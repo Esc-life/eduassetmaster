@@ -17,19 +17,21 @@ export function Sidebar({ onItemClick }: SidebarProps) {
     ];
 
     return (
-        <aside className="w-64 bg-sidebar text-sidebar-fg h-screen fixed left-0 top-0 flex flex-col shadow-xl z-50">
+        <aside className="w-64 bg-sidebar text-sidebar-fg h-screen fixed left-0 top-0 flex flex-col shadow-xl z-[9999]">
             <div className="p-6 text-2xl font-bold border-b border-blue-800 flex items-center justify-between">
                 <span>EduAsset</span>
                 <button
                     type="button"
                     onClick={(e) => {
+                        // Prevent click from bubbling or default behavior blocking
                         e.stopPropagation();
-                        onItemClick?.();
+                        e.preventDefault();
+                        if (onItemClick) onItemClick();
                     }}
-                    className="md:hidden p-2 text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+                    className="md:hidden p-3 -mr-2 text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer relative z-50 touch-manipulation"
                     aria-label="메뉴 닫기"
                 >
-                    <X className="w-6 h-6" />
+                    <X className="w-7 h-7" />
                 </button>
             </div>
             <nav className="flex-1 p-4 space-y-2">
