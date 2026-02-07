@@ -191,17 +191,17 @@ export default function DevicesPage() {
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white">기기 관리</h1>
                     <p className="text-gray-500 dark:text-gray-400 text-sm">전체 자산 목록 및 상태를 관리합니다.</p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
                     <button
                         onClick={() => setIsAddDeviceOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm whitespace-nowrap flex-auto md:flex-none justify-center"
                     >
                         <Plus className="w-4 h-4" />
                         기기 추가
                     </button>
                     <button
                         onClick={() => setIsBulkOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm text-sm font-medium"
+                        className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm text-sm font-medium whitespace-nowrap flex-auto md:flex-none justify-center"
                     >
                         <FileSpreadsheet className="w-4 h-4" />
                         일괄 등록 (엑셀)
@@ -209,7 +209,7 @@ export default function DevicesPage() {
                     {selectedDevices.length > 0 && (
                         <button
                             onClick={handleDeleteSelected}
-                            className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors shadow-sm text-sm font-medium"
+                            className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors shadow-sm text-sm font-medium whitespace-nowrap flex-auto md:flex-none justify-center"
                         >
                             <Trash2 className="w-4 h-4" />
                             선택 삭제 ({selectedDevices.length})
@@ -217,7 +217,7 @@ export default function DevicesPage() {
                     )}
                     <button
                         onClick={() => setDeleteModal({ open: true, type: 'all' })}
-                        className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors shadow-sm text-sm font-medium"
+                        className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors shadow-sm text-sm font-medium whitespace-nowrap flex-auto md:flex-none justify-center"
                     >
                         <Trash2 className="w-4 h-4" />
                         전체 삭제

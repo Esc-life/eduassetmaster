@@ -287,11 +287,11 @@ export default function Home() {
 
   return (
     <div className="space-y-6 flex flex-col items-center pb-20">
-      <div className="w-full flex items-center justify-between">
+      <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
           학교 배치도 (Main Campus)
         </h1>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           {isScanning ? (
             <div className="flex items-center gap-2 px-4 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium animate-pulse">
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -302,7 +302,7 @@ export default function Home() {
               {/* Name Management Button */}
               <button
                 onClick={() => setShowNameModal(true)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-green-700 transition-colors"
+                className="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-green-700 transition-colors whitespace-nowrap flex-auto md:flex-none justify-center"
                 title="AI로 이름을 자동 추출하거나 엑셀로 관리"
               >
                 <div className="flex items-center gap-1">
@@ -311,12 +311,12 @@ export default function Home() {
                 이름 관리
               </button>
 
-              <div className="h-6 w-px bg-gray-300 dark:bg-gray-700 mx-1" />
+              <div className="hidden md:block h-6 w-px bg-gray-300 dark:bg-gray-700 mx-1" />
 
               {/* AI Structure Detection */}
               <button
                 onClick={handleAIScan}
-                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-indigo-700 transition-colors"
+                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-indigo-700 transition-colors whitespace-nowrap flex-auto md:flex-none justify-center"
                 title="Google Vision 대신 OpenCV를 사용하여 기하학적 구조(네모칸)만 빠르게 찾습니다."
               >
                 <ScanSearch className="w-4 h-4" />
@@ -328,7 +328,7 @@ export default function Home() {
                 {isEditing && selectedZoneIds.size > 0 && (
                   <button
                     onClick={deleteSelectedZones}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-red-100 text-red-600 text-sm font-medium rounded-lg hover:bg-red-200 transition-colors animate-in fade-in"
+                    className="flex items-center gap-2 px-3 py-1.5 bg-red-100 text-red-600 text-sm font-medium rounded-lg hover:bg-red-200 transition-colors animate-in fade-in whitespace-nowrap"
                   >
                     <Trash2 className="w-4 h-4" />
                     선택 삭제 ({selectedZoneIds.size})
@@ -343,7 +343,7 @@ export default function Home() {
                   className={`flex items-center gap-2 px-3 py-1.5 border rounded-lg text-sm font-medium transition-colors ${isEditing
                     ? 'bg-orange-100 border-orange-200 text-orange-700'
                     : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-                    }`}
+                    } whitespace-nowrap flex-auto md:flex-none justify-center`}
                 >
                   {isEditing ? (
                     <>
@@ -359,7 +359,7 @@ export default function Home() {
                 </button>
               </div>
 
-              <div className="h-6 w-px bg-gray-300 dark:bg-gray-700 mx-1" />
+              <div className="hidden md:block h-6 w-px bg-gray-300 dark:bg-gray-700 mx-1" />
 
               <button
                 onClick={() => {
@@ -368,7 +368,7 @@ export default function Home() {
                     uploaderRef.current?.open();
                   }
                 }}
-                className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors whitespace-nowrap flex-auto md:flex-none justify-center"
               >
                 <ImageIcon className="w-4 h-4" />
                 배치도 변경
@@ -376,7 +376,7 @@ export default function Home() {
 
               <Link
                 href="/scan"
-                className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-bold rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md active:scale-95"
+                className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-bold rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md active:scale-95 whitespace-nowrap flex-auto md:flex-none justify-center"
               >
                 <ScanLine className="w-4 h-4" />
                 스캔 등록

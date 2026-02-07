@@ -94,14 +94,14 @@ export default function SoftwarePage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">소프트웨어 및 계정 관리</h1>
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white whitespace-nowrap">소프트웨어 및 계정 관리</h1>
                     <p className="text-sm text-gray-500 mt-1">학교에서 사용하는 라이선스와 관리자 계정을 관리합니다.</p>
                 </div>
                 <button
                     onClick={() => handleOpenModal()}
-                    className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap w-full md:w-auto justify-center"
                 >
                     <Plus className="w-4 h-4" />
                     {activeTab === 'software' ? '소프트웨어 등록' : '계정 등록'}
