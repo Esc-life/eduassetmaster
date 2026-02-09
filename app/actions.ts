@@ -966,3 +966,99 @@ export async function syncDeviceLocationString(deviceId: string, sheetId: string
         console.error('Sync Location String Error:', e);
     }
 }
+
+export async function getDeviceInstances(deviceId: string) {
+    const sheetId = await getUserSheetId();
+    if (sheetId === 'NO_SHEET') return [];
+
+    try {
+        const rows = await getData('DeviceInstances!A2:F', sheetId);
+        if (!rows) return [];
+
+        return rows
+            .filter((r: any[]) => r[1] === deviceId)
+            .map((r: any[]) => ({
+                id: r[0],
+                deviceId: r[1],
+                locationId: r[2],
+                locationName: r[3],
+                quantity: parseInt(r[4] || '1'),
+                notes: r[5] || ''
+            }));
+    } catch (e) {
+        return [];
+    }
+}
+
+export async function updateDeviceWithDistribution(
+    deviceId: string,
+    deviceUpdates: Partial<Device>,
+    distributions: { locationName: string, quantity: number }[]
+) {
+    const sheetId = await getUserSheetId();
+    if (sheetId === 'NO_SHEET') return { success: false, error: 'No Sheet' };
+
+    try {
+        const deviceRows = await getData('Devices!A2:R', sheetId);
+        if (!deviceRows) return { success: false, error: 'Device DB Error' };
+
+        const deviceIndex = deviceRows.findIndex((r: any[]) => r[0] === deviceId);
+        if (deviceIndex === -1) return { success: false, error: 'Device not found' };
+
+        const currentDevice = deviceRows[deviceIndex];
+        const updatedRow = [...currentDevice];
+
+        if (deviceUpdates.category !== undefined) updatedRow[1] = deviceUpdates.category;
+        if (deviceUpdates.model !== undefined) updatedRow[2] = deviceUpdates.model;
+        if (deviceUpdates.ip !== undefined) updatedRow[3] = deviceUpdates.ip;
+        if (deviceUpdates.status !== undefined) updatedRow[4] = deviceUpdates.status;
+        if (deviceUpdates.purchaseDate !== undefined) updatedRow[5] = deviceUpdates.purchaseDate;
+        if (deviceUpdates.groupId !== undefined) updatedRow[6] = deviceUpdates.groupId;
+        if (deviceUpdates.name !== undefined) updatedRow[7] = deviceUpdates.name;
+        if (deviceUpdates.acquisitionDivision !== undefined) updatedRow[8] = deviceUpdates.acquisitionDivision;
+        if (deviceUpdates.quantity !== undefined) updatedRow[9] = deviceUpdates.quantity;
+        if (deviceUpdates.unitPrice !== undefined) updatedRow[10] = deviceUpdates.unitPrice;
+        if (deviceUpdates.totalAmount !== undefined) updatedRow[11] = deviceUpdates.totalAmount;
+        if (deviceUpdates.serviceLifeChange !== undefined) updatedRow[12] = deviceUpdates.serviceLifeChange;
+        if (deviceUpdates.osVersion !== undefined) updatedRow[14] = deviceUpdates.osVersion;
+        if (deviceUpdates.windowsPassword !== undefined) updatedRow[15] = deviceUpdates.windowsPassword;
+        if (deviceUpdates.userName !== undefined) updatedRow[16] = deviceUpdates.userName;
+        if (deviceUpdates.pcName !== undefined) updatedRow[17] = deviceUpdates.pcName;
+
+        await updateData(`Devices!A${deviceIndex + 2}`, [updatedRow], sheetId);
+
+        const instanceRows = await getData('DeviceInstances!A2:F', sheetId);
+        const mapConfig = await fetchMapConfiguration(sheetId);
+
+        let otherInstances: any[][] = [];
+        if (instanceRows) {
+            otherInstances = instanceRows.filter((r: any[]) => r[1] !== deviceId);
+        }
+
+        const newInstanceRows = distributions.map(dist => {
+            const zone = mapConfig.zones.find(z => z.name === dist.locationName);
+            return [
+                `inst-${Math.random().toString(36).substr(2, 9)}`,
+                deviceId,
+                zone ? zone.id : 'TEXT_ONLY',
+                dist.locationName,
+                dist.quantity,
+                'Distributed from Modal'
+            ];
+        });
+
+        await clearData('DeviceInstances!A2:F', sheetId);
+
+        const allInstances = [...otherInstances, ...newInstanceRows];
+        if (allInstances.length > 0) {
+            await updateData('DeviceInstances!A2', allInstances, sheetId);
+        }
+
+        await syncDeviceLocationString(deviceId, sheetId);
+
+        return { success: true };
+    } catch (e) {
+        console.error(e);
+        return { success: false, error: String(e) };
+    }
+}
