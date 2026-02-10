@@ -41,6 +41,7 @@ export default function Home() {
   // Multi-Selection State (Merged into Editing Mode)
   const [selectedZoneIds, setSelectedZoneIds] = useState<Set<string>>(new Set());
   const [editingZone, setEditingZone] = useState<Location | null>(null); // For zone editing
+  const [lastSelectedPin, setLastSelectedPin] = useState<Location | null>(null);
 
   // 1. Statistics Calculation
   const stats = useMemo(() => {
@@ -302,7 +303,7 @@ export default function Home() {
               {/* Name Management Button */}
               <button
                 onClick={() => setShowNameModal(true)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-green-700 transition-colors whitespace-nowrap flex-auto md:flex-none justify-center"
+                className="cursor-pointer flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-green-700 transition-colors whitespace-nowrap flex-auto md:flex-none justify-center"
                 title="AI로 이름을 자동 추출하거나 엑셀로 관리"
               >
                 <div className="flex items-center gap-1">
@@ -316,7 +317,7 @@ export default function Home() {
               {/* AI Structure Detection */}
               <button
                 onClick={handleAIScan}
-                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-indigo-700 transition-colors whitespace-nowrap flex-auto md:flex-none justify-center"
+                className="cursor-pointer flex items-center gap-2 px-3 py-1.5 bg-indigo-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-indigo-700 transition-colors whitespace-nowrap flex-auto md:flex-none justify-center"
                 title="Google Vision 대신 OpenCV를 사용하여 기하학적 구조(네모칸)만 빠르게 찾습니다."
               >
                 <ScanSearch className="w-4 h-4" />
@@ -368,7 +369,7 @@ export default function Home() {
                     uploaderRef.current?.open();
                   }
                 }}
-                className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors whitespace-nowrap flex-auto md:flex-none justify-center"
+                className="cursor-pointer flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors whitespace-nowrap flex-auto md:flex-none justify-center"
               >
                 <ImageIcon className="w-4 h-4" />
                 배치도 변경
@@ -495,8 +496,10 @@ export default function Home() {
               onClose={() => setSelectedPin(null)}
               zone={selectedPin}
               deviceInstances={deviceInstances.filter(inst => inst.locationId === selectedPin.id)}
+              allDeviceInstances={deviceInstances}
               allDevices={devices}
               onEditDevice={(device) => {
+                setLastSelectedPin(selectedPin);
                 setEditDevice(device);
                 setSelectedPin(null);
               }}
@@ -537,17 +540,33 @@ export default function Home() {
         <DeviceEditModal
           isOpen={!!editDevice}
           device={editDevice}
-          onClose={() => setEditDevice(null)}
+          onClose={() => {
+            setEditDevice(null);
+            if (lastSelectedPin) {
+              setSelectedPin(lastSelectedPin);
+              setLastSelectedPin(null);
+            }
+          }}
           onSave={async (updates) => {
             if (!editDevice) return;
-            const result = await updateDevice(editDevice.id, updates);
-            if (result.success) {
-              alert('수정이 저장되었습니다.');
-              setEditDevice(null);
-              const { devices: updatedDevices } = await fetchAssetData();
-              if (updatedDevices) setDevices(updatedDevices);
-            } else {
-              alert('수정 실패: ' + result.error);
+
+            if (Object.keys(updates).length > 0) {
+              const result = await updateDevice(editDevice.id, updates);
+              if (!result.success) {
+                alert('수정 실패: ' + result.error);
+                return;
+              }
+            }
+
+            const { devices: updatedDevices, deviceInstances: updatedInstances } = await fetchAssetData();
+            if (updatedDevices) setDevices(updatedDevices);
+            if (updatedInstances) setDeviceInstances(updatedInstances);
+
+            // alert('저장되었습니다.'); // Optional feedback
+            setEditDevice(null);
+            if (lastSelectedPin) {
+              setSelectedPin(lastSelectedPin);
+              setLastSelectedPin(null);
             }
           }}
           zones={pins}

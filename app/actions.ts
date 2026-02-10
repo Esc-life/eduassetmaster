@@ -1062,3 +1062,130 @@ export async function updateDeviceWithDistribution(
         return { success: false, error: String(e) };
     }
 }
+
+// --- Loan Management ---
+
+export interface LoanRecord {
+    id: string;
+    deviceId: string;
+    deviceName: string;
+    userId: string;
+    userName: string;
+    loanDate: string;
+    dueDate: string;
+    returnDate?: string;
+    status: 'Active' | 'Returned' | 'Overdue';
+    notes?: string;
+}
+
+export async function getLoans() {
+    const sheetId = await getUserSheetId();
+    if (sheetId === 'NO_SHEET') return [];
+
+    try {
+        const rows = await getData('Loans!A2:J', sheetId);
+        if (!rows) return [];
+
+        return rows.map((r: any[]) => ({
+            id: r[0],
+            deviceId: r[1],
+            deviceName: r[2],
+            userId: r[3],
+            userName: r[4],
+            loanDate: r[5],
+            dueDate: r[6],
+            returnDate: r[7] || undefined,
+            status: r[8] as any,
+            notes: r[9] || ''
+        }));
+    } catch (e) {
+        return [];
+    }
+}
+
+export async function createLoan(deviceId: string, userId: string, userName: string, dueDate: string, notes: string = '') {
+    const sheetId = await getUserSheetId();
+    if (sheetId === 'NO_SHEET') return { success: false, error: '시트가 없습니다.' };
+
+    try {
+        const deviceRows = await getData('Devices!A2:R', sheetId);
+        if (!deviceRows) return { success: false, error: 'Device DB Error' };
+
+        const deviceIndex = deviceRows.findIndex((r: any[]) => r[0] === deviceId);
+        if (deviceIndex === -1) return { success: false, error: '기기를 찾을 수 없습니다.' };
+
+        const device = deviceRows[deviceIndex];
+        if (device[4] !== '사용 가능') {
+            return { success: false, error: `기기가 대여 가능한 상태가 아닙니다. (현재 상태: ${device[4]})` };
+        }
+
+        const updatedRow = [...device];
+        updatedRow[4] = '대여중';
+
+        // Update user info in device table (optional but good for sync)
+        updatedRow[16] = userName;
+
+        await updateData(`Devices!A${deviceIndex + 2}`, [updatedRow], sheetId);
+
+        const loanId = `loan-${Date.now()}`;
+        const loanDate = new Date().toISOString().split('T')[0];
+        const newLoanRow = [
+            loanId,
+            deviceId,
+            device[7], // Name
+            userId,
+            userName,
+            loanDate,
+            dueDate,
+            '',
+            'Active',
+            notes
+        ];
+
+        await appendData('Loans!A1', [newLoanRow], sheetId);
+
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: String(e) };
+    }
+}
+
+export async function returnLoan(loanId: string, returnCondition: string = 'Good') {
+    const sheetId = await getUserSheetId();
+    if (sheetId === 'NO_SHEET') return { success: false };
+
+    try {
+        const loanRows = await getData('Loans!A2:J', sheetId);
+        if (!loanRows) return { success: false, error: 'Loan DB Error' };
+
+        const loanIndex = loanRows.findIndex((r: any[]) => r[0] === loanId);
+        if (loanIndex === -1) return { success: false, error: '대여 기록을 찾을 수 없습니다.' };
+
+        const loan = loanRows[loanIndex];
+        const deviceId = loan[1];
+
+        const updatedLoan = [...loan];
+        updatedLoan[7] = new Date().toISOString().split('T')[0];
+        updatedLoan[8] = 'Returned';
+
+        await updateData(`Loans!A${loanIndex + 2}`, [updatedLoan], sheetId);
+
+        const deviceRows = await getData('Devices!A2:R', sheetId);
+        if (deviceRows) {
+            const deviceIndex = deviceRows.findIndex((r: any[]) => r[0] === deviceId);
+
+            if (deviceIndex !== -1) {
+                const device = deviceRows[deviceIndex];
+                const updatedDevice = [...device];
+                updatedDevice[4] = returnCondition === 'Broken' ? '수리 필요' : '사용 가능';
+                updatedDevice[16] = ''; // Clear User Name
+
+                await updateData(`Devices!A${deviceIndex + 2}`, [updatedDevice], sheetId);
+            }
+        }
+
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: String(e) };
+    }
+}

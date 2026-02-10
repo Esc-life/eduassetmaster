@@ -147,6 +147,7 @@ export function DeviceEditModal({ isOpen, device, onClose, onSave, zones = [] }:
                 const result = await updateDeviceWithDistribution(device.id, formData, distributions);
                 if (!result.success) throw new Error(result.error);
                 router.refresh();
+                await onSave({});
                 onClose();
             } else {
                 await onSave(formData);

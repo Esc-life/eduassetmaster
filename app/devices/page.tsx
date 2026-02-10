@@ -201,7 +201,7 @@ export default function DevicesPage() {
                     </button>
                     <button
                         onClick={() => setIsBulkOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm text-sm font-medium whitespace-nowrap flex-auto md:flex-none justify-center"
+                        className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm text-sm font-medium whitespace-nowrap flex-auto md:flex-none justify-center"
                     >
                         <FileSpreadsheet className="w-4 h-4" />
                         일괄 등록 (엑셀)
@@ -217,7 +217,7 @@ export default function DevicesPage() {
                     )}
                     <button
                         onClick={() => setDeleteModal({ open: true, type: 'all' })}
-                        className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors shadow-sm text-sm font-medium whitespace-nowrap flex-auto md:flex-none justify-center"
+                        className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors shadow-sm text-sm font-medium whitespace-nowrap flex-auto md:flex-none justify-center"
                     >
                         <Trash2 className="w-4 h-4" />
                         전체 삭제
@@ -243,7 +243,7 @@ export default function DevicesPage() {
                         <button
                             key={status}
                             onClick={() => setFilterStatus(status)}
-                            className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${filterStatus === status
+                            className={`cursor-pointer px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${filterStatus === status
                                 ? 'bg-primary text-white'
                                 : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
                                 }`}
@@ -319,7 +319,7 @@ export default function DevicesPage() {
                                                 <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <button
                                                         onClick={() => setEditDevice(device)}
-                                                        className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                                                        className="cursor-pointer p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
                                                         title="수정"
                                                     >
                                                         <Edit className="w-4 h-4" />
