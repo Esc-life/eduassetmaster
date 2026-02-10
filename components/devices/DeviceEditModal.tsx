@@ -65,9 +65,9 @@ export function DeviceEditModal({ isOpen, device, onClose, onSave, zones = [] }:
 
             // 배치 상세 정보 로드
             setIsLoadingDist(true);
-            getDeviceInstances(device.id).then(insts => {
+            getDeviceInstances(device.id).then((insts: any[]) => {
                 if (insts && insts.length > 0) {
-                    setDistributions(insts.map(i => ({ locationName: i.locationName, quantity: i.quantity })));
+                    setDistributions(insts.map((i: any) => ({ locationName: i.locationName, quantity: i.quantity })));
                 } else {
                     const qty = parseInt(String(device.quantity || '1'));
                     if (device.installLocation && device.installLocation.trim() !== '') {
