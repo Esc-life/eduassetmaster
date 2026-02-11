@@ -1198,8 +1198,8 @@ export async function changePassword(current: string, newPass: string) {
 
     const email = session.user.email;
 
-    // Admin fallback user check
-    if (email === 'admin@test.com') return { success: false, error: '데모 관리자 계정은 비밀번호를 변경할 수 없습니다.' };
+    // Admin fallback user check - 제한 해제
+    // if (email === 'admin@test.com') return { success: false, error: '데모 관리자 계정은 비밀번호를 변경할 수 없습니다.' };
 
     try {
         const rows = await getData('Users!A:E');

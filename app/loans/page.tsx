@@ -114,144 +114,143 @@ export default function LoansPage() {
     );
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 md:p-8">
-            <div className="max-w-7xl mx-auto space-y-6">
-                {/* Header */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">대여/반납 관리</h1>
-                        <p className="text-sm text-gray-500">기기 대여 현황을 확인하고 관리합니다.</p>
-                    </div>
-                    <div className="flex gap-2">
-                        <button
-                            onClick={loadData}
-                            className="p-2 text-gray-500 hover:text-blue-600 transition-colors cursor-pointer"
-                            title="새로고침"
-                        >
-                            <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
-                        </button>
-                        <button
-                            onClick={() => setShowModal(true)}
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm cursor-pointer"
-                        >
-                            <Plus className="w-5 h-5" />
-                            대여 등록
-                        </button>
-                    </div>
+        <div className="space-y-6">
+            {/* Header */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">대여/반납 관리</h1>
+                    <p className="text-sm text-gray-500">기기 대여 현황을 확인하고 관리합니다.</p>
                 </div>
-
-                {/* Filters */}
-                <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
-                    <div className="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
-                        <button
-                            onClick={() => setActiveTab('active')}
-                            className={`px-4 py-2 rounded-md text-sm font-medium transition-all cursor-pointer ${activeTab === 'active'
-                                ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm'
-                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
-                                }`}
-                        >
-                            대여중 ({loans.filter(l => l.status === 'Active' || l.status === 'Overdue').length})
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('history')}
-                            className={`px-4 py-2 rounded-md text-sm font-medium transition-all cursor-pointer ${activeTab === 'history'
-                                ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm'
-                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
-                                }`}
-                        >
-                            반납 완료
-                        </button>
-                    </div>
-                    <div className="relative w-full md:w-64">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <input
-                            type="text"
-                            placeholder="기기명, 사용자명 검색"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border rounded-lg dark:bg-gray-900 dark:border-gray-700 text-sm focus:ring-2 focus:ring-blue-500"
-                        />
-                    </div>
-                </div>
-
-                {/* Table */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-left">
-                            <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-                                <tr>
-                                    <th className="px-6 py-3">상태</th>
-                                    <th className="px-6 py-3">기기 정보</th>
-                                    <th className="px-6 py-3">대여자</th>
-                                    <th className="px-6 py-3">대여일</th>
-                                    <th className="px-6 py-3">반납 예정일</th>
-                                    {activeTab === 'history' && <th className="px-6 py-3">실제 반납일</th>}
-                                    <th className="px-6 py-3">관리</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {isLoading ? (
-                                    <tr>
-                                        <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
-                                            로딩 중...
-                                        </td>
-                                    </tr>
-                                ) : filteredLoans.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
-                                            표시할 대여 기록이 없습니다.
-                                        </td>
-                                    </tr>
-                                ) : filteredLoans.map((loan) => {
-                                    const isOverdue = loan.status === 'Active' && new Date(loan.dueDate) < new Date();
-                                    return (
-                                        <tr key={loan.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                                            <td className="px-6 py-4">
-                                                {loan.status === 'Returned' ? (
-                                                    <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs font-semibold">반납 완료</span>
-                                                ) : isOverdue ? (
-                                                    <span className="px-2 py-1 bg-red-100 text-red-600 rounded text-xs font-semibold flex items-center gap-1 w-fit">
-                                                        <AlertCircle className="w-3 h-3" /> 연체
-                                                    </span>
-                                                ) : (
-                                                    <span className="px-2 py-1 bg-green-100 text-green-600 rounded text-xs font-semibold">대여중</span>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
-                                                {loan.deviceName}
-                                                <div className="text-xs text-gray-500 font-normal mt-0.5">{loan.deviceId}</div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-2">
-                                                    <User className="w-4 h-4 text-gray-400" />
-                                                    {loan.userName}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-gray-500">{loan.loanDate}</td>
-                                            <td className={`px-6 py-4 font-medium ${isOverdue ? 'text-red-500' : 'text-gray-500'}`}>
-                                                {loan.dueDate}
-                                            </td>
-                                            {activeTab === 'history' && (
-                                                <td className="px-6 py-4 text-gray-500">{loan.returnDate}</td>
-                                            )}
-                                            <td className="px-6 py-4">
-                                                {loan.status !== 'Returned' && (
-                                                    <button
-                                                        onClick={() => handleReturn(loan.id)}
-                                                        className="font-medium text-blue-600 dark:text-blue-500 hover:underline cursor-pointer"
-                                                    >
-                                                        반납 처리
-                                                    </button>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
+                <div className="flex gap-2">
+                    <button
+                        onClick={loadData}
+                        className="p-2 text-gray-500 hover:text-blue-600 transition-colors cursor-pointer"
+                        title="새로고침"
+                    >
+                        <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
+                    </button>
+                    <button
+                        onClick={() => setShowModal(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm cursor-pointer"
+                    >
+                        <Plus className="w-5 h-5" />
+                        대여 등록
+                    </button>
                 </div>
             </div>
+
+            {/* Filters */}
+            <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+                <div className="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
+                    <button
+                        onClick={() => setActiveTab('active')}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all cursor-pointer ${activeTab === 'active'
+                            ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm'
+                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
+                            }`}
+                    >
+                        대여중 ({loans.filter(l => l.status === 'Active' || l.status === 'Overdue').length})
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('history')}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all cursor-pointer ${activeTab === 'history'
+                            ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm'
+                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
+                            }`}
+                    >
+                        반납 완료
+                    </button>
+                </div>
+                <div className="relative w-full md:w-64">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                        type="text"
+                        placeholder="기기명, 사용자명 검색"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border rounded-lg dark:bg-gray-900 dark:border-gray-700 text-sm focus:ring-2 focus:ring-blue-500"
+                    />
+                </div>
+            </div>
+
+            {/* Table */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                        <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                            <tr>
+                                <th className="px-6 py-3">상태</th>
+                                <th className="px-6 py-3">기기 정보</th>
+                                <th className="px-6 py-3">대여자</th>
+                                <th className="px-6 py-3">대여일</th>
+                                <th className="px-6 py-3">반납 예정일</th>
+                                {activeTab === 'history' && <th className="px-6 py-3">실제 반납일</th>}
+                                <th className="px-6 py-3">관리</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {isLoading ? (
+                                <tr>
+                                    <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                                        로딩 중...
+                                    </td>
+                                </tr>
+                            ) : filteredLoans.length === 0 ? (
+                                <tr>
+                                    <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                                        표시할 대여 기록이 없습니다.
+                                    </td>
+                                </tr>
+                            ) : filteredLoans.map((loan) => {
+                                const isOverdue = loan.status === 'Active' && new Date(loan.dueDate) < new Date();
+                                return (
+                                    <tr key={loan.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                        <td className="px-6 py-4">
+                                            {loan.status === 'Returned' ? (
+                                                <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs font-semibold">반납 완료</span>
+                                            ) : isOverdue ? (
+                                                <span className="px-2 py-1 bg-red-100 text-red-600 rounded text-xs font-semibold flex items-center gap-1 w-fit">
+                                                    <AlertCircle className="w-3 h-3" /> 연체
+                                                </span>
+                                            ) : (
+                                                <span className="px-2 py-1 bg-green-100 text-green-600 rounded text-xs font-semibold">대여중</span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
+                                            {loan.deviceName}
+                                            <div className="text-xs text-gray-500 font-normal mt-0.5">{loan.deviceId}</div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-2">
+                                                <User className="w-4 h-4 text-gray-400" />
+                                                {loan.userName}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-gray-500">{loan.loanDate}</td>
+                                        <td className={`px-6 py-4 font-medium ${isOverdue ? 'text-red-500' : 'text-gray-500'}`}>
+                                            {loan.dueDate}
+                                        </td>
+                                        {activeTab === 'history' && (
+                                            <td className="px-6 py-4 text-gray-500">{loan.returnDate}</td>
+                                        )}
+                                        <td className="px-6 py-4">
+                                            {loan.status !== 'Returned' && (
+                                                <button
+                                                    onClick={() => handleReturn(loan.id)}
+                                                    className="font-medium text-blue-600 dark:text-blue-500 hover:underline cursor-pointer"
+                                                >
+                                                    반납 처리
+                                                </button>
+                                            )}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {/* Filters & Content End */}
 
             {/* Loan Modal */}
             <AnimatePresence>
@@ -406,6 +405,6 @@ export default function LoansPage() {
                     </div>
                 )}
             </AnimatePresence>
-        </div>
+        </div >
     );
 }

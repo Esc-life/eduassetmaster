@@ -71,8 +71,23 @@ export default function Home() {
         const localImage = localStorage.getItem('school_map_image');
         const localZones = localStorage.getItem('school_map_zones');
 
-        if (serverImage) setMapImage(serverImage);
-        else if (localImage) setMapImage(localImage);
+        const imageToLoad = serverImage || localImage;
+
+        // If there's an image, wait for it to load before hiding spinner
+        if (imageToLoad) {
+          const img = new Image();
+          img.onload = () => {
+            setMapImage(imageToLoad);
+            setIsLoadingMap(false);
+          };
+          img.onerror = () => {
+            setMapImage(imageToLoad); // Still show it even if error
+            setIsLoadingMap(false);
+          };
+          img.src = imageToLoad;
+        } else {
+          setIsLoadingMap(false);
+        }
 
         if (serverZones && serverZones.length > 0) setPins(serverZones);
         else if (localZones) setPins(JSON.parse(localZones));
@@ -81,7 +96,6 @@ export default function Home() {
         if (serverInstances) setDeviceInstances(serverInstances);
       } catch (error) {
         console.error('Error loading map data:', error);
-      } finally {
         setIsLoadingMap(false);
       }
     };
