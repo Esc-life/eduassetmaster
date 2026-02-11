@@ -333,14 +333,7 @@ export function AssetDetailModal({
                                             className="w-full px-4 py-3 border rounded-lg dark:bg-gray-800 dark:border-gray-700 text-lg font-semibold text-center"
                                             autoFocus
                                         />
-                                        <input
-                                            type="range"
-                                            min="1"
-                                            max={getDeviceStats(selectedDevice).remaining}
-                                            value={quantity}
-                                            onChange={(e) => setQuantity(parseInt(e.target.value))}
-                                            className="w-full mt-2"
-                                        />
+
                                     </div>
 
                                     <button

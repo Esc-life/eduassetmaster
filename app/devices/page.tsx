@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { fetchAssetData, registerBulkDevices, updateDevice, deleteDevice, deleteAllDevices, deleteBulkDevices, fetchMapConfiguration } from '@/app/actions';
+import { fetchAssetData, registerBulkDevices, updateDevice, deleteDevice, deleteAllDevices, deleteBulkDevices, fetchMapConfiguration, setDevicesStatus } from '@/app/actions';
 import { Device, DeviceStatus, Location } from '@/types';
-import { Search, Filter, MoreHorizontal, Laptop, Tablet, Smartphone, Monitor, Loader2, FileSpreadsheet, Plus, Edit, Trash2 } from 'lucide-react';
+import { Search, Filter, MoreHorizontal, Laptop, Tablet, Smartphone, Monitor, Loader2, FileSpreadsheet, Plus, Edit, Trash2, AlertTriangle, Minus } from 'lucide-react';
 import { BulkUploadModal } from '@/components/devices/BulkUploadModal';
 import { DeviceEditModal } from '@/components/devices/DeviceEditModal';
 import { DeleteConfirmModal } from '@/components/devices/DeleteConfirmModal';
+import { DisposalModal } from '@/components/devices/DisposalModal';
 import { useRouter } from 'next/navigation';
 
 export default function DevicesPage() {
@@ -21,6 +22,7 @@ export default function DevicesPage() {
     const [deleteModal, setDeleteModal] = useState<{ open: boolean; type: 'single' | 'all'; device?: Device }>({ open: false, type: 'single' });
     const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
     const [zones, setZones] = useState<Location[]>([]); // Available zones
+    const [isDisposalModalOpen, setIsDisposalModalOpen] = useState(false);
 
     useEffect(() => {
         const loadData = async () => {
@@ -185,6 +187,22 @@ export default function DevicesPage() {
                 onConfirm={deleteModal.type === 'all' ? handleDeleteAll : handleDeleteDevice}
             />
 
+            {/* Disposal Modal */}
+            <DisposalModal
+                isOpen={isDisposalModalOpen}
+                onClose={() => setIsDisposalModalOpen(false)}
+                devices={devices.filter(d => selectedDevices.includes(d.id))}
+                onConfirm={async (ids) => {
+                    const res = await setDevicesStatus(ids, '고장/폐기');
+                    if (res.success) {
+                        alert('상태가 변경되었습니다.');
+                        window.location.reload();
+                    } else {
+                        alert('변경 실패: ' + res.error);
+                    }
+                }}
+            />
+
             {/* Header Section */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -207,13 +225,22 @@ export default function DevicesPage() {
                         일괄 등록 (엑셀)
                     </button>
                     {selectedDevices.length > 0 && (
-                        <button
-                            onClick={handleDeleteSelected}
-                            className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors shadow-sm text-sm font-medium whitespace-nowrap flex-auto md:flex-none justify-center"
-                        >
-                            <Trash2 className="w-4 h-4" />
-                            선택 삭제 ({selectedDevices.length})
-                        </button>
+                        <>
+                            <button
+                                onClick={() => setIsDisposalModalOpen(true)}
+                                className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors shadow-sm text-sm font-medium whitespace-nowrap flex-auto md:flex-none justify-center"
+                            >
+                                <Minus className="w-4 h-4" />
+                                불용 처리 ({selectedDevices.length})
+                            </button>
+                            <button
+                                onClick={handleDeleteSelected}
+                                className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors shadow-sm text-sm font-medium whitespace-nowrap flex-auto md:flex-none justify-center"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                선택 삭제 ({selectedDevices.length})
+                            </button>
+                        </>
                     )}
                     <button
                         onClick={() => setDeleteModal({ open: true, type: 'all' })}

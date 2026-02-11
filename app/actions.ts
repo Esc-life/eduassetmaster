@@ -1227,3 +1227,105 @@ export async function changePassword(current: string, newPass: string) {
         return { success: false, error: String(e) };
     }
 }
+
+// --- Zone & Device Status Management ---
+
+export async function setDevicesStatus(deviceIds: string[], status: string) {
+    const sheetId = await getUserSheetId();
+    if (sheetId === 'NO_SHEET') return { success: false, error: '시트가 없습니다.' };
+
+    try {
+        const rows = await getData('Devices!A2:R', sheetId);
+        if (!rows) return { success: false, error: 'Devices not found' };
+
+        const updates: { range: string, values: any[][] }[] = [];
+
+        rows.forEach((row: any[], idx: number) => {
+            // row[0] is ID
+            if (deviceIds.includes(row[0])) {
+                const newRow = [...row];
+                newRow[4] = status; // Status Column (E, Index 4)
+                updates.push({ range: `Devices!A${idx + 2}`, values: [newRow] });
+            }
+        });
+
+        for (const up of updates) {
+            await updateData(up.range, up.values, sheetId);
+        }
+
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: String(e) };
+    }
+}
+
+export async function updateZoneName(zoneId: string, oldName: string, newName: string) {
+    const sheetId = await getUserSheetId();
+    if (sheetId === 'NO_SHEET') return { success: false, error: '시트가 없습니다.' };
+
+    try {
+        // 1. Update Locations Sheet (Custom Name)
+        let locRows = null;
+        try { locRows = await getData('Locations!A:C', sheetId); } catch (e) { }
+
+        if (locRows) {
+            const rowIndex = locRows.findIndex((r: any[]) => r[0] === zoneId);
+            if (rowIndex !== -1) {
+                const updatedRow = [...locRows[rowIndex]];
+                updatedRow[2] = newName; // Update Custom Name (Column C, Index 2)
+                // Assuming Row 1 is header, so array index 0 is Row 1? No.
+                // getData usually fetches values. If A:C, Row 1 is Header. LocRows[0] is Header.
+                // So rowIndex is correct 0-based index. Row Number is rowIndex + 1.
+                await updateData(`Locations!A${rowIndex + 1}`, [updatedRow], sheetId);
+            } else {
+                // If not found in Locations sheet
+                await appendData('Locations!A1', [[zoneId, oldName, newName]], sheetId);
+            }
+        } else {
+            // Create Sheet if missing
+            await addSheet('Locations', sheetId);
+            await updateData('Locations!A1', [['Zone ID', 'Auto Name', 'Custom Name'], [zoneId, oldName, newName]], sheetId);
+        }
+
+        // 2. Update DeviceInstances Sheet (Location Name)
+        try {
+            const instRows = await getData('DeviceInstances!A2:F', sheetId);
+            if (instRows) {
+                const updates: { range: string, values: any[][] }[] = [];
+                instRows.forEach((row: any[], idx: number) => {
+                    if (row[2] === zoneId || (oldName && row[3] === oldName)) {
+                        const newRow = [...row];
+                        newRow[3] = newName;
+                        updates.push({ range: `DeviceInstances!A${idx + 2}`, values: [newRow] });
+                    }
+                });
+                for (const up of updates) {
+                    await updateData(up.range, up.values, sheetId);
+                }
+            }
+        } catch (e) { console.log('Instance update skipped', e); }
+
+        // 3. Update Devices Sheet (Install Location)
+        try {
+            const devRows = await getData('Devices!A2:R', sheetId);
+            if (devRows) {
+                const devUpdates: { range: string, values: any[][] }[] = [];
+                devRows.forEach((row: any[], idx: number) => {
+                    // Check Install Location (Index 13) or Group ID (Index 6)
+                    if (row[6] === zoneId || (oldName && row[13] === oldName)) {
+                        const newRow = [...row];
+                        newRow[13] = newName;
+                        devUpdates.push({ range: `Devices!A${idx + 2}`, values: [newRow] });
+                    }
+                });
+                for (const up of devUpdates) {
+                    await updateData(up.range, up.values, sheetId);
+                }
+            }
+        } catch (e) { console.log('Device update skipped', e); }
+
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: String(e) };
+    }
+}

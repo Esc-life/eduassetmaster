@@ -8,9 +8,9 @@ import { Device, Location, DeviceInstance } from '@/types';
 import { MOCK_DEVICES, MOCK_SOFTWARE } from '@/lib/mock-data';
 import { useOCR } from '@/hooks/useOCR';
 import Link from 'next/link';
-import { Image as ImageIcon, PlusCircle, Check, Trash2, MousePointer2, ScanSearch, Loader2, Save, Minus, RotateCcw, FileSpreadsheet, ScanLine } from 'lucide-react';
+import { Image as ImageIcon, PlusCircle, Check, Trash2, MousePointer2, ScanSearch, Loader2, Save, Minus, RotateCcw, FileSpreadsheet, ScanLine, Edit3, Settings, MoreHorizontal } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { fetchMapConfiguration, saveMapConfiguration, syncZonesToSheet, fetchAssetData, updateDevice, createDeviceInstance, deleteDeviceInstance } from '@/app/actions';
+import { fetchMapConfiguration, saveMapConfiguration, syncZonesToSheet, fetchAssetData, updateDevice, createDeviceInstance, deleteDeviceInstance, updateZoneName } from '@/app/actions';
 import { DeviceEditModal } from '@/components/devices/DeviceEditModal';
 import { ZoneEditModal } from '@/components/map/ZoneEditModal';
 
@@ -42,6 +42,8 @@ export default function Home() {
   const [selectedZoneIds, setSelectedZoneIds] = useState<Set<string>>(new Set());
   const [editingZone, setEditingZone] = useState<Location | null>(null); // For zone editing
   const [lastSelectedPin, setLastSelectedPin] = useState<Location | null>(null);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [showZoneMenu, setShowZoneMenu] = useState(false);
 
   // 1. Statistics Calculation
   const stats = useMemo(() => {
@@ -138,7 +140,27 @@ export default function Home() {
     }
   };
 
-  const handleZoneClick = (pin: Location, e: React.MouseEvent) => {
+  const handleZoneClick = async (pin: Location, e: React.MouseEvent) => {
+    // In Renaming Mode, prompt for new name
+    if (isRenaming) {
+      e.stopPropagation();
+      const newName = prompt(`'${pin.name}' 의 새로운 이름을 입력하세요:`, pin.name);
+      if (newName && newName.trim() !== '' && newName !== pin.name) {
+        try {
+          // 1. Local Update
+          const updatedPins = pins.map(p => p.id === pin.id ? { ...p, name: newName } : p);
+          savePins(updatedPins);
+
+          // 2. Server/Sheet Update
+          await updateZoneName(pin.id, pin.name, newName);
+          // Optimistic alert not needed if UI reflects change immediately
+        } catch (err) {
+          alert('이름 변경 실패: ' + String(err));
+        }
+      }
+      return;
+    }
+
     // In Editing Mode, clicking toggles selection (for deletion)
     if (isEditing) {
       toggleZoneSelection(pin.id, e);
@@ -293,373 +315,393 @@ export default function Home() {
           학교 배치도 (Main Campus)
         </h1>
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-          {isScanning ? (
-            <div className="flex items-center gap-2 px-4 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium animate-pulse">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              {statusText}
-            </div>
-          ) : mapImage ? (
-            <>
-              {/* Name Management Button */}
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto relative">
+            {/* Zone Management Dropdown */}
+            <div className="relative">
               <button
-                onClick={() => setShowNameModal(true)}
-                className="cursor-pointer flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-green-700 transition-colors whitespace-nowrap flex-auto md:flex-none justify-center"
-                title="AI로 이름을 자동 추출하거나 엑셀로 관리"
+                onClick={() => setShowZoneMenu(!showZoneMenu)}
+                className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm"
               >
-                <div className="flex items-center gap-1">
-                  <span className="text-xs font-mono border border-white/40 rounded px-1">A</span>
-                </div>
-                이름 관리
+                <Settings className="w-4 h-4" />
+                <span>구역 관리</span>
               </button>
 
-              <div className="hidden md:block h-6 w-px bg-gray-300 dark:bg-gray-700 mx-1" />
-
-              {/* AI Structure Detection */}
-              <button
-                onClick={handleAIScan}
-                className="cursor-pointer flex items-center gap-2 px-3 py-1.5 bg-indigo-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-indigo-700 transition-colors whitespace-nowrap flex-auto md:flex-none justify-center"
-                title="Google Vision 대신 OpenCV를 사용하여 기하학적 구조(네모칸)만 빠르게 찾습니다."
-              >
-                <ScanSearch className="w-4 h-4" />
-                AI 구역 찾기
-              </button>
-
-              {/* Edit Mode Toggle with Delete Action */}
-              <div className="flex items-center gap-2">
-                {isEditing && selectedZoneIds.size > 0 && (
+              {showZoneMenu && (
+                <div className="absolute top-full right-0 mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden">
                   <button
-                    onClick={deleteSelectedZones}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-red-100 text-red-600 text-sm font-medium rounded-lg hover:bg-red-200 transition-colors animate-in fade-in whitespace-nowrap"
+                    onClick={() => {
+                      setIsEditing(!isEditing);
+                      setIsRenaming(false);
+                      setShowZoneMenu(false);
+                    }}
+                    className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 ${isEditing ? 'text-blue-600 bg-blue-50' : 'text-gray-700 dark:text-gray-200'}`}
                   >
-                    <Trash2 className="w-4 h-4" />
-                    선택 삭제 ({selectedZoneIds.size})
+                    <Check className={`w-4 h-4 ${isEditing ? 'opacity-100' : 'opacity-0'}`} />
+                    구역 편집 {isEditing ? '(ON)' : ''}
                   </button>
-                )}
+                  <button
+                    onClick={() => {
+                      setIsRenaming(!isRenaming);
+                      setIsEditing(false);
+                      setShowZoneMenu(false);
+                    }}
+                    className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 ${isRenaming ? 'text-blue-600 bg-blue-50' : 'text-gray-700 dark:text-gray-200'}`}
+                  >
+                    <Edit3 className="w-4 h-4" />
+                    이름 변경 {isRenaming ? '(ON)' : ''}
+                  </button>
+                  <div className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
+                  <button
+                    onClick={() => { handleAIScan(); setShowZoneMenu(false); }}
+                    className="w-full text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                  >
+                    <ScanSearch className="w-4 h-4" />
+                    자동 스캔
+                  </button>
+                  <button
+                    onClick={() => { setShowNameModal(true); setShowZoneMenu(false); }}
+                    className="w-full text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                  >
+                    <ScanLine className="w-4 h-4" />
+                    이름 자동 인식
+                  </button>
+                  <button
+                    onClick={() => { handleSyncZones(); setShowZoneMenu(false); }}
+                    className="w-full text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                  >
+                    <FileSpreadsheet className="w-4 h-4" />
+                    시트로 내보내기
+                  </button>
+                  <div className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
+                  <Link
+                    href="/scan"
+                    className="w-full text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                  >
+                    <ScanLine className="w-4 h-4" />
+                    스캔 등록
+                  </Link>
+                  <button
+                    onClick={() => {
+                      if (confirm('배치도를 변경하시겠습니까?')) {
+                        setMapImage(undefined);
+                        uploaderRef.current?.open();
+                        setShowZoneMenu(false);
+                      }
+                    }}
+                    className="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
+                  >
+                    <ImageIcon className="w-4 h-4" />
+                    배치도 변경
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Mode Indicators */}
+            {isEditing && (
+              <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold animate-pulse border border-red-200">
+                편집 모드 (삭제 가능)
+              </span>
+            )}
+            {isRenaming && (
+              <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold animate-pulse border border-green-200">
+                이름 변경 모드
+              </span>
+            )}
+            {isEditing && selectedZoneIds.size > 0 && (
+              <button
+                onClick={deleteSelectedZones}
+                className="ml-2 flex items-center gap-2 px-3 py-1.5 bg-red-100 text-red-600 text-xs font-bold rounded-lg hover:bg-red-200 transition-colors border border-red-200 whitespace-nowrap"
+              >
+                <Trash2 className="w-3 h-3" />
+                삭제 ({selectedZoneIds.size})
+              </button>
+            )}
+
+
+            {isScanning ? (
+              <div className="flex items-center gap-2 px-4 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium animate-pulse">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                {statusText}
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        {/* Edit Mode Banner */}
+        <AnimatePresence>
+          {isEditing && (
+            <motion.div
+              initial={{ opacity: 0, y: -20, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: 'auto' }}
+              exit={{ opacity: 0, y: -20, height: 0 }}
+              className="w-full bg-orange-50/90 dark:bg-orange-900/20 border-b border-orange-100 dark:border-orange-800/30 overflow-hidden"
+            >
+              <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-center gap-6 text-sm text-orange-800 dark:text-orange-200">
+                <div className="flex items-center gap-2">
+                  <PlusCircle className="w-4 h-4" />
+                  <span><strong>생성:</strong> 빈 공간 드래그</span>
+                </div>
+                <div className="w-px h-3 bg-orange-200 dark:bg-orange-700" />
 
                 <button
-                  onClick={() => {
-                    setIsEditing(!isEditing);
-                    setSelectedZoneIds(new Set()); // Clear selection on toggle
-                  }}
-                  className={`flex items-center gap-2 px-3 py-1.5 border rounded-lg text-sm font-medium transition-colors ${isEditing
-                    ? 'bg-orange-100 border-orange-200 text-orange-700'
-                    : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-                    } whitespace-nowrap flex-auto md:flex-none justify-center`}
+                  onClick={handleSelectAll}
+                  className="flex items-center gap-2 hover:bg-orange-100 dark:hover:bg-orange-800/50 px-2 py-1 rounded transition-colors"
                 >
-                  {isEditing ? (
-                    <>
-                      <Check className="w-4 h-4" />
-                      편집 완료
-                    </>
-                  ) : (
-                    <>
-                      <MousePointer2 className="w-4 h-4" />
-                      구역 편집
-                    </>
-                  )}
+                  <Check className="w-4 h-4" />
+                  <span><strong>전체 선택</strong> ({pins.length}개)</span>
                 </button>
+
+                <div className="w-px h-3 bg-orange-200 dark:bg-orange-700" />
+
+                <div className="flex items-center gap-2">
+                  <MousePointer2 className="w-4 h-4" />
+                  <span><strong>선택:</strong> 클릭</span>
+                </div>
+                <div className="w-px h-3 bg-orange-200 dark:bg-orange-700" />
+                <div className="flex items-center gap-2">
+                  <Trash2 className="w-4 h-4" />
+                  <span><strong>삭제:</strong> 선택 후 '선택 삭제'</span>
+                </div>
               </div>
-
-              <div className="hidden md:block h-6 w-px bg-gray-300 dark:bg-gray-700 mx-1" />
-
-              <button
-                onClick={() => {
-                  if (confirm('배치도를 변경하시겠습니까? 기존 구역 정보는 유지됩니다.')) {
-                    setMapImage(undefined);
-                    uploaderRef.current?.open();
-                  }
-                }}
-                className="cursor-pointer flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors whitespace-nowrap flex-auto md:flex-none justify-center"
-              >
-                <ImageIcon className="w-4 h-4" />
-                배치도 변경
-              </button>
-
-              <Link
-                href="/scan"
-                className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-bold rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md active:scale-95 whitespace-nowrap flex-auto md:flex-none justify-center"
-              >
-                <ScanLine className="w-4 h-4" />
-                스캔 등록
-              </Link>
-            </>
-          ) : null}
-        </div>
-      </div>
-
-      {/* Edit Mode Banner */}
-      <AnimatePresence>
-        {isEditing && (
-          <motion.div
-            initial={{ opacity: 0, y: -20, height: 0 }}
-            animate={{ opacity: 1, y: 0, height: 'auto' }}
-            exit={{ opacity: 0, y: -20, height: 0 }}
-            className="w-full bg-orange-50/90 dark:bg-orange-900/20 border-b border-orange-100 dark:border-orange-800/30 overflow-hidden"
-          >
-            <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-center gap-6 text-sm text-orange-800 dark:text-orange-200">
-              <div className="flex items-center gap-2">
-                <PlusCircle className="w-4 h-4" />
-                <span><strong>생성:</strong> 빈 공간 드래그</span>
-              </div>
-              <div className="w-px h-3 bg-orange-200 dark:bg-orange-700" />
-
-              <button
-                onClick={handleSelectAll}
-                className="flex items-center gap-2 hover:bg-orange-100 dark:hover:bg-orange-800/50 px-2 py-1 rounded transition-colors"
-              >
-                <Check className="w-4 h-4" />
-                <span><strong>전체 선택</strong> ({pins.length}개)</span>
-              </button>
-
-              <div className="w-px h-3 bg-orange-200 dark:bg-orange-700" />
-
-              <div className="flex items-center gap-2">
-                <MousePointer2 className="w-4 h-4" />
-                <span><strong>선택:</strong> 클릭</span>
-              </div>
-              <div className="w-px h-3 bg-orange-200 dark:bg-orange-700" />
-              <div className="flex items-center gap-2">
-                <Trash2 className="w-4 h-4" />
-                <span><strong>삭제:</strong> 선택 후 '선택 삭제'</span>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <div className="flex-1 w-full max-w-7xl bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden relative" ref={mapContainerRef}>
-        {isLoadingMap ? (
-          <div className="absolute inset-0 bg-white dark:bg-gray-900 z-50 flex items-center justify-center">
-            <div className="text-center">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-              <p className="text-gray-900 dark:text-white font-medium">배치도와 구역을 불러오는 중입니다...</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">잠시만 기다려주세요</p>
-            </div>
-          </div>
-        ) : !mapImage ? (
-          <ImageUploader ref={uploaderRef} currentImage={mapImage} onImageUpload={handleImageUpload} />
-        ) : (
-          <AssetMapViewer
-            imageSrc={mapImage}
-            zoom={zoom}
-            pins={pins}
-            selectedPin={selectedPin}
-            isEditing={isEditing}
-            selectedZoneIds={selectedZoneIds}
-            onPinClick={handleZoneClick}
-            onBgClick={() => {
-              setSelectedPin(null);
-              if (isEditing) setSelectedZoneIds(new Set());
-            }}
-            onPinMove={(id: string, x: number, y: number) => {
-              const newPins = pins.map(p => p.id === id ? { ...p, pinX: x, pinY: y } : p);
-              savePins(newPins);
-            }}
-            onPinResize={(id: string, w: number, h: number) => {
-              const newPins = pins.map(p => p.id === id ? { ...p, width: w, height: h } : p);
-              savePins(newPins);
-            }}
-            onZoneCreate={(rect: { x: number, y: number, w: number, h: number }) => {
-              const newPin: Location = {
-                id: `zone-${Date.now()}`,
-                name: `구역 ${pins.length + 1}`,
-                pinX: rect.x,
-                pinY: rect.y,
-                width: rect.w,
-                height: rect.h,
-                type: 'Classroom'
-              };
-              savePins([...pins, newPin]);
-            }}
-            onZoneDoubleClick={handleZoneDoubleClick}
-          />
-        )}
-
-        {/* Zoom Controls */}
-        <div className="absolute top-4 right-4 flex flex-col gap-2 z-10">
-          <button onClick={handleZoomIn} className="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300">
-            <PlusCircle className="w-5 h-5" />
-          </button>
-          <button onClick={handleZoomReset} className="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300">
-            <RotateCcw className="w-5 h-5" />
-          </button>
-          <button onClick={handleZoomOut} className="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300">
-            <Minus className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Asset Details Modal */}
-        <AnimatePresence>
-          {selectedPin && !isEditing && (
-            <AssetDetailModal
-              isOpen={!!selectedPin}
-              onClose={() => setSelectedPin(null)}
-              zone={selectedPin}
-              deviceInstances={deviceInstances.filter(inst => inst.locationId === selectedPin.id)}
-              allDeviceInstances={deviceInstances}
-              allDevices={devices}
-              onEditDevice={(device) => {
-                setLastSelectedPin(selectedPin);
-                setEditDevice(device);
-                setSelectedPin(null);
-              }}
-              onAssignDevice={async (deviceId, zoneId, zoneName, quantity) => {
-                const result = await createDeviceInstance({
-                  deviceId,
-                  locationId: zoneId,
-                  locationName: zoneName,
-                  quantity,
-                  notes: ''
-                });
-
-                if (result.success) {
-                  const { devices: updatedDevices, deviceInstances: updatedInstances } = await fetchAssetData();
-                  if (updatedDevices) setDevices(updatedDevices);
-                  if (updatedInstances) setDeviceInstances(updatedInstances);
-                } else {
-                  throw new Error(result.error);
-                }
-              }}
-              onRemoveInstance={async (instanceId) => {
-                const result = await deleteDeviceInstance(instanceId);
-                if (result.success) {
-                  const { deviceInstances: updatedInstances } = await fetchAssetData();
-                  if (updatedInstances) setDeviceInstances(updatedInstances);
-                } else {
-                  throw new Error(result.error || 'Failed to remove instance');
-                }
-              }}
-            />
+            </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Device Edit Modal (from map) */}
-        <DeviceEditModal
-          isOpen={!!editDevice}
-          device={editDevice}
-          onClose={() => {
-            setEditDevice(null);
-            if (lastSelectedPin) {
-              setSelectedPin(lastSelectedPin);
-              setLastSelectedPin(null);
-            }
-          }}
-          onSave={async (updates) => {
-            if (!editDevice) return;
+        <div className="flex-1 w-full max-w-7xl bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden relative" ref={mapContainerRef}>
+          {isLoadingMap ? (
+            <div className="absolute inset-0 bg-white dark:bg-gray-900 z-50 flex items-center justify-center">
+              <div className="text-center">
+                <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                <p className="text-gray-900 dark:text-white font-medium">배치도와 구역을 불러오는 중입니다...</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">잠시만 기다려주세요</p>
+              </div>
+            </div>
+          ) : !mapImage ? (
+            <ImageUploader ref={uploaderRef} currentImage={mapImage} onImageUpload={handleImageUpload} />
+          ) : (
+            <AssetMapViewer
+              imageSrc={mapImage}
+              zoom={zoom}
+              pins={pins}
+              selectedPin={selectedPin}
+              isEditing={isEditing}
+              selectedZoneIds={selectedZoneIds}
+              onPinClick={handleZoneClick}
+              onBgClick={() => {
+                setSelectedPin(null);
+                if (isEditing) setSelectedZoneIds(new Set());
+              }}
+              onPinMove={(id: string, x: number, y: number) => {
+                const newPins = pins.map(p => p.id === id ? { ...p, pinX: x, pinY: y } : p);
+                savePins(newPins);
+              }}
+              onPinResize={(id: string, w: number, h: number) => {
+                const newPins = pins.map(p => p.id === id ? { ...p, width: w, height: h } : p);
+                savePins(newPins);
+              }}
+              onZoneCreate={(rect: { x: number, y: number, w: number, h: number }) => {
+                const newPin: Location = {
+                  id: `zone-${Date.now()}`,
+                  name: `구역 ${pins.length + 1}`,
+                  pinX: rect.x,
+                  pinY: rect.y,
+                  width: rect.w,
+                  height: rect.h,
+                  type: 'Classroom'
+                };
+                savePins([...pins, newPin]);
+              }}
+              onZoneDoubleClick={handleZoneDoubleClick}
+            />
+          )}
 
-            if (Object.keys(updates).length > 0) {
-              const result = await updateDevice(editDevice.id, updates);
-              if (!result.success) {
-                alert('수정 실패: ' + result.error);
-                return;
+          {/* Zoom Controls */}
+          <div className="absolute top-4 right-4 flex flex-col gap-2 z-10">
+            <button onClick={handleZoomIn} className="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300">
+              <PlusCircle className="w-5 h-5" />
+            </button>
+            <button onClick={handleZoomReset} className="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300">
+              <RotateCcw className="w-5 h-5" />
+            </button>
+            <button onClick={handleZoomOut} className="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300">
+              <Minus className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Asset Details Modal */}
+          <AnimatePresence>
+            {selectedPin && !isEditing && (
+              <AssetDetailModal
+                isOpen={!!selectedPin}
+                onClose={() => setSelectedPin(null)}
+                zone={selectedPin}
+                deviceInstances={deviceInstances.filter(inst => inst.locationId === selectedPin.id)}
+                allDeviceInstances={deviceInstances}
+                allDevices={devices}
+                onEditDevice={(device) => {
+                  setLastSelectedPin(selectedPin);
+                  setEditDevice(device);
+                  setSelectedPin(null);
+                }}
+                onAssignDevice={async (deviceId, zoneId, zoneName, quantity) => {
+                  const result = await createDeviceInstance({
+                    deviceId,
+                    locationId: zoneId,
+                    locationName: zoneName,
+                    quantity,
+                    notes: ''
+                  });
+
+                  if (result.success) {
+                    const { devices: updatedDevices, deviceInstances: updatedInstances } = await fetchAssetData();
+                    if (updatedDevices) setDevices(updatedDevices);
+                    if (updatedInstances) setDeviceInstances(updatedInstances);
+                  } else {
+                    throw new Error(result.error);
+                  }
+                }}
+                onRemoveInstance={async (instanceId) => {
+                  const result = await deleteDeviceInstance(instanceId);
+                  if (result.success) {
+                    const { deviceInstances: updatedInstances } = await fetchAssetData();
+                    if (updatedInstances) setDeviceInstances(updatedInstances);
+                  } else {
+                    throw new Error(result.error || 'Failed to remove instance');
+                  }
+                }}
+              />
+            )}
+          </AnimatePresence>
+
+          {/* Device Edit Modal (from map) */}
+          <DeviceEditModal
+            isOpen={!!editDevice}
+            device={editDevice}
+            onClose={() => {
+              setEditDevice(null);
+              if (lastSelectedPin) {
+                setSelectedPin(lastSelectedPin);
+                setLastSelectedPin(null);
               }
-            }
+            }}
+            onSave={async (updates) => {
+              if (!editDevice) return;
 
-            const { devices: updatedDevices, deviceInstances: updatedInstances } = await fetchAssetData();
-            if (updatedDevices) setDevices(updatedDevices);
-            if (updatedInstances) setDeviceInstances(updatedInstances);
+              if (Object.keys(updates).length > 0) {
+                const result = await updateDevice(editDevice.id, updates);
+                if (!result.success) {
+                  alert('수정 실패: ' + result.error);
+                  return;
+                }
+              }
 
-            // alert('저장되었습니다.'); // Optional feedback
-            setEditDevice(null);
-            if (lastSelectedPin) {
-              setSelectedPin(lastSelectedPin);
-              setLastSelectedPin(null);
-            }
-          }}
-          zones={pins}
-        />
+              const { devices: updatedDevices, deviceInstances: updatedInstances } = await fetchAssetData();
+              if (updatedDevices) setDevices(updatedDevices);
+              if (updatedInstances) setDeviceInstances(updatedInstances);
 
-        {/* Zone Edit Modal */}
-        <ZoneEditModal
-          isOpen={!!editingZone}
-          zone={editingZone}
-          onClose={() => setEditingZone(null)}
-          onSave={handleZoneSave}
-        />
+              // alert('저장되었습니다.'); // Optional feedback
+              setEditDevice(null);
+              if (lastSelectedPin) {
+                setSelectedPin(lastSelectedPin);
+                setLastSelectedPin(null);
+              }
+            }}
+            zones={pins}
+          />
 
-        {/* AI Result Confirmation Modal (Structure) */}
-        {showOCRModal && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-xl max-w-sm w-full"
-            >
-              <h3 className="text-lg font-bold mb-2">구역 찾기 완료</h3>
-              <p className="text-gray-600 dark:text-gray-300 text-sm mb-4">
-                {ocrResults.length}개의 구역 구조를 찾았습니다.<br />
-                적용 후 [구역 편집] 모드에서 불필요한 구역을 정리해주세요.
-              </p>
-              <div className="flex justify-end gap-2">
-                <button onClick={() => { setShowOCRModal(false); setOcrResults([]); }} className="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded-lg">취소</button>
-                <button onClick={confirmStructureUpdate} className="px-4 py-2 bg-primary text-white rounded-lg">적용 및 편집</button>
-              </div>
-            </motion.div>
-          </div>
-        )}
+          {/* Zone Edit Modal */}
+          <ZoneEditModal
+            isOpen={!!editingZone}
+            zone={editingZone}
+            onClose={() => setEditingZone(null)}
+            onSave={handleZoneSave}
+          />
 
-        {/* Name Management Modal */}
-        {showNameModal && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-xl max-w-md w-full"
-            >
-              <h3 className="text-xl font-bold mb-2">구역 이름 관리</h3>
-              <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">
-                구역 이름을 설정하는 두 가지 방법 중 선택하세요.
-              </p>
+          {/* AI Result Confirmation Modal (Structure) */}
+          {showOCRModal && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-xl max-w-sm w-full"
+              >
+                <h3 className="text-lg font-bold mb-2">구역 찾기 완료</h3>
+                <p className="text-gray-600 dark:text-gray-300 text-sm mb-4">
+                  {ocrResults.length}개의 구역 구조를 찾았습니다.<br />
+                  적용 후 [구역 편집] 모드에서 불필요한 구역을 정리해주세요.
+                </p>
+                <div className="flex justify-end gap-2">
+                  <button onClick={() => { setShowOCRModal(false); setOcrResults([]); }} className="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded-lg">취소</button>
+                  <button onClick={confirmStructureUpdate} className="px-4 py-2 bg-primary text-white rounded-lg">적용 및 편집</button>
+                </div>
+              </motion.div>
+            </div>
+          )}
 
-              <div className="space-y-4">
-                <button
-                  onClick={handleAutoNameZones}
-                  className="w-full flex items-center gap-4 p-4 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 transition-all group text-left"
-                >
-                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-                    <ScanSearch className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="font-semibold text-gray-900 dark:text-white group-hover:text-blue-700">AI 이름 추출</div>
-                    <div className="text-xs text-gray-500">이미지에 적힌 텍스트(예: "과학실")를 자동으로 읽어옵니다.</div>
-                  </div>
-                </button>
+          {/* Name Management Modal */}
+          {showNameModal && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-xl max-w-md w-full"
+              >
+                <h3 className="text-xl font-bold mb-2">구역 이름 관리</h3>
+                <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">
+                  구역 이름을 설정하는 두 가지 방법 중 선택하세요.
+                </p>
 
-                <button
-                  onClick={handleSyncZones}
-                  className="w-full flex items-center gap-4 p-4 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-green-50 dark:hover:bg-green-900/20 hover:border-green-300 transition-all group text-left"
-                >
-                  <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600">
-                    <FileSpreadsheet className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="font-semibold text-gray-900 dark:text-white group-hover:text-green-700">엑셀(구글 시트)로 관리</div>
-                    <div className="text-xs text-gray-500">구역 목록을 시트로 내보내고 직접 이름을 입력합니다.</div>
-                  </div>
-                </button>
-              </div>
+                <div className="space-y-4">
+                  <button
+                    onClick={handleAutoNameZones}
+                    className="w-full flex items-center gap-4 p-4 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 transition-all group text-left"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                      <ScanSearch className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-900 dark:text-white group-hover:text-blue-700">AI 이름 추출</div>
+                      <div className="text-xs text-gray-500">이미지에 적힌 텍스트(예: "과학실")를 자동으로 읽어옵니다.</div>
+                    </div>
+                  </button>
 
-              <button onClick={() => setShowNameModal(false)} className="mt-8 w-full py-2 text-gray-500 hover:text-gray-700 text-sm">닫기</button>
-            </motion.div>
-          </div>
-        )}
-      </div>
+                  <button
+                    onClick={handleSyncZones}
+                    className="w-full flex items-center gap-4 p-4 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-green-50 dark:hover:bg-green-900/20 hover:border-green-300 transition-all group text-left"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600">
+                      <FileSpreadsheet className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-900 dark:text-white group-hover:text-green-700">엑셀(구글 시트)로 관리</div>
+                      <div className="text-xs text-gray-500">구역 목록을 시트로 내보내고 직접 이름을 입력합니다.</div>
+                    </div>
+                  </button>
+                </div>
 
-      {/* Footer Stats */}
-      <div className="flex gap-8 text-center bg-gray-50 dark:bg-gray-800/50 py-4 px-8 rounded-2xl">
-        <div>
-          <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalZones}</div>
-          <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mt-1">Total Zones</div>
+                <button onClick={() => setShowNameModal(false)} className="mt-8 w-full py-2 text-gray-500 hover:text-gray-700 text-sm">닫기</button>
+              </motion.div>
+            </div>
+          )}
         </div>
-        <div className="w-px bg-gray-200 dark:bg-gray-700" />
-        <div>
-          <div className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.withDevices}</div>
-          <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mt-1">Assigned</div>
-        </div>
-        <div className="w-px bg-gray-200 dark:bg-gray-700" />
-        <div>
-          <div className="text-2xl font-bold text-orange-500 dark:text-orange-400">{stats.empty}</div>
-          <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mt-1">Empty</div>
+
+        {/* Footer Stats */}
+        <div className="flex gap-8 text-center bg-gray-50 dark:bg-gray-800/50 py-4 px-8 rounded-2xl">
+          <div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalZones}</div>
+            <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mt-1">Total Zones</div>
+          </div>
+          <div className="w-px bg-gray-200 dark:bg-gray-700" />
+          <div>
+            <div className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.withDevices}</div>
+            <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mt-1">Assigned</div>
+          </div>
+          <div className="w-px bg-gray-200 dark:bg-gray-700" />
+          <div>
+            <div className="text-2xl font-bold text-orange-500 dark:text-orange-400">{stats.empty}</div>
+            <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mt-1">Empty</div>
+          </div>
         </div>
       </div>
     </div>
