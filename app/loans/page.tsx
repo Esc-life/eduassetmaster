@@ -118,14 +118,9 @@ export default function LoansPage() {
             <div className="max-w-7xl mx-auto space-y-6">
                 {/* Header */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                        <Link href="/" className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors cursor-pointer">
-                            <ArrowLeft className="w-6 h-6 text-gray-600 dark:text-gray-400" />
-                        </Link>
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">대여/반납 관리</h1>
-                            <p className="text-sm text-gray-500">기기 대여 현황을 확인하고 관리합니다.</p>
-                        </div>
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">대여/반납 관리</h1>
+                        <p className="text-sm text-gray-500">기기 대여 현황을 확인하고 관리합니다.</p>
                     </div>
                     <div className="flex gap-2">
                         <button

@@ -7,19 +7,8 @@ export function Header() {
     const { data: session } = useSession();
 
     return (
-        <header className="h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 flex items-center justify-between sticky top-0 z-10 transition-colors">
-            <div className="flex items-center flex-1 max-w-xl">
-                <div className="relative w-full">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                        type="text"
-                        placeholder="자산 검색 (기기명, 모델명, 관리번호...)"
-                        className="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-gray-900 border-none rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:outline-none dark:text-gray-200"
-                    />
-                </div>
-            </div>
-
-            <div className="flex items-center gap-4 ml-4">
+        <header className="h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 flex items-center justify-end sticky top-0 z-10 transition-colors">
+            <div className="flex items-center gap-4">
                 {/* Notification Bell */}
                 <button className="relative p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors">
                     <Bell className="w-5 h-5" />

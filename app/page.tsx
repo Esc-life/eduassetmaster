@@ -314,7 +314,7 @@ export default function Home() {
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
           학교 배치도 (Main Campus)
         </h1>
-        <div className="flex flex-wrap items-center gap-2 w-full">
+        <div className="flex flex-wrap items-center gap-2 w-full justify-end">
           {isScanning ? (
             <div className="flex items-center gap-2 px-4 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium animate-pulse">
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -674,7 +674,7 @@ export default function Home() {
         </div>
 
         {/* Footer Stats */}
-        <div className="flex gap-8 text-center bg-gray-50 dark:bg-gray-800/50 py-4 px-8 rounded-2xl">
+        <div className="flex gap-8 text-center bg-gray-50 dark:bg-gray-800/50 py-4 px-8 rounded-2xl justify-center">
           <div>
             <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalZones}</div>
             <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mt-1">Total Zones</div>
