@@ -48,20 +48,17 @@ export default function Home() {
   // 1. Statistics Calculation
   const stats = useMemo(() => {
     const total = pins.length;
-    const assigned = pins.filter(p => p.type === 'Classroom' || p.type === 'Office').length; // Just counts
-    const available = total - assigned; // Logic placeholder
-    // Let's make it real based on device mapping
-    const deviceCount = pins.reduce((acc, pin) => {
-      const hasDevice = MOCK_DEVICES.some(d => d.groupId === pin.id);
-      return acc + (hasDevice ? 1 : 0);
-    }, 0);
+    // Count zones with actual device instances
+    const zonesWithDevices = pins.filter(pin => {
+      return deviceInstances.some(inst => inst.locationId === pin.id);
+    }).length;
 
     return {
       totalZones: total,
-      withDevices: deviceCount,
-      empty: total - deviceCount
+      withDevices: zonesWithDevices,
+      empty: total - zonesWithDevices
     };
-  }, [pins]);
+  }, [pins, deviceInstances]);
 
   // 2. Load Map Image, Zones, and Devices (Server + Local Fallback)
   useEffect(() => {
@@ -455,11 +452,11 @@ export default function Home() {
           )}
         </AnimatePresence>
 
-        <div className="flex-1 w-full max-w-7xl bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden relative" ref={mapContainerRef}>
+        <div className="flex-1 w-full max-w-7xl mx-auto bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden relative" ref={mapContainerRef}>
           {isLoadingMap ? (
             <div className="absolute inset-0 bg-white dark:bg-gray-900 z-50 flex items-center justify-center">
               <div className="text-center">
-                <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
                 <p className="text-gray-900 dark:text-white font-medium">배치도와 구역을 불러오는 중입니다...</p>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">잠시만 기다려주세요</p>
               </div>
@@ -663,6 +660,23 @@ export default function Home() {
                     <div>
                       <div className="font-semibold text-gray-900 dark:text-white group-hover:text-green-700">엑셀(구글 시트)로 관리</div>
                       <div className="text-xs text-gray-500">구역 목록을 시트로 내보내고 직접 이름을 입력합니다.</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setIsRenaming(true);
+                      setIsEditing(false);
+                      setShowNameModal(false);
+                    }}
+                    className="w-full flex items-center gap-4 p-4 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:border-purple-300 transition-all group text-left"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600">
+                      <Edit3 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-900 dark:text-white group-hover:text-purple-700">배치도에서 이름 변경하기</div>
+                      <div className="text-xs text-gray-500">배치도에서 각 구역을 클릭하여 직접 이름을 변경합니다.</div>
                     </div>
                   </button>
                 </div>

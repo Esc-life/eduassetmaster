@@ -215,7 +215,7 @@ export default function DevicesPage() {
                         className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm whitespace-nowrap flex-auto md:flex-none justify-center"
                     >
                         <Plus className="w-4 h-4" />
-                        기기 추가
+                        개별 등록
                     </button>
                     <button
                         onClick={() => setIsBulkOpen(true)}
@@ -224,23 +224,25 @@ export default function DevicesPage() {
                         <FileSpreadsheet className="w-4 h-4" />
                         일괄 등록 (엑셀)
                     </button>
+                    <button
+                        onClick={() => selectedDevices.length > 0 && setIsDisposalModalOpen(true)}
+                        disabled={selectedDevices.length === 0}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors shadow-sm text-sm font-medium whitespace-nowrap flex-auto md:flex-none justify-center ${selectedDevices.length > 0
+                                ? 'bg-gray-600 text-white hover:bg-gray-700 cursor-pointer'
+                                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            }`}
+                    >
+                        <Minus className="w-4 h-4" />
+                        불용 처리 {selectedDevices.length > 0 && `(${selectedDevices.length})`}
+                    </button>
                     {selectedDevices.length > 0 && (
-                        <>
-                            <button
-                                onClick={() => setIsDisposalModalOpen(true)}
-                                className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors shadow-sm text-sm font-medium whitespace-nowrap flex-auto md:flex-none justify-center"
-                            >
-                                <Minus className="w-4 h-4" />
-                                불용 처리 ({selectedDevices.length})
-                            </button>
-                            <button
-                                onClick={handleDeleteSelected}
-                                className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors shadow-sm text-sm font-medium whitespace-nowrap flex-auto md:flex-none justify-center"
-                            >
-                                <Trash2 className="w-4 h-4" />
-                                선택 삭제 ({selectedDevices.length})
-                            </button>
-                        </>
+                        <button
+                            onClick={handleDeleteSelected}
+                            className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors shadow-sm text-sm font-medium whitespace-nowrap flex-auto md:flex-none justify-center"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                            선택 삭제 ({selectedDevices.length})
+                        </button>
                     )}
                     <button
                         onClick={() => setDeleteModal({ open: true, type: 'all' })}
