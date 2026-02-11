@@ -1197,21 +1197,40 @@ export async function changePassword(current: string, newPass: string) {
     if (!session || !session.user?.email) return { success: false, error: '로그인이 필요합니다.' };
 
     const email = session.user.email;
-
-    // Admin fallback user check - 제한 해제
-    // if (email === 'admin@test.com') return { success: false, error: '데모 관리자 계정은 비밀번호를 변경할 수 없습니다.' };
+    const sheetId = await getUserSheetId();
+    if (sheetId === 'NO_SHEET') return { success: false, error: '연결된 시트가 없습니다.' };
 
     try {
-        const rows = await getData('Users!A:E');
-        if (!rows) return { success: false, error: '사용자 DB를 찾을 수 없습니다.' };
+        let rows = await getData('Users!A:E', sheetId);
 
-        // Index 2 is Email. Rows include header, so find will hit actual user.
+        // If Users sheet doesn't exist, create it
+        if (!rows) {
+            await addSheet('Users', sheetId);
+            await updateData('Users!A1', [['ID', 'Name', 'Email', 'Password', 'Role']], sheetId);
+            rows = [];
+        }
+
         const userIndex = rows.findIndex((r: any[]) => r[2] === email);
-        if (userIndex === -1) return { success: false, error: '사용자를 찾을 수 없습니다.' };
+
+        if (userIndex === -1) {
+            // User not found. If current password matches '1234' (Default Admin), create user.
+            if (current === '1234') {
+                const newUser = [
+                    'User-' + Date.now(),
+                    'Admin User',
+                    email,
+                    newPass,
+                    'admin'
+                ];
+                await appendData('Users!A1', [newUser], sheetId);
+                return { success: true };
+            }
+            return { success: false, error: '사용자를 찾을 수 없습니다.' };
+        }
 
         const userRow = rows[userIndex];
 
-        // Index 3 is Password
+        // Check current password (Index 3)
         if (userRow[3] !== current) {
             return { success: false, error: '현재 비밀번호가 일치하지 않습니다.' };
         }
@@ -1219,8 +1238,8 @@ export async function changePassword(current: string, newPass: string) {
         const updatedRow = [...userRow];
         updatedRow[3] = newPass;
 
-        // Row number is index + 1 (A1 notation)
-        await updateData(`Users!A${userIndex + 1}`, [updatedRow]);
+        // Row number is index + 1
+        await updateData(`Users!A${userIndex + 1}`, [updatedRow], sheetId);
 
         return { success: true };
     } catch (e) {
@@ -1272,13 +1291,9 @@ export async function updateZoneName(zoneId: string, oldName: string, newName: s
             const rowIndex = locRows.findIndex((r: any[]) => r[0] === zoneId);
             if (rowIndex !== -1) {
                 const updatedRow = [...locRows[rowIndex]];
-                updatedRow[2] = newName; // Update Custom Name (Column C, Index 2)
-                // Assuming Row 1 is header, so array index 0 is Row 1? No.
-                // getData usually fetches values. If A:C, Row 1 is Header. LocRows[0] is Header.
-                // So rowIndex is correct 0-based index. Row Number is rowIndex + 1.
+                updatedRow[2] = newName;
                 await updateData(`Locations!A${rowIndex + 1}`, [updatedRow], sheetId);
             } else {
-                // If not found in Locations sheet
                 await appendData('Locations!A1', [[zoneId, oldName, newName]], sheetId);
             }
         } else {
@@ -1305,19 +1320,42 @@ export async function updateZoneName(zoneId: string, oldName: string, newName: s
             }
         } catch (e) { console.log('Instance update skipped', e); }
 
-        // 3. Update Devices Sheet (Install Location)
+        // 3. Update Devices Sheet (Install Location) - Enhanced Logic
         try {
             const devRows = await getData('Devices!A2:R', sheetId);
+            const instRows = await getData('DeviceInstances!A2:F', sheetId); // Fetch instances for cross-check
+
             if (devRows) {
                 const devUpdates: { range: string, values: any[][] }[] = [];
+
+                // Find devices currently in this zone (via DeviceInstances)
+                const deviceIdsInZone = new Set<string>();
+                if (instRows) {
+                    instRows.forEach((r: any[]) => {
+                        if (r[2] === zoneId) deviceIdsInZone.add(r[1]); // r[1] is DeviceID
+                    });
+                }
+
                 devRows.forEach((row: any[], idx: number) => {
-                    // Check Install Location (Index 13) or Group ID (Index 6)
-                    if (row[6] === zoneId || (oldName && row[13] === oldName)) {
+                    const devId = row[0];
+                    const currentLocName = row[13];
+                    const currentGroupId = row[6];
+
+                    // Criteria: 
+                    // 1. Device ID is in the affected zone (via Instances)
+                    // 2. Install Location matches oldName (Legacy/Exact string match)
+                    // 3. GroupID matches zoneId (Direct link)
+                    if (
+                        deviceIdsInZone.has(devId) ||
+                        currentGroupId === zoneId ||
+                        (oldName && currentLocName === oldName)
+                    ) {
                         const newRow = [...row];
-                        newRow[13] = newName;
+                        newRow[13] = newName; // Update Install Location Name column
                         devUpdates.push({ range: `Devices!A${idx + 2}`, values: [newRow] });
                     }
                 });
+
                 for (const up of devUpdates) {
                     await updateData(up.range, up.values, sheetId);
                 }
