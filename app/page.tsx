@@ -42,7 +42,7 @@ export default function Home() {
   const [selectedZoneIds, setSelectedZoneIds] = useState<Set<string>>(new Set());
   const [editingZone, setEditingZone] = useState<Location | null>(null); // For zone editing
   const [lastSelectedPin, setLastSelectedPin] = useState<Location | null>(null);
-  const [isRenaming, setIsRenaming] = useState(false);
+
   const [showZoneMenu, setShowZoneMenu] = useState(false);
 
   // 1. Statistics Calculation
@@ -151,27 +151,7 @@ export default function Home() {
     }
   };
 
-  const handleZoneClick = async (pin: Location, e: React.MouseEvent) => {
-    // In Renaming Mode, prompt for new name
-    if (isRenaming) {
-      e.stopPropagation();
-      const newName = prompt(`'${pin.name}' 의 새로운 이름을 입력하세요:`, pin.name);
-      if (newName && newName.trim() !== '' && newName !== pin.name) {
-        try {
-          // 1. Local Update
-          const updatedPins = pins.map(p => p.id === pin.id ? { ...p, name: newName } : p);
-          savePins(updatedPins);
-
-          // 2. Server/Sheet Update
-          await updateZoneName(pin.id, pin.name, newName);
-          // Optimistic alert not needed if UI reflects change immediately
-        } catch (err) {
-          alert('이름 변경 실패: ' + String(err));
-        }
-      }
-      return;
-    }
-
+  const handleZoneClick = (pin: Location, e: React.MouseEvent) => {
     // In Editing Mode, clicking toggles selection (for deletion)
     if (isEditing) {
       toggleZoneSelection(pin.id, e);
@@ -187,7 +167,19 @@ export default function Home() {
     }
   };
 
-  const handleZoneSave = (zoneId: string, updates: Partial<Location>) => {
+  const handleZoneSave = async (zoneId: string, updates: Partial<Location>) => {
+    // 1. Update Google Sheet (Custom Name) if name changed
+    if (updates.name) {
+      const targetPin = pins.find(p => p.id === zoneId);
+      if (targetPin && targetPin.name !== updates.name) {
+        try {
+          await updateZoneName(zoneId, targetPin.name, updates.name);
+        } catch (err) {
+          console.error('Failed to update sheet name:', err);
+        }
+      }
+    }
+
     const newPins = pins.map(p =>
       p.id === zoneId ? { ...p, ...updates } : p
     );
@@ -382,7 +374,6 @@ export default function Home() {
                 <button
                   onClick={() => {
                     setIsEditing(!isEditing);
-                    setIsRenaming(false);
                     setSelectedZoneIds(new Set()); // Clear selection on toggle
                   }}
                   className={`flex items-center gap-2 px-3 py-1.5 border rounded-lg text-sm font-medium transition-colors ${isEditing
@@ -403,28 +394,7 @@ export default function Home() {
                   )}
                 </button>
 
-                <button
-                  onClick={() => {
-                    setIsRenaming(!isRenaming);
-                    setIsEditing(false);
-                  }}
-                  className={`flex items-center gap-2 px-3 py-1.5 border rounded-lg text-sm font-medium transition-colors ${isRenaming
-                    ? 'bg-green-100 border-green-200 text-green-700'
-                    : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-                    } whitespace-nowrap flex-auto md:flex-none justify-center`}
-                >
-                  {isRenaming ? (
-                    <>
-                      <Check className="w-4 h-4" />
-                      완료
-                    </>
-                  ) : (
-                    <>
-                      <Edit className="w-4 h-4" />
-                      이름 변경
-                    </>
-                  )}
-                </button>
+
               </div>
             </>
           ) : (
@@ -677,22 +647,7 @@ export default function Home() {
                     </div>
                   </button>
 
-                  <button
-                    onClick={() => {
-                      setIsRenaming(true);
-                      setIsEditing(false);
-                      setShowNameModal(false);
-                    }}
-                    className="w-full flex items-center gap-4 p-4 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:border-purple-300 transition-all group text-left"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600">
-                      <Edit3 className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="font-semibold text-gray-900 dark:text-white group-hover:text-purple-700">배치도에서 이름 변경하기</div>
-                      <div className="text-xs text-gray-500">배치도에서 각 구역을 클릭하여 직접 이름을 변경합니다.</div>
-                    </div>
-                  </button>
+
                 </div>
 
                 <button onClick={() => setShowNameModal(false)} className="mt-8 w-full py-2 text-gray-500 hover:text-gray-700 text-sm">닫기</button>
