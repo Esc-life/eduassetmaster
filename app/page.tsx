@@ -310,11 +310,11 @@ export default function Home() {
 
   return (
     <div className="space-y-6 flex flex-col items-center pb-20">
-      <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="w-full flex flex-col gap-4">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
           학교 배치도 (Main Campus)
         </h1>
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full">
           {isScanning ? (
             <div className="flex items-center gap-2 px-4 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium animate-pulse">
               <Loader2 className="w-4 h-4 animate-spin" />
