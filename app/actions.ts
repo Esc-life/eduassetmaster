@@ -1189,3 +1189,41 @@ export async function returnLoan(loanId: string, returnCondition: string = 'Good
         return { success: false, error: String(e) };
     }
 }
+
+// --- User Management ---
+
+export async function changePassword(current: string, newPass: string) {
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user?.email) return { success: false, error: '로그인이 필요합니다.' };
+
+    const email = session.user.email;
+
+    // Admin fallback user check
+    if (email === 'admin@test.com') return { success: false, error: '데모 관리자 계정은 비밀번호를 변경할 수 없습니다.' };
+
+    try {
+        const rows = await getData('Users!A:E');
+        if (!rows) return { success: false, error: '사용자 DB를 찾을 수 없습니다.' };
+
+        // Index 2 is Email. Rows include header, so find will hit actual user.
+        const userIndex = rows.findIndex((r: any[]) => r[2] === email);
+        if (userIndex === -1) return { success: false, error: '사용자를 찾을 수 없습니다.' };
+
+        const userRow = rows[userIndex];
+
+        // Index 3 is Password
+        if (userRow[3] !== current) {
+            return { success: false, error: '현재 비밀번호가 일치하지 않습니다.' };
+        }
+
+        const updatedRow = [...userRow];
+        updatedRow[3] = newPass;
+
+        // Row number is index + 1 (A1 notation)
+        await updateData(`Users!A${userIndex + 1}`, [updatedRow]);
+
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: String(e) };
+    }
+}

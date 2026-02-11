@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Save, RefreshCw, Database, Key, User, Copy, Check, Link as LinkIcon, Server, HelpCircle, X, ExternalLink } from 'lucide-react';
-import { fetchSystemConfig, saveSystemConfig, getMySheetId } from '@/app/actions';
+import { fetchSystemConfig, saveSystemConfig, getMySheetId, changePassword } from '@/app/actions';
 
 function GuideModal({ onClose }: { onClose: () => void }) {
     return (
@@ -75,6 +75,31 @@ export default function SettingsPage() {
 
     // Guide Modal
     const [showGuide, setShowGuide] = useState(false);
+
+    // Password Change
+    const [curPass, setCurPass] = useState('');
+    const [newPass, setNewPass] = useState('');
+    const [cfmPass, setCfmPass] = useState('');
+    const [isPwChanging, setIsPwChanging] = useState(false);
+
+    const handleChangePassword = async () => {
+        if (!curPass || !newPass || !cfmPass) return alert('모든 항목을 입력해주세요.');
+        if (newPass !== cfmPass) return alert('새 비밀번호가 일치하지 않습니다.');
+        if (newPass.length < 4) return alert('비밀번호는 4자 이상이어야 합니다.');
+
+        setIsPwChanging(true);
+        const result = await changePassword(curPass, newPass);
+        setIsPwChanging(false);
+
+        if (result.success) {
+            alert('비밀번호가 변경되었습니다.');
+            setCurPass('');
+            setNewPass('');
+            setCfmPass('');
+        } else {
+            alert('변경 실패: ' + result.error);
+        }
+    };
 
     useEffect(() => {
         const load = async () => {
@@ -196,6 +221,33 @@ export default function SettingsPage() {
                                     <span className="text-blue-600 dark:text-blue-400 font-medium">* 서버 환경 변수에 키가 있다면 입력하지 않아도 자동 적용됩니다.</span>
                                 </p>
                             </div>
+                        </div>
+                    </Section>
+
+                    {/* 2.5 Password Change */}
+                    <Section title="계정 보안" icon={<div className="w-5 h-5 flex items-center justify-center text-red-500 font-bold">🔒</div>} color="bg-red-50 dark:bg-red-900/20">
+                        <div className="space-y-4">
+                            <div>
+                                <label className="label">현재 비밀번호</label>
+                                <input type="password" value={curPass} onChange={e => setCurPass(e.target.value)} className="input-field" placeholder="현재 비밀번호 입력" />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="label">새 비밀번호</label>
+                                    <input type="password" value={newPass} onChange={e => setNewPass(e.target.value)} className="input-field" placeholder="새 비밀번호 (4자 이상)" />
+                                </div>
+                                <div>
+                                    <label className="label">새 비밀번호 확인</label>
+                                    <input type="password" value={cfmPass} onChange={e => setCfmPass(e.target.value)} className="input-field" placeholder="비밀번호 확인" />
+                                </div>
+                            </div>
+                            <button
+                                onClick={handleChangePassword}
+                                disabled={isPwChanging}
+                                className="w-full py-2.5 bg-gray-800 hover:bg-gray-900 dark:bg-gray-700 dark:hover:bg-gray-600 text-white rounded-lg font-bold transition-all disabled:opacity-50 text-sm"
+                            >
+                                {isPwChanging ? '변경 중...' : '비밀번호 변경'}
+                            </button>
                         </div>
                     </Section>
 

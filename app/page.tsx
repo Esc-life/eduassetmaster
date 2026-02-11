@@ -512,9 +512,6 @@ export default function Home() {
                   notes: ''
                 });
 
-                // Sync: Update Device installLocation property
-                await updateDevice(deviceId, { installLocation: zoneName });
-
                 if (result.success) {
                   const { devices: updatedDevices, deviceInstances: updatedInstances } = await fetchAssetData();
                   if (updatedDevices) setDevices(updatedDevices);
