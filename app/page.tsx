@@ -8,7 +8,7 @@ import { Device, Location, DeviceInstance } from '@/types';
 import { MOCK_DEVICES, MOCK_SOFTWARE } from '@/lib/mock-data';
 import { useOCR } from '@/hooks/useOCR';
 import Link from 'next/link';
-import { Image as ImageIcon, PlusCircle, Check, Trash2, MousePointer2, ScanSearch, Loader2, Save, Minus, RotateCcw, FileSpreadsheet, ScanLine, Edit3, Settings, MoreHorizontal } from 'lucide-react';
+import { Image as ImageIcon, PlusCircle, Check, Trash2, MousePointer2, ScanSearch, Loader2, Save, Minus, RotateCcw, FileSpreadsheet, ScanLine, Edit3, Settings, MoreHorizontal, CheckSquare, Edit } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { fetchMapConfiguration, saveMapConfiguration, syncZonesToSheet, fetchAssetData, updateDevice, createDeviceInstance, deleteDeviceInstance, updateZoneName } from '@/app/actions';
 import { DeviceEditModal } from '@/components/devices/DeviceEditModal';
@@ -315,117 +315,115 @@ export default function Home() {
           학교 배치도 (Main Campus)
         </h1>
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto relative">
-            {/* Zone Management Dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setShowZoneMenu(!showZoneMenu)}
-                className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm"
-              >
-                <Settings className="w-4 h-4" />
-                <span>구역 관리</span>
-              </button>
-
-              {showZoneMenu && (
-                <div className="absolute top-full right-0 mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden">
-                  <button
-                    onClick={() => {
-                      setIsEditing(!isEditing);
-                      setIsRenaming(false);
-                      setShowZoneMenu(false);
-                    }}
-                    className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 ${isEditing ? 'text-blue-600 bg-blue-50' : 'text-gray-700 dark:text-gray-200'}`}
-                  >
-                    <Check className={`w-4 h-4 ${isEditing ? 'opacity-100' : 'opacity-0'}`} />
-                    구역 편집 {isEditing ? '(ON)' : ''}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setIsRenaming(!isRenaming);
-                      setIsEditing(false);
-                      setShowZoneMenu(false);
-                    }}
-                    className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 ${isRenaming ? 'text-blue-600 bg-blue-50' : 'text-gray-700 dark:text-gray-200'}`}
-                  >
-                    <Edit3 className="w-4 h-4" />
-                    이름 변경 {isRenaming ? '(ON)' : ''}
-                  </button>
-                  <div className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
-                  <button
-                    onClick={() => { handleAIScan(); setShowZoneMenu(false); }}
-                    className="w-full text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
-                  >
-                    <ScanSearch className="w-4 h-4" />
-                    자동 스캔
-                  </button>
-                  <button
-                    onClick={() => { setShowNameModal(true); setShowZoneMenu(false); }}
-                    className="w-full text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
-                  >
-                    <ScanLine className="w-4 h-4" />
-                    이름 자동 인식
-                  </button>
-                  <button
-                    onClick={() => { handleSyncZones(); setShowZoneMenu(false); }}
-                    className="w-full text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
-                  >
-                    <FileSpreadsheet className="w-4 h-4" />
-                    시트로 내보내기
-                  </button>
-                  <div className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
-                  <Link
-                    href="/scan"
-                    className="w-full text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
-                  >
-                    <ScanLine className="w-4 h-4" />
-                    스캔 등록
-                  </Link>
-                  <button
-                    onClick={() => {
-                      if (confirm('배치도를 변경하시겠습니까?')) {
-                        setMapImage(undefined);
-                        uploaderRef.current?.open();
-                        setShowZoneMenu(false);
-                      }
-                    }}
-                    className="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
-                  >
-                    <ImageIcon className="w-4 h-4" />
-                    배치도 변경
-                  </button>
-                </div>
-              )}
+          {isScanning ? (
+            <div className="flex items-center gap-2 px-4 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium animate-pulse">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              {statusText}
             </div>
-
-            {/* Mode Indicators */}
-            {isEditing && (
-              <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold animate-pulse border border-red-200">
-                편집 모드 (삭제 가능)
-              </span>
-            )}
-            {isRenaming && (
-              <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold animate-pulse border border-green-200">
-                이름 변경 모드
-              </span>
-            )}
-            {isEditing && selectedZoneIds.size > 0 && (
+          ) : mapImage ? (
+            <>
+              {/* Name Management Button */}
               <button
-                onClick={deleteSelectedZones}
-                className="ml-2 flex items-center gap-2 px-3 py-1.5 bg-red-100 text-red-600 text-xs font-bold rounded-lg hover:bg-red-200 transition-colors border border-red-200 whitespace-nowrap"
+                onClick={() => setShowNameModal(true)}
+                className="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-green-700 transition-colors whitespace-nowrap flex-auto md:flex-none justify-center"
+                title="AI로 이름을 자동 추출하거나 엑셀로 관리"
               >
-                <Trash2 className="w-3 h-3" />
-                삭제 ({selectedZoneIds.size})
+                <div className="flex items-center gap-1">
+                  <span className="text-xs font-mono border border-white/40 rounded px-1">A</span>
+                </div>
+                이름 관리
               </button>
-            )}
 
+              <div className="hidden md:block h-6 w-px bg-gray-300 dark:bg-gray-700 mx-1" />
 
-            {isScanning ? (
-              <div className="flex items-center gap-2 px-4 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium animate-pulse">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                {statusText}
+              {/* AI Structure Detection */}
+              <button
+                onClick={handleAIScan}
+                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-indigo-700 transition-colors whitespace-nowrap flex-auto md:flex-none justify-center"
+                title="Google Vision과 OpenCV를 사용하여 기하학적 구조(사각형/빌딩 검출)를 찾습니다."
+              >
+                <ScanSearch className="w-4 h-4" />
+                AI 구역 찾기
+              </button>
+
+              {/* Edit Mode Toggle with Delete Action */}
+              <div className="flex items-center gap-2">
+                {isEditing && selectedZoneIds.size > 0 && (
+                  <button
+                    onClick={deleteSelectedZones}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-red-100 text-red-600 text-sm font-medium rounded-lg hover:bg-red-200 transition-colors animate-in fade-in whitespace-nowrap"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    선택 삭제 ({selectedZoneIds.size})
+                  </button>
+                )}
+
+                {isEditing && (
+                  <button
+                    onClick={handleSelectAll}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-100 text-blue-600 text-sm font-medium rounded-lg hover:bg-blue-200 transition-colors whitespace-nowrap"
+                  >
+                    <CheckSquare className="w-4 h-4" />
+                    전체 선택
+                  </button>
+                )}
+
+                <button
+                  onClick={() => {
+                    setIsEditing(!isEditing);
+                    setIsRenaming(false);
+                    setSelectedZoneIds(new Set()); // Clear selection on toggle
+                  }}
+                  className={`flex items-center gap-2 px-3 py-1.5 border rounded-lg text-sm font-medium transition-colors ${isEditing
+                    ? 'bg-orange-100 border-orange-200 text-orange-700'
+                    : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                    } whitespace-nowrap flex-auto md:flex-none justify-center`}
+                >
+                  {isEditing ? (
+                    <>
+                      <Check className="w-4 h-4" />
+                      편집 완료
+                    </>
+                  ) : (
+                    <>
+                      <Edit3 className="w-4 h-4" />
+                      구역 편집
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsRenaming(!isRenaming);
+                    setIsEditing(false);
+                  }}
+                  className={`flex items-center gap-2 px-3 py-1.5 border rounded-lg text-sm font-medium transition-colors ${isRenaming
+                    ? 'bg-green-100 border-green-200 text-green-700'
+                    : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                    } whitespace-nowrap flex-auto md:flex-none justify-center`}
+                >
+                  {isRenaming ? (
+                    <>
+                      <Check className="w-4 h-4" />
+                      완료
+                    </>
+                  ) : (
+                    <>
+                      <Edit className="w-4 h-4" />
+                      이름 변경
+                    </>
+                  )}
+                </button>
               </div>
-            ) : null}
-          </div>
+            </>
+          ) : (
+            <button
+              onClick={() => uploaderRef.current?.open()}
+              className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors shadow-sm text-sm font-medium"
+            >
+              배치도 업로드
+            </button>
+          )}
         </div>
 
         {/* Edit Mode Banner */}
@@ -443,17 +441,6 @@ export default function Home() {
                   <span><strong>생성:</strong> 빈 공간 드래그</span>
                 </div>
                 <div className="w-px h-3 bg-orange-200 dark:bg-orange-700" />
-
-                <button
-                  onClick={handleSelectAll}
-                  className="flex items-center gap-2 hover:bg-orange-100 dark:hover:bg-orange-800/50 px-2 py-1 rounded transition-colors"
-                >
-                  <Check className="w-4 h-4" />
-                  <span><strong>전체 선택</strong> ({pins.length}개)</span>
-                </button>
-
-                <div className="w-px h-3 bg-orange-200 dark:bg-orange-700" />
-
                 <div className="flex items-center gap-2">
                   <MousePointer2 className="w-4 h-4" />
                   <span><strong>선택:</strong> 클릭</span>
@@ -461,7 +448,7 @@ export default function Home() {
                 <div className="w-px h-3 bg-orange-200 dark:bg-orange-700" />
                 <div className="flex items-center gap-2">
                   <Trash2 className="w-4 h-4" />
-                  <span><strong>삭제:</strong> 선택 후 '선택 삭제'</span>
+                  <span><strong>삭제:</strong> 선택 후 헤더의 '선택 삭제' 버튼 클릭</span>
                 </div>
               </div>
             </motion.div>
