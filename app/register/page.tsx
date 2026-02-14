@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { UserPlus, Mail, Lock, Database, FileSpreadsheet, Server, Cloud, Eye, Key, Loader2, Check, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 
-type DBType = 'sheet' | 'firebase' | 'supabase';
+type DBType = 'sheet' | 'firebase';
 
 interface RegisterForm {
     name: string;
@@ -27,9 +27,7 @@ interface RegisterForm {
     fbMessagingSenderId: string;
     fbAppId: string;
 
-    // Supabase
-    sbUrl: string;
-    sbKey: string;
+
 
     // AI Service
     visionApiKey: string;
@@ -53,8 +51,7 @@ export default function RegisterPage() {
         fbStorageBucket: '',
         fbMessagingSenderId: '',
         fbAppId: '',
-        sbUrl: '',
-        sbKey: '',
+
         visionApiKey: ''
     });
 
@@ -99,12 +96,6 @@ export default function RegisterPage() {
                 setLoading(false);
                 return;
             }
-        } else if (form.dbType === 'supabase') {
-            if (!form.sbUrl || !form.sbKey) {
-                setError('Supabase URL과 Key를 입력해주세요.');
-                setLoading(false);
-                return;
-            }
         }
 
         if (!form.visionApiKey) {
@@ -124,6 +115,38 @@ export default function RegisterPage() {
                 const data = await res.json();
                 throw new Error(data.message || '회원가입 실패');
             }
+
+            // Save config to Cookie for Magic Link & Server Actions (Client Side Storage)
+            const configToSave = {
+                dbType: form.dbType,
+                managerName: form.name,
+                visionApiKey: form.visionApiKey,
+                sheet: form.dbType === 'sheet' ? {
+                    spreadsheetId: form.spreadsheetId,
+                    serviceAccountJson: form.serviceAccountJson
+                } : undefined,
+                firebase: form.dbType === 'firebase' ? {
+                    apiKey: form.fbApiKey,
+                    authDomain: form.fbAuthDomain,
+                    projectId: form.fbProjectId,
+                    storageBucket: form.fbStorageBucket,
+                    messagingSenderId: form.fbMessagingSenderId,
+                    appId: form.fbAppId
+                } : undefined
+            };
+
+            // Minify JSON if needed
+            if (configToSave.sheet?.serviceAccountJson) {
+                try {
+                    const minified = JSON.stringify(JSON.parse(configToSave.sheet.serviceAccountJson));
+                    configToSave.sheet.serviceAccountJson = minified;
+                } catch (e) { }
+            }
+
+            // Encode (Handle UTF-8 safely)
+            // Use Lax for better UX on redirect
+            const cookieValue = encodeURIComponent(JSON.stringify(configToSave));
+            document.cookie = `edu-asset-config=${cookieValue}; path=/; max-age=31536000; SameSite=Lax`;
 
             alert('회원가입 및 설정이 완료되었습니다. 로그인해주세요.');
             router.push('/login');
@@ -156,7 +179,7 @@ export default function RegisterPage() {
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">이름 (학교/이부서명)</label>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">이름 (학교/부서명)</label>
                                 <input
                                     type="text"
                                     required
@@ -195,7 +218,7 @@ export default function RegisterPage() {
                             데이터 서버 설정
                         </h3>
 
-                        <div className="grid grid-cols-3 gap-4 mb-4">
+                        <div className="grid grid-cols-2 gap-4 mb-4">
                             <button
                                 type="button"
                                 onClick={() => handleChange('dbType', 'sheet')}
@@ -211,14 +234,6 @@ export default function RegisterPage() {
                             >
                                 <Cloud className={`w-8 h-8 mb-2 ${form.dbType === 'firebase' ? 'text-orange-600' : 'text-gray-400'}`} />
                                 <span className={`font-medium ${form.dbType === 'firebase' ? 'text-orange-700 dark:text-orange-300' : 'text-gray-500'}`}>Firebase</span>
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => handleChange('dbType', 'supabase')}
-                                className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${form.dbType === 'supabase' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'}`}
-                            >
-                                <Server className={`w-8 h-8 mb-2 ${form.dbType === 'supabase' ? 'text-emerald-600' : 'text-gray-400'}`} />
-                                <span className={`font-medium ${form.dbType === 'supabase' ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-500'}`}>Supabase</span>
                             </button>
                         </div>
 
@@ -245,7 +260,10 @@ export default function RegisterPage() {
                                         value={form.serviceAccountJson}
                                         onChange={(e) => handleChange('serviceAccountJson', e.target.value)}
                                     />
-                                    <p className="mt-1 text-xs text-gray-500">구글 클라우드 콘솔에서 다운로드한 JSON 파일 내용을 그대로 붙여넣으세요.</p>
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        경로: Google Cloud Console &gt; IAM 및 관리자 &gt; 서비스 계정 &gt; 키 만들기 (JSON)
+                                        <br />다운로드한 JSON 파일 내용을 그대로 붙여넣으세요.
+                                    </p>
                                 </div>
                             </div>
                         )}
@@ -278,31 +296,11 @@ export default function RegisterPage() {
                                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">App ID</label>
                                         <input type="text" className="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3" value={form.fbAppId} onChange={(e) => handleChange('fbAppId', e.target.value)} />
                                     </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Supabase Config */}
-                        {form.dbType === 'supabase' && (
-                            <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg space-y-4 animate-in fade-in">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Project URL</label>
-                                    <input
-                                        type="text"
-                                        className="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3"
-                                        placeholder="https://xyz...supabase.co"
-                                        value={form.sbUrl}
-                                        onChange={(e) => handleChange('sbUrl', e.target.value)}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">API Key (Anon / Service Role)</label>
-                                    <input
-                                        type="password"
-                                        className="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3"
-                                        value={form.sbKey}
-                                        onChange={(e) => handleChange('sbKey', e.target.value)}
-                                    />
+                                    <div className="md:col-span-2">
+                                        <p className="text-xs text-gray-500 bg-blue-50 p-2 rounded text-center">
+                                            경로: Firebase 콘솔 &gt; 프로젝트 설정 &gt; 일반 &gt; 내 앱 &gt; SDK 설정 및 구성 (Config)
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -364,7 +362,7 @@ export default function RegisterPage() {
                         </button>
                     </div>
                 </form>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 }

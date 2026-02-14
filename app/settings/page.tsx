@@ -81,6 +81,50 @@ export default function SettingsPage() {
     const [newPass, setNewPass] = useState('');
     const [cfmPass, setCfmPass] = useState('');
     const [isPwChanging, setIsPwChanging] = useState(false);
+    const [magicLink, setMagicLink] = useState('');
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+
+        // Check for Magic Link param
+        const params = new URLSearchParams(window.location.search);
+        const magic = params.get('config_sync');
+        if (magic) {
+            try {
+                // Decode: Base64 -> URI Component -> JSON
+                const configStr = decodeURIComponent(escape(atob(magic)));
+                JSON.parse(configStr); // Validate JSON
+
+                if (confirm('설정 동기화 링크가 감지되었습니다.\n현재 기기에 설정을 적용하시겠습니까?')) {
+                    const encoded = encodeURIComponent(configStr);
+                    // Save to Cookie (Available for Server Actions)
+                    document.cookie = `edu-asset-config=${encoded}; path=/; max-age=31536000; SameSite=Lax`;
+                    alert('설정이 성공적으로 적용되었습니다!');
+                    window.location.href = '/settings';
+                }
+            } catch (e) {
+                console.error(e);
+                alert('유효하지 않은 설정 링크입니다.');
+            }
+        }
+    }, []);
+
+    const generateMagicLink = () => {
+        if (typeof document === 'undefined') return;
+        const matches = document.cookie.match(new RegExp('(^| )edu-asset-config=([^;]+)'));
+        if (matches) {
+            try {
+                const configStr = decodeURIComponent(matches[2]);
+                const magic = btoa(unescape(encodeURIComponent(configStr)));
+                const link = `${window.location.origin}/settings?config_sync=${magic}`;
+                setMagicLink(link);
+            } catch (e) {
+                alert('설정 생성 중 오류가 발생했습니다.');
+            }
+        } else {
+            alert('내보낼 설정이 없습니다. 먼저 설정을 저장해주세요.');
+        }
+    };
 
     const handleChangePassword = async () => {
         if (!curPass || !newPass || !cfmPass) return alert('모든 항목을 입력해주세요.');
@@ -221,6 +265,39 @@ export default function SettingsPage() {
                                     <span className="text-blue-600 dark:text-blue-400 font-medium">* 서버 환경 변수에 키가 있다면 입력하지 않아도 자동 적용됩니다.</span>
                                 </p>
                             </div>
+                        </div>
+                    </Section>
+
+                    {/* 2.2 Magic Link (Setting Sync) */}
+                    <Section title="설정 동기화 (PC ↔ 모바일)" icon={<Key className="w-5 h-5 text-green-500" />} color="bg-green-50 dark:bg-green-900/20">
+                        <div className="space-y-4">
+                            <p className="text-sm text-gray-600 dark:text-gray-300">
+                                현재 기기의 설정(API 키, DB 연결정보)을 다른 기기로 복사할 수 있습니다.<br />
+                                <span className="text-xs text-gray-400">* 보안을 위해 비밀번호는 포함되지 않습니다.</span>
+                            </p>
+
+                            {magicLink ? (
+                                <div className="space-y-2 animate-in fade-in">
+                                    <div className="p-3 bg-gray-100 dark:bg-gray-900 rounded-lg break-all text-xs font-mono text-gray-600 dark:text-gray-400 max-h-24 overflow-y-auto">
+                                        {magicLink}
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(magicLink);
+                                            alert('설정 링크가 복사되었습니다! 카카오톡 등으로 모바일에 전송하세요.');
+                                        }}
+                                        className="btn-secondary w-full"
+                                    >
+                                        <Copy className="w-4 h-4 mr-2 inline" />
+                                        링크 복사하기
+                                    </button>
+                                </div>
+                            ) : (
+                                <button onClick={generateMagicLink} className="btn-secondary w-full">
+                                    <LinkIcon className="w-4 h-4 mr-2 inline" />
+                                    설정 내보내기 (매직 링크 생성)
+                                </button>
+                            )}
                         </div>
                     </Section>
 
