@@ -264,6 +264,10 @@ export default function RegisterPage() {
                                         경로: Google Cloud Console &gt; IAM 및 관리자 &gt; 서비스 계정 &gt; 키 만들기 (JSON)
                                         <br />다운로드한 JSON 파일 내용을 그대로 붙여넣으세요.
                                     </p>
+                                    <div className="mt-2 bg-yellow-50 p-2 rounded border border-yellow-200 text-xs text-yellow-800">
+                                        <strong>⚠️ 중요:</strong> JSON 내용 중 <code>client_email</code> 값을 복사하여, <br />
+                                        연동할 <strong>구글 시트의 [공유]</strong> 버튼을 눌러 '편집자' 권한으로 초대해야 합니다.
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -326,7 +330,10 @@ export default function RegisterPage() {
                                     onChange={(e) => handleChange('visionApiKey', e.target.value)}
                                 />
                             </div>
-                            <p className="mt-1 text-xs text-gray-500">이미지 텍스트 인식(OCR)을 위해 필요합니다.</p>
+                            <p className="mt-1 text-xs text-gray-500">
+                                이미지 텍스트 인식(OCR)을 위해 필요합니다.<br />
+                                <span className="text-gray-400">경로: Google Cloud Console &gt; 사용자 인증 정보 &gt; 사용자 인증 정보 만들기 &gt; API 키</span>
+                            </p>
                         </div>
                     </div>
 
