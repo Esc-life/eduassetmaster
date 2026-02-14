@@ -5,7 +5,21 @@ import { authOptions } from "@/lib/auth";
 import { getData, updateData, appendData, addSheet, clearData } from '@/lib/google-sheets';
 import { MOCK_DEVICES, MOCK_SOFTWARE, MOCK_CREDENTIALS } from '@/lib/mock-data';
 import { Device, Software, Credential, Location, DeviceInstance } from '@/types';
-// PDF parsing removed due to Vercel serverless environment incompatibility
+import { cookies } from 'next/headers';
+import * as fbActions from './firebase-actions';
+
+// Helper to get App Config from Cookie
+async function _getAppConfig() {
+    try {
+        const store = await Promise.resolve(cookies());
+        const cookie = store.get('edu-asset-config');
+        if (cookie?.value) {
+            return JSON.parse(decodeURIComponent(cookie.value));
+        }
+    } catch (e) { }
+    return null;
+}
+
 
 export async function parsePdfAction(formData: FormData): Promise<{ success: boolean; text?: string; error?: string }> {
     // PDF parsing disabled on server due to Vercel compatibility issues
@@ -35,6 +49,12 @@ async function getUserSheetId() {
 }
 
 export async function fetchAssetData(overrideSheetId?: string) {
+    // 0. Check Firebase Mode
+    const appConfig = await _getAppConfig();
+    if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
+        return await fbActions.fetchAssetData(appConfig.firebase);
+    }
+
     try {
         const sheetId = overrideSheetId || await getUserSheetId();
 
@@ -463,6 +483,12 @@ export async function syncZonesToSheet(zones: Location[]) {
 
 // Device Management Functions
 export async function updateDevice(deviceId: string, updates: Partial<Device>, overrideSheetId?: string) {
+    // 0. Check Firebase Mode
+    const appConfig = await _getAppConfig();
+    if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
+        return await fbActions.updateDevice(appConfig.firebase, deviceId, updates);
+    }
+
     const sheetId = overrideSheetId || await getUserSheetId();
     if (sheetId === 'NO_SHEET') return { success: false, error: '?ㅽ봽?덈뱶?쒗듃媛 ?곕룞?섏? ?딆븯?듬땲??' };
     if (isGlobalMockMode && !sheetId) return { success: true };
@@ -707,6 +733,12 @@ export async function updateDeviceInstance(instanceId: string, updates: Partial<
  * Delete a DeviceInstance
  */
 export async function deleteDeviceInstance(instanceId: string) {
+    // 0. Check Firebase Mode
+    const appConfig = await _getAppConfig();
+    if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
+        return await fbActions.deleteDeviceInstance(appConfig.firebase, instanceId);
+    }
+
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
         return { success: false, error: 'Unauthorized' };
@@ -745,6 +777,12 @@ export async function deleteDeviceInstance(instanceId: string) {
 // --- System Configuration ---
 
 export async function fetchSystemConfig(overrideSheetId?: string) {
+    // 0. Check Firebase Mode
+    const appConfig = await _getAppConfig();
+    if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
+        return await fbActions.fetchSystemConfig(appConfig.firebase);
+    }
+
     const sheetId = overrideSheetId || await getUserSheetId();
     if (sheetId === 'NO_SHEET') return {};
 
@@ -767,6 +805,12 @@ export async function fetchSystemConfig(overrideSheetId?: string) {
 }
 
 export async function saveSystemConfig(config: Record<string, string>) {
+    // 0. Check Firebase Mode
+    const appConfig = await _getAppConfig();
+    if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
+        return await fbActions.saveSystemConfig(appConfig.firebase, config);
+    }
+
     const sheetId = await getUserSheetId();
     if (sheetId === 'NO_SHEET') return { success: false, error: 'No sheet connected' };
 
@@ -968,6 +1012,12 @@ export async function syncDeviceLocationString(deviceId: string, sheetId: string
 }
 
 export async function getDeviceInstances(deviceId: string) {
+    // 0. Check Firebase Mode
+    const appConfig = await _getAppConfig();
+    if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
+        return await fbActions.getDeviceInstances(appConfig.firebase, deviceId);
+    }
+
     const sheetId = await getUserSheetId();
     if (sheetId === 'NO_SHEET') return [];
 
@@ -995,6 +1045,12 @@ export async function updateDeviceWithDistribution(
     deviceUpdates: Partial<Device>,
     distributions: { locationName: string, quantity: number }[]
 ) {
+    // 0. Check Firebase Mode
+    const appConfig = await _getAppConfig();
+    if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
+        return await fbActions.updateDeviceWithDistribution(appConfig.firebase, deviceId, deviceUpdates, distributions);
+    }
+
     const sheetId = await getUserSheetId();
     if (sheetId === 'NO_SHEET') return { success: false, error: 'No Sheet' };
 
@@ -1279,6 +1335,12 @@ export async function setDevicesStatus(deviceIds: string[], status: string) {
 }
 
 export async function updateZoneName(zoneId: string, oldName: string, newName: string) {
+    // 0. Check Firebase Mode
+    const appConfig = await _getAppConfig();
+    if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
+        return await fbActions.updateZoneName(appConfig.firebase, zoneId, oldName, newName);
+    }
+
     const sheetId = await getUserSheetId();
     if (sheetId === 'NO_SHEET') return { success: false, error: '시트가 없습니다.' };
 
