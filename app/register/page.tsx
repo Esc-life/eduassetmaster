@@ -104,43 +104,53 @@ export default function RegisterPage() {
             return;
         }
 
+        // 1. Construct Config (Needed before calling register action)
+        const configToSave = {
+            dbType: form.dbType,
+            managerName: form.name,
+            visionApiKey: form.visionApiKey,
+            sheet: form.dbType === 'sheet' ? {
+                spreadsheetId: form.spreadsheetId,
+                serviceAccountJson: form.serviceAccountJson
+            } : undefined,
+            firebase: form.dbType === 'firebase' ? {
+                apiKey: form.fbApiKey,
+                authDomain: form.fbAuthDomain,
+                projectId: form.fbProjectId,
+                storageBucket: form.fbStorageBucket,
+                messagingSenderId: form.fbMessagingSenderId,
+                appId: form.fbAppId
+            } : undefined
+        };
+
+        // Minify JSON if needed
+        if (configToSave.sheet?.serviceAccountJson) {
+            try {
+                const minified = JSON.stringify(JSON.parse(configToSave.sheet.serviceAccountJson));
+                configToSave.sheet.serviceAccountJson = minified;
+            } catch (e) { }
+        }
+
         try {
-            const res = await fetch('/api/auth/register', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(form)
-            });
+            if (form.dbType === 'firebase') {
+                const { registerUser } = await import('@/app/firebase-actions');
+                const res = await registerUser(configToSave.firebase, {
+                    email: form.email,
+                    password: form.password,
+                    name: form.name
+                });
+                if (!res.success) throw new Error(res.error || 'Firebase Register Failed');
+            } else {
+                const res = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(form)
+                });
 
-            if (!res.ok) {
-                const data = await res.json();
-                throw new Error(data.message || '회원가입 실패');
-            }
-
-            // Save config to Cookie for Magic Link & Server Actions (Client Side Storage)
-            const configToSave = {
-                dbType: form.dbType,
-                managerName: form.name,
-                visionApiKey: form.visionApiKey,
-                sheet: form.dbType === 'sheet' ? {
-                    spreadsheetId: form.spreadsheetId,
-                    serviceAccountJson: form.serviceAccountJson
-                } : undefined,
-                firebase: form.dbType === 'firebase' ? {
-                    apiKey: form.fbApiKey,
-                    authDomain: form.fbAuthDomain,
-                    projectId: form.fbProjectId,
-                    storageBucket: form.fbStorageBucket,
-                    messagingSenderId: form.fbMessagingSenderId,
-                    appId: form.fbAppId
-                } : undefined
-            };
-
-            // Minify JSON if needed
-            if (configToSave.sheet?.serviceAccountJson) {
-                try {
-                    const minified = JSON.stringify(JSON.parse(configToSave.sheet.serviceAccountJson));
-                    configToSave.sheet.serviceAccountJson = minified;
-                } catch (e) { }
+                if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(data.message || '회원가입 실패');
+                }
             }
 
             // Encode (Handle UTF-8 safely)

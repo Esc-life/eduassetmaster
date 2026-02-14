@@ -1,6 +1,8 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { getData } from "@/lib/google-sheets";
+import { cookies } from "next/headers";
+import { verifyUser } from "@/app/firebase-actions";
 
 export const authOptions: NextAuthOptions = {
     providers: [
@@ -12,6 +14,26 @@ export const authOptions: NextAuthOptions = {
             },
             async authorize(credentials) {
                 if (!credentials?.email || !credentials?.password) return null;
+
+                // 0. Check Cookie for Firebase Login
+                try {
+                    const store = await Promise.resolve(cookies());
+                    const cookie = store.get('edu-asset-config');
+                    if (cookie?.value) {
+                        const config = JSON.parse(decodeURIComponent(cookie.value));
+                        if (config.dbType === 'firebase' && config.firebase) {
+                            const user = await verifyUser(config.firebase, { email: credentials.email, password: credentials.password });
+                            if (!user) return null;
+                            return {
+                                id: user.id || user.email,
+                                name: user.name,
+                                email: user.email,
+                                role: user.role,
+                                spreadsheetId: 'FIREBASE_MODE' // Placeholder
+                            };
+                        }
+                    }
+                } catch (e) { }
 
                 try {
                     // Fetch users from Sheet (Master Sheet)

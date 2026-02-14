@@ -1,7 +1,50 @@
 'use server';
 
-import { collection, query, where, getDocs, doc, setDoc, updateDoc, addDoc, deleteDoc, writeBatch } from "firebase/firestore";
+import { collection, query, where, getDocs, getDoc, doc, setDoc, updateDoc, addDoc, deleteDoc, writeBatch } from "firebase/firestore";
 import { getFirebaseStore } from "@/lib/firebase";
+
+// --- Authentication ---
+export async function registerUser(config: any, userData: { email: string, password: string, name: string }) {
+    const db = getFirebaseStore(config);
+    try {
+        const docRef = doc(db, "Users", userData.email);
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+            return { success: false, error: '이미 등록된 이메일입니다.' };
+        }
+
+        await setDoc(docRef, {
+            email: userData.email,
+            password: userData.password, // Plain text for demo
+            name: userData.name,
+            role: 'admin',
+            createdAt: new Date().toISOString()
+        });
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: String(e) };
+    }
+}
+
+export async function verifyUser(config: any, creds: { email: string, password: string }) {
+    const db = getFirebaseStore(config);
+    try {
+        const docRef = doc(db, "Users", creds.email);
+        const snap = await getDoc(docRef);
+
+        if (snap.exists()) {
+            const u = snap.data();
+            if (u.password === creds.password) {
+                return { id: u.email, name: u.name, email: u.email, role: u.role };
+            }
+        }
+        return null;
+    } catch (e) {
+        console.error("verifyUser Error", e);
+        return null;
+    }
+}
+
 
 // --- System Config ---
 export async function fetchSystemConfig(config: any) {
@@ -132,7 +175,7 @@ export async function updateDeviceWithDistribution(config: any, deviceId: string
             // But updateDevice expects existing ID.
             // If new device, handle create?
             // Assuming device exists or setDoc with merge
-            batch.set(devRef, updates, { merge: true });
+            await setDoc(devRef, updates, { merge: true });
         }
 
         // 2. Clear old instances
