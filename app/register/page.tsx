@@ -59,6 +59,40 @@ export default function RegisterPage() {
         setForm(prev => ({ ...prev, [field]: value }));
     };
 
+    const handleFirebasePaste = (text: string) => {
+        if (!text.trim()) return;
+
+        // Extract value by key (Supports "key": "value" and key: "value")
+        const extract = (key: string) => {
+            const regex = new RegExp(`['"]?${key}['"]?\\s*:\\s*['"]([^'"]+)['"]`, 'i');
+            const match = text.match(regex);
+            return match ? match[1] : null;
+        };
+
+        const updates: Partial<RegisterForm> = {};
+        const mapping: Record<string, keyof RegisterForm> = {
+            apiKey: 'fbApiKey',
+            authDomain: 'fbAuthDomain',
+            projectId: 'fbProjectId',
+            storageBucket: 'fbStorageBucket',
+            messagingSenderId: 'fbMessagingSenderId',
+            appId: 'fbAppId'
+        };
+
+        let found = false;
+        for (const [src, dest] of Object.entries(mapping)) {
+            const val = extract(src);
+            if (val) {
+                updates[dest] = val;
+                found = true;
+            }
+        }
+
+        if (found) {
+            setForm(prev => ({ ...prev, ...updates }));
+        }
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -285,6 +319,23 @@ export default function RegisterPage() {
                         {/* Firebase Config */}
                         {form.dbType === 'firebase' && (
                             <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg space-y-4 animate-in fade-in">
+                                {/* Paste Area */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Firebase 설정 붙여넣기 (자동 입력)
+                                    </label>
+                                    <textarea
+                                        rows={4}
+                                        className="block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-300 text-xs font-mono placeholder-gray-400"
+                                        placeholder={`// 아래와 같은 설정 코드를 붙여넣으면 자동 입력됩니다.\nconst firebaseConfig = {\n  apiKey: "AIzaSy...",\n  authDomain: "...",\n  ...\n};`}
+                                        onChange={(e) => handleFirebasePaste(e.target.value)}
+                                    />
+                                    <p className="mt-1 text-xs text-blue-600 dark:text-blue-400 font-medium">
+                                        ✨ 코드를 붙여넣으면 아래 필드가 자동으로 채워집니다.
+                                    </p>
+                                </div>
+                                <div className="border-t border-gray-200 dark:border-gray-700 border-dashed"></div>
+
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">API Key</label>
