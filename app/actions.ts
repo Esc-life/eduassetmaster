@@ -871,7 +871,7 @@ export async function processScannedImage(imageBase64: string, locationName: str
         // Need to import fetchAssetData or define it here? It's exported in this file.
         // Since we are inside the module, we can call fetchAssetData directly if it's defined in scope.
         // It is exported, so it's available.
-        const { devices } = await fetchAssetData(overrideSheetId);
+        const { devices } = (await fetchAssetData(overrideSheetId)) as { devices: Device[] };
 
         if (!devices || devices.length === 0) {
             return { success: false, error: '매칭할 기기 데이터가 없습니다. 엑셀 데이터를 먼저 확인해주세요.', text: fullText };
@@ -881,7 +881,7 @@ export async function processScannedImage(imageBase64: string, locationName: str
         // Clean text: Remove ALL non-alphanumeric chars (including hyphens, underscores) to handle OCR errors better
         const normalize = (s: string) => s.replace(/[^a-zA-Z0-9가-힣]/g, '').toUpperCase();
         const cleanText = normalize(fullText);
-        let matchedDevice = null;
+        let matchedDevice: Device | null = null;
 
         for (const device of devices) {
             if (!device) continue;
