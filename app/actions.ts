@@ -52,7 +52,13 @@ export async function fetchAssetData(overrideSheetId?: string) {
     // 0. Check Firebase Mode
     const appConfig = await _getAppConfig();
     if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
-        return await fbActions.fetchAssetData(appConfig.firebase);
+        const fbData: any = await fbActions.fetchAssetData(appConfig.firebase);
+        return {
+            devices: (fbData.devices || []) as Device[],
+            software: [] as Software[],
+            credentials: [] as Credential[],
+            deviceInstances: (fbData.instances || []) as DeviceInstance[]
+        };
     }
 
     try {
