@@ -1,6 +1,6 @@
 'use server';
 
-import { collection, query, where, getDocs, getDoc, doc, setDoc, updateDoc, addDoc, deleteDoc, writeBatch } from "firebase/firestore";
+import { collection, query, where, getDocs, getDoc, doc, setDoc, updateDoc, addDoc, deleteDoc, writeBatch } from "firebase/firestore/lite";
 import { getFirebaseStore } from "@/lib/firebase";
 
 // --- Authentication ---
