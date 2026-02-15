@@ -60,18 +60,22 @@ export default function Home() {
     };
   }, [pins, deviceInstances]);
 
-  // 2. Load Map Image, Zones, and Devices (Server + Local Fallback)
+  // 2. Load Map Image, Zones, and Devices (Server Only)
   useEffect(() => {
+    // Clear legacy local storage to ensure clean state
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('school_map_image');
+      localStorage.removeItem('school_map_zones');
+    }
+
     const loadMapData = async () => {
       setIsLoadingMap(true);
       try {
         const { mapImage: serverImage, zones: serverZones } = await fetchMapConfiguration();
         const { devices: serverDevices, deviceInstances: serverInstances } = await fetchAssetData();
 
-        const localImage = localStorage.getItem('school_map_image');
-        const localZones = localStorage.getItem('school_map_zones');
-
-        const imageToLoad = serverImage || localImage;
+        // localStorage logic removed to prevent data leak between accounts
+        const imageToLoad = serverImage;
 
         // If there's an image, wait for it to load before hiding spinner
         if (imageToLoad) {
@@ -86,14 +90,19 @@ export default function Home() {
           };
           img.src = imageToLoad;
         } else {
+          setMapImage(undefined);
           setIsLoadingMap(false);
         }
 
-        if (serverZones && serverZones.length > 0) setPins(serverZones);
-        else if (localZones) setPins(JSON.parse(localZones));
+        if (serverZones) setPins(serverZones);
+        else setPins([]);
 
         if (serverDevices) setDevices(serverDevices);
+        else setDevices([]);
+
         if (serverInstances) setDeviceInstances(serverInstances);
+        else setDeviceInstances([]);
+
       } catch (error) {
         console.error('Error loading map data:', error);
         setIsLoadingMap(false);
@@ -107,7 +116,7 @@ export default function Home() {
     const reader = new FileReader();
     reader.onloadend = () => {
       const base64String = reader.result as string;
-      localStorage.setItem('school_map_image', base64String);
+      // localStorage removed
       setMapImage(base64String);
       // Ensure we have the map image
       const currentImage = base64String;
@@ -120,11 +129,11 @@ export default function Home() {
 
   const savePins = (newPins: Location[]) => {
     setPins(newPins);
-    localStorage.setItem('school_map_zones', JSON.stringify(newPins));
+    // localStorage removed
 
     // Ensure we have the map image
-    const currentImage = mapImage || localStorage.getItem('school_map_image');
-    console.log(`[Client] Saving Pins: ${newPins.length} zones. Image Present: ${!!currentImage}`);
+    const currentImage = mapImage;
+    console.log(`[Client] Saving Pins: ${newPins.length} zones.`);
 
     // Sync to Server
     saveMapConfiguration(currentImage || null, newPins)
