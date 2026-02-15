@@ -83,7 +83,7 @@ export default function RegisterPage() {
         for (const [src, dest] of Object.entries(mapping)) {
             const val = extract(src);
             if (val) {
-                updates[dest] = val;
+                updates[dest] = val as any;
                 found = true;
             }
         }
