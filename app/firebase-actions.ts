@@ -293,3 +293,41 @@ export async function syncZonesToDB(config: any, zones: any[]) {
         return { success: false, error: String(e) };
     }
 }
+
+export async function registerBulkDevicesToDB(config: any, devices: any[]) {
+    const db = getFirebaseStore(config);
+    try {
+        const batch = writeBatch(db);
+        let opCount = 0;
+
+        // Firestore batch limit is 500. If more, need to split.
+        // For simplicity, handle chunks of 400.
+        const chunks = [];
+        for (let i = 0; i < devices.length; i += 400) {
+            chunks.push(devices.slice(i, i + 400));
+        }
+
+        for (const chunk of chunks) {
+            const newBatch = writeBatch(db);
+            chunk.forEach((d: any) => {
+                const id = d.id || crypto.randomUUID(); // Ensure ID
+                const ref = doc(db, "Devices", id);
+                newBatch.set(ref, {
+                    ...d,
+                    id: id,
+                    status: d.status || '사용 가능',
+                    quantity: d.quantity ? Number(d.quantity) : 1,
+                    unitPrice: d.unitPrice ? Number(d.unitPrice) : 0,
+                    totalAmount: d.totalAmount ? Number(d.totalAmount) : 0,
+                    createdAt: new Date().toISOString()
+                }, { merge: true });
+            });
+            await newBatch.commit();
+            opCount += chunk.length;
+        }
+
+        return { success: true, count: opCount };
+    } catch (e) {
+        return { success: false, error: String(e) };
+    }
+}

@@ -111,14 +111,19 @@ export function BulkUploadModal({ isOpen, onClose, onSave }: BulkUploadModalProp
                         const dataRows = json.slice(headerIndex + 1);
 
                         // Convert to array of objects based on index
-                        const objects = dataRows.map((row: any) => {
-                            const obj: any = {};
-                            headerRow.forEach((h, i) => {
-                                if (h) obj[h] = row[i];
+                        const objects = dataRows
+                            .map((row: any) => {
+                                const obj: any = {};
+                                headerRow.forEach((h, i) => {
+                                    if (h) obj[h] = row[i];
+                                });
+                                obj._raw = row; // Store raw row for index-based access
+                                return obj;
+                            })
+                            .filter((obj: any) => {
+                                // Filter out empty rows: keep row if at least one value is non-empty
+                                return Object.keys(obj).some(k => k !== '_raw' && obj[k] !== undefined && obj[k] !== null && String(obj[k]).trim() !== '');
                             });
-                            obj._raw = row; // Store raw row for index-based access
-                            return obj;
-                        });
 
                         setHeaders(headerRow.filter(h => h !== ''));
                         setParsedData(objects);

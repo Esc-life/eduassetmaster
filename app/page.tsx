@@ -366,19 +366,7 @@ export default function Home() {
             </div>
           ) : mapImage ? (
             <>
-              {/* Name Management Button */}
-              <button
-                onClick={() => setShowNameModal(true)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-green-700 transition-colors whitespace-nowrap flex-auto md:flex-none justify-center"
-                title="AI로 이름을 자동 추출하거나 엑셀로 관리"
-              >
-                <div className="flex items-center gap-1">
-                  <span className="text-xs font-mono border border-white/40 rounded px-1">A</span>
-                </div>
-                이름 관리
-              </button>
 
-              <div className="hidden md:block h-6 w-px bg-gray-300 dark:bg-gray-700 mx-1" />
 
               {/* 1. AI Structure Detection */}
               <button

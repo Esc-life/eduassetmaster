@@ -23,14 +23,16 @@ export const authOptions: NextAuthOptions = {
                         const config = JSON.parse(decodeURIComponent(cookie.value));
                         if (config.dbType === 'firebase' && config.firebase) {
                             const user = await verifyUser(config.firebase, { email: credentials.email, password: credentials.password });
-                            if (!user) return null;
-                            return {
-                                id: user.id || user.email,
-                                name: user.name,
-                                email: user.email,
-                                role: user.role,
-                                spreadsheetId: 'FIREBASE_MODE' // Placeholder
-                            };
+                            if (user) {
+                                return {
+                                    id: user.id || user.email,
+                                    name: user.name,
+                                    email: user.email,
+                                    role: user.role,
+                                    spreadsheetId: 'FIREBASE_MODE' // Placeholder
+                                };
+                            }
+                            // If login fails in Firebase, fall through to Sheet/Hardcoded logic
                         }
                     }
                 } catch (e) { }
