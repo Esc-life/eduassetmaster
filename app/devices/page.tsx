@@ -117,10 +117,11 @@ export default function DevicesPage() {
     const filteredDevices = useMemo(() => {
         return devices.filter((device) => {
             const matchesStatus = filterStatus === 'All' || device.status === filterStatus;
+            const searchLower = searchTerm.toLowerCase();
             const matchesSearch =
-                device.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                device.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                device.id.toLowerCase().includes(searchTerm.toLowerCase());
+                (device.name || '').toLowerCase().includes(searchLower) ||
+                (device.model || '').toLowerCase().includes(searchLower) ||
+                (device.id || '').toLowerCase().includes(searchLower);
             return matchesStatus && matchesSearch;
         });
     }, [devices, filterStatus, searchTerm]);
