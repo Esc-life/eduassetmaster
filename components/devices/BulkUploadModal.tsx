@@ -208,6 +208,8 @@ export function BulkUploadModal({ isOpen, onClose, onSave }: BulkUploadModalProp
         return parsedData.map(row => {
             const newRow: any = {};
             mappings.forEach(m => {
+                // User Request: Do not import installLocation from Excel
+                if (m.target === 'installLocation') return;
                 newRow[m.target] = row[m.source];
             });
 
