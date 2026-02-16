@@ -426,7 +426,7 @@ export async function registerBulkDevices(devices: any[]) {
 
     const sheetId = await getUserSheetId();
     if (sheetId === 'NO_SHEET') return { success: false, error: '?ㅽ봽?덈뱶?쒗듃媛 ?곕룞?섏? ?딆븯?듬땲??' };
-    if (isGlobalMockMode && !sheetId) return { success: true };
+    if (isGlobalMockMode && !sheetId) return { success: true, count: 0 };
 
     try {
         let rows = await getData('Devices!A:A', sheetId);

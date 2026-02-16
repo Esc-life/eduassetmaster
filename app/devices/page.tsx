@@ -47,7 +47,7 @@ export default function DevicesPage() {
         setIsLoading(true);
         const result = await registerBulkDevices(data);
         if (result.success) {
-            alert(`${result.count}개 기기가 성공적으로 등록되었습니다.`);
+            alert(`${(result as any).count}개 기기가 성공적으로 등록되었습니다.`);
             // Reload page to reflect changes
             window.location.reload();
         } else {
@@ -228,8 +228,8 @@ export default function DevicesPage() {
                         onClick={() => selectedDevices.length > 0 && setIsDisposalModalOpen(true)}
                         disabled={selectedDevices.length === 0}
                         className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors shadow-sm text-sm font-medium whitespace-nowrap flex-auto md:flex-none justify-center ${selectedDevices.length > 0
-                                ? 'bg-gray-600 text-white hover:bg-gray-700 cursor-pointer'
-                                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            ? 'bg-gray-600 text-white hover:bg-gray-700 cursor-pointer'
+                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                             }`}
                     >
                         <Minus className="w-4 h-4" />
