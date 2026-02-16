@@ -28,7 +28,8 @@ export default function Home() {
   const [devices, setDevices] = useState<Device[]>([]); // Real devices
   const [deviceInstances, setDeviceInstances] = useState<DeviceInstance[]>([]); // Device instances
   const [editDevice, setEditDevice] = useState<Device | null>(null); // For editing
-  const [isLoadingMap, setIsLoadingMap] = useState(true); // Start with loading state
+  const [isLoadingMap, setIsLoadingMap] = useState(true); // Server Data Fetching
+  const [isMapLoading, setIsMapLoading] = useState(false); // Image Rendering
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const uploaderRef = useRef<ImageUploaderHandle>(null);
@@ -80,20 +81,14 @@ export default function Home() {
 
         // If there's an image, wait for it to load before hiding spinner
         if (imageToLoad) {
-          const img = new Image();
-          img.onload = () => {
-            setMapImage(imageToLoad);
-            setIsLoadingMap(false);
-          };
-          img.onerror = () => {
-            setMapImage(imageToLoad); // Still show it even if error
-            setIsLoadingMap(false);
-          };
-          img.src = imageToLoad;
+          setMapImage(imageToLoad);
+          setIsMapLoading(true); // Trigger visual loading (waits for AssetMapViewer onLoad)
         } else {
           setMapImage(undefined);
-          setIsLoadingMap(false);
+          setIsMapLoading(false);
         }
+
+        setIsLoadingMap(false); // Data fetch done, allow rendering
 
         if (serverZones) setPins(serverZones);
         else setPins([]);
@@ -299,6 +294,19 @@ export default function Home() {
     }
   };
 
+  const handleDeleteMap = () => {
+    const input = prompt("배치도를 삭제하시겠습니까?\n삭제하려면 '배치도 삭제'라고 입력하세요.");
+    if (input === '배치도 삭제') {
+      setMapImage(undefined);
+      setPins([]);
+      setIsEditing(false);
+      setIsMapLoading(false);
+      saveMapConfiguration(null, [])
+        .then(() => alert("배치도가 삭제되었습니다."))
+        .catch(e => alert("삭제 중 오류 발생: " + e));
+    }
+  };
+
   const confirmStructureUpdate = () => {
     // Advanced Merge with De-duplication (Center Point Distance Check)
     // We want to avoid deleting unique rooms just because they overlap with a larger zone.
@@ -372,63 +380,77 @@ export default function Home() {
 
               <div className="hidden md:block h-6 w-px bg-gray-300 dark:bg-gray-700 mx-1" />
 
-              {/* AI Structure Detection */}
+              {/* 1. AI Structure Detection */}
               <button
                 onClick={handleAIScan}
                 className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-indigo-700 transition-colors whitespace-nowrap flex-auto md:flex-none justify-center"
-                title="Google Vision과 OpenCV를 사용하여 기하학적 구조(사각형/빌딩 검출)를 찾습니다."
               >
                 <ScanSearch className="w-4 h-4" />
-                AI 구역 찾기
+                1. AI 구역 인식
               </button>
 
-              {/* Edit Mode Toggle with Delete Action */}
-              <div className="flex items-center gap-2">
-                {isEditing && selectedZoneIds.size > 0 && (
-                  <button
-                    onClick={deleteSelectedZones}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-red-100 text-red-600 text-sm font-medium rounded-lg hover:bg-red-200 transition-colors animate-in fade-in whitespace-nowrap"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    선택 삭제 ({selectedZoneIds.size})
-                  </button>
+              {/* 2. Edit Mode Toggle */}
+              <button
+                onClick={() => {
+                  setIsEditing(!isEditing);
+                  setSelectedZoneIds(new Set());
+                }}
+                className={`flex items-center gap-2 px-3 py-1.5 border rounded-lg text-sm font-medium transition-colors ${isEditing
+                  ? 'bg-orange-100 border-orange-200 text-orange-700'
+                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                  } whitespace-nowrap flex-auto md:flex-none justify-center`}
+              >
+                {isEditing ? (
+                  <>
+                    <Check className="w-4 h-4" />
+                    2. 편집 완료
+                  </>
+                ) : (
+                  <>
+                    <Edit3 className="w-4 h-4" />
+                    2. 구역 편집
+                  </>
                 )}
+              </button>
 
-                {isEditing && (
-                  <button
-                    onClick={handleSelectAll}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-100 text-blue-600 text-sm font-medium rounded-lg hover:bg-blue-200 transition-colors whitespace-nowrap"
-                  >
-                    <CheckSquare className="w-4 h-4" />
-                    전체 선택
-                  </button>
-                )}
+              {/* 3. Name Management */}
+              <button
+                onClick={() => setShowNameModal(true)}
+                className="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-green-700 transition-colors whitespace-nowrap flex-auto md:flex-none justify-center"
+              >
+                <Settings className="w-4 h-4" />
+                3. 이름 관리
+              </button>
 
+              {/* 4. Delete Map */}
+              <button
+                onClick={handleDeleteMap}
+                className="flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-600 border border-red-200 text-sm font-medium rounded-lg hover:bg-red-100 transition-colors whitespace-nowrap flex-auto md:flex-none justify-center"
+              >
+                <Trash2 className="w-4 h-4" />
+                4. 배치도 삭제
+              </button>
+
+              {/* Selection Actions (Only in Edit Mode) */}
+              {isEditing && selectedZoneIds.size > 0 && (
                 <button
-                  onClick={() => {
-                    setIsEditing(!isEditing);
-                    setSelectedZoneIds(new Set()); // Clear selection on toggle
-                  }}
-                  className={`flex items-center gap-2 px-3 py-1.5 border rounded-lg text-sm font-medium transition-colors ${isEditing
-                    ? 'bg-orange-100 border-orange-200 text-orange-700'
-                    : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-                    } whitespace-nowrap flex-auto md:flex-none justify-center`}
+                  onClick={deleteSelectedZones}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-red-100 text-red-600 text-sm font-medium rounded-lg hover:bg-red-200 transition-colors animate-in fade-in whitespace-nowrap ml-2 border border-red-200"
                 >
-                  {isEditing ? (
-                    <>
-                      <Check className="w-4 h-4" />
-                      편집 완료
-                    </>
-                  ) : (
-                    <>
-                      <Edit3 className="w-4 h-4" />
-                      구역 편집
-                    </>
-                  )}
+                  <Trash2 className="w-4 h-4" />
+                  선택 삭제 ({selectedZoneIds.size})
                 </button>
+              )}
 
-
-              </div>
+              {isEditing && (
+                <button
+                  onClick={handleSelectAll}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 text-sm font-medium rounded-lg hover:bg-blue-100 transition-colors whitespace-nowrap border border-blue-200"
+                >
+                  <CheckSquare className="w-4 h-4" />
+                  전체 선택
+                </button>
+              )}
             </>
           ) : (
             <button
@@ -470,52 +492,60 @@ export default function Home() {
         </AnimatePresence>
 
         <div className="flex-1 w-full max-w-7xl mx-auto bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden relative" ref={mapContainerRef}>
-          {isLoadingMap ? (
+          {(isLoadingMap || isMapLoading) && (
             <div className="absolute inset-0 bg-white dark:bg-gray-900 z-50 flex items-center justify-center">
               <div className="text-center">
                 <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
-                <p className="text-gray-900 dark:text-white font-medium">배치도와 구역을 불러오는 중입니다...</p>
+                <p className="text-gray-900 dark:text-white font-medium">
+                  {isLoadingMap ? '배치도 데이터를 불러오는 중...' : '이미지 렌더링 중...'}
+                </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">잠시만 기다려주세요</p>
               </div>
             </div>
-          ) : !mapImage ? (
+          )}
+
+          {!isLoadingMap && !mapImage ? (
             <ImageUploader ref={uploaderRef} currentImage={mapImage} onImageUpload={handleImageUpload} />
           ) : (
-            <AssetMapViewer
-              imageSrc={mapImage}
-              zoom={zoom}
-              pins={pins}
-              selectedPin={selectedPin}
-              isEditing={isEditing}
-              selectedZoneIds={selectedZoneIds}
-              onPinClick={handleZoneClick}
-              onBgClick={() => {
-                setSelectedPin(null);
-                // Keep selections in edit mode to prevent accidental clearing
-                // if (isEditing) setSelectedZoneIds(new Set()); 
-              }}
-              onPinMove={(id: string, x: number, y: number) => {
-                const newPins = pins.map(p => p.id === id ? { ...p, pinX: x, pinY: y } : p);
-                savePins(newPins);
-              }}
-              onPinResize={(id: string, w: number, h: number) => {
-                const newPins = pins.map(p => p.id === id ? { ...p, width: w, height: h } : p);
-                savePins(newPins);
-              }}
-              onZoneCreate={(rect: { x: number, y: number, w: number, h: number }) => {
-                const newPin: Location = {
-                  id: `zone-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-                  name: `구역 ${pins.length + 1}`,
-                  pinX: rect.x,
-                  pinY: rect.y,
-                  width: rect.w,
-                  height: rect.h,
-                  type: 'Classroom'
-                };
-                savePins([...pins, newPin]);
-              }}
-              onZoneDoubleClick={handleZoneDoubleClick}
-            />
+            // Render map viewer but keep it hidden/under loader until onImageLoad fires
+            <>
+              <AssetMapViewer
+                imageSrc={mapImage || ''}
+                zoom={zoom}
+                pins={pins}
+                selectedPin={selectedPin}
+                isEditing={isEditing}
+                selectedZoneIds={selectedZoneIds}
+                onPinClick={handleZoneClick}
+                onImageLoad={() => setIsMapLoading(false)}
+                onBgClick={() => {
+                  setSelectedPin(null);
+                  // Keep selections in edit mode to prevent accidental clearing
+                  // if (isEditing) setSelectedZoneIds(new Set()); 
+                }}
+                onPinMove={(id: string, x: number, y: number) => {
+                  const newPins = pins.map(p => p.id === id ? { ...p, pinX: x, pinY: y } : p);
+                  savePins(newPins);
+                }}
+                onPinResize={(id: string, w: number, h: number) => {
+                  const newPins = pins.map(p => p.id === id ? { ...p, width: w, height: h } : p);
+                  savePins(newPins);
+                }}
+                onZoneCreate={(rect: { x: number, y: number, w: number, h: number }) => {
+                  const newPin: Location = {
+                    id: `zone-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                    name: `구역 ${pins.length + 1}`,
+                    pinX: rect.x,
+                    pinY: rect.y,
+                    width: rect.w,
+                    height: rect.h,
+                    type: 'Classroom'
+                  };
+                  savePins([...pins, newPin]);
+                }}
+                onZoneDoubleClick={handleZoneDoubleClick}
+              />
+            </>
           )}
 
           {/* Zoom Controls */}
@@ -648,6 +678,7 @@ export default function Home() {
             onClose={() => setShowNameModal(false)}
             onSave={handleBatchSave}
             onAutoDetect={() => handleAutoNameZones(false)}
+            isScanning={isScanning}
           />
         </div>
 

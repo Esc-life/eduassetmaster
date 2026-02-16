@@ -60,7 +60,12 @@ export const authOptions: NextAuthOptions = {
                         console.log(`[Auth] ✅ User found: ${userRow[2]} | SheetID: ${userRow[4]}`);
 
                         // Check password
-                        if (userRow[3] === credentials.password) {
+                        // Check password (Trim check)
+                        const storedPass = String(userRow[3] || '').trim();
+                        const inputPass = String(credentials.password || '').trim();
+
+                        // Also check for raw match just in case
+                        if (storedPass === inputPass || userRow[3] === credentials.password) {
                             return {
                                 id: userRow[0],
                                 name: userRow[1],
@@ -68,7 +73,7 @@ export const authOptions: NextAuthOptions = {
                                 spreadsheetId: userRow[4] // Important: Index 4
                             } as any;
                         } else {
-                            console.log(`[Auth] ❌ Password mismatch for ${userRow[2]}`);
+                            console.log(`[Auth] ❌ Password mismatch for ${userRow[2]} (InputLen: ${inputPass.length}, StoredLen: ${storedPass.length})`);
                         }
                     } else {
                         console.log(`[Auth] ❌ User not found in sheet: ${credentials.email}`);

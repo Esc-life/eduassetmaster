@@ -17,6 +17,7 @@ interface AssetMapViewerProps {
     onPinResize: (id: string, w: number, h: number) => void;
     onZoneCreate: (rect: { x: number, y: number, w: number, h: number }) => void;
     onZoneDoubleClick?: (pin: Location) => void;
+    onImageLoad?: () => void;
 }
 
 export function AssetMapViewer({
@@ -32,6 +33,7 @@ export function AssetMapViewer({
     onPinResize,
     onZoneCreate,
     onZoneDoubleClick,
+    onImageLoad,
 }: AssetMapViewerProps) {
     const mapWrapperRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<HTMLDivElement>(null);
@@ -95,6 +97,7 @@ export function AssetMapViewer({
                     alt="Map"
                     className="w-full h-auto block select-none"
                     draggable={false}
+                    onLoad={onImageLoad}
                 />
 
                 {/* Overlay for Zones */}

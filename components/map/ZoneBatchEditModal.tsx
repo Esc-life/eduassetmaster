@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Location } from '@/types';
-import { X, Save, ScanSearch, Wand2, Check } from 'lucide-react';
+import { X, Save, ScanSearch, Wand2, Check, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface ZoneBatchEditModalProps {
@@ -11,9 +11,10 @@ interface ZoneBatchEditModalProps {
     onClose: () => void;
     onSave: (newZones: Location[]) => void;
     onAutoDetect: () => void;
+    isScanning?: boolean;
 }
 
-export function ZoneBatchEditModal({ isOpen, zones, onClose, onSave, onAutoDetect }: ZoneBatchEditModalProps) {
+export function ZoneBatchEditModal({ isOpen, zones, onClose, onSave, onAutoDetect, isScanning }: ZoneBatchEditModalProps) {
     const [editedZones, setEditedZones] = useState<Location[]>([]);
 
     useEffect(() => {
@@ -75,10 +76,20 @@ export function ZoneBatchEditModal({ isOpen, zones, onClose, onSave, onAutoDetec
                 <div className="px-6 py-3 bg-blue-50/50 dark:bg-blue-900/10 border-b border-blue-100 dark:border-blue-800 flex flex-wrap gap-3 shrink-0 items-center">
                     <button
                         onClick={onAutoDetect}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-white border border-blue-200 shadow-sm text-blue-700 text-sm font-medium rounded-lg hover:bg-blue-50 transition-colors"
+                        disabled={isScanning}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-white border border-blue-200 shadow-sm text-blue-700 text-sm font-medium rounded-lg hover:bg-blue-50 transition-colors disabled:opacity-75 disabled:cursor-wait"
                     >
-                        <ScanSearch className="w-4 h-4" />
-                        AI 이름 자동 추출
+                        {isScanning ? (
+                            <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                추출 중...
+                            </>
+                        ) : (
+                            <>
+                                <ScanSearch className="w-4 h-4" />
+                                AI 이름 자동 추출
+                            </>
+                        )}
                     </button>
                     <div className="text-xs text-blue-600 flex items-center ml-auto hidden sm:flex">
                         <Wand2 className="w-3 h-3 mr-1" />
