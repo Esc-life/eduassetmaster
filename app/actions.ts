@@ -142,7 +142,14 @@ export async function fetchAssetData(overrideSheetId?: string) {
 }
 
 export async function fetchMapConfiguration(overrideSheetId?: string) {
-    const sheetId = overrideSheetId || await getUserSheetId();
+    const appConfig = await _getAppConfig();
+
+    // Firebase Branch
+    if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
+        return fbActions.fetchMapConfiguration(appConfig.firebase);
+    }
+
+    const sheetId = overrideSheetId || appConfig?.sheet?.spreadsheetId || await getUserSheetId();
 
     if (sheetId === 'NO_SHEET') return { mapImage: null, zones: [] };
     if (isGlobalMockMode && !sheetId) return { mapImage: null, zones: [] };
@@ -204,6 +211,13 @@ export async function fetchMapConfiguration(overrideSheetId?: string) {
 }
 
 export async function saveMapConfiguration(mapImage: string | null, zones: Location[]) {
+    const appConfig = await _getAppConfig();
+
+    // Firebase Branch
+    if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
+        return fbActions.saveMapConfiguration(appConfig.firebase, mapImage, zones);
+    }
+
     const sheetId = await getUserSheetId();
     if (sheetId === 'NO_SHEET') return { success: false, error: '?ㅽ봽?덈뱶?쒗듃 ID媛 ?ㅼ젙?섏? ?딆븯?듬땲??' };
     if (isGlobalMockMode && !sheetId) return { success: true };
@@ -448,6 +462,13 @@ export async function registerBulkDevices(devices: any[]) {
 }
 
 export async function syncZonesToSheet(zones: Location[]) {
+    const appConfig = await _getAppConfig();
+
+    // Firebase Branch
+    if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
+        return fbActions.syncZonesToDB(appConfig.firebase, zones);
+    }
+
     const sheetId = await getUserSheetId();
     if (sheetId === 'NO_SHEET') return { success: false };
     if (isGlobalMockMode && !sheetId) return { success: true };

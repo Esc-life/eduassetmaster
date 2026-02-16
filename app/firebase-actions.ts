@@ -205,3 +205,91 @@ export async function updateDeviceWithDistribution(config: any, deviceId: string
         return { success: false, error: String(e) };
     }
 }
+
+// --- Map Config & Sync ---
+export async function saveMapConfiguration(config: any, mapImage: string | null, zones: any[]) {
+    const db = getFirebaseStore(config);
+    try {
+        const batch = writeBatch(db);
+
+        // 1. Save Zones JSON (Frontend State)
+        const zoneRef = doc(db, "SystemConfig", "MapZones");
+        batch.set(zoneRef, {
+            json: JSON.stringify(zones),
+            updatedAt: new Date().toISOString()
+        });
+
+        // 2. Save Image (Chunking) if provided
+        if (mapImage) {
+            const CHUNK_SIZE = 800000; // 800KB
+            const totalChunks = Math.ceil(mapImage.length / CHUNK_SIZE);
+
+            const metaRef = doc(db, "SystemConfig", "MapImageMeta");
+            batch.set(metaRef, { totalChunks, updatedAt: new Date().toISOString() });
+
+            for (let i = 0; i < totalChunks; i++) {
+                const chunk = mapImage.substring(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+                batch.set(doc(db, "SystemConfig", `MapImage_${i}`), { data: chunk });
+            }
+        }
+
+        await batch.commit();
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: String(e) };
+    }
+}
+
+export async function fetchMapConfiguration(config: any) {
+    const db = getFirebaseStore(config);
+    try {
+        const zoneDoc = await getDoc(doc(db, "SystemConfig", "MapZones"));
+        let zones = [];
+        if (zoneDoc.exists() && zoneDoc.data().json) {
+            try { zones = JSON.parse(zoneDoc.data().json); } catch (e) { }
+        }
+
+        const metaDoc = await getDoc(doc(db, "SystemConfig", "MapImageMeta"));
+        let mapImage = null;
+
+        if (metaDoc.exists()) {
+            const total = metaDoc.data().totalChunks || 0;
+            if (total > 0) {
+                const promises = [];
+                for (let i = 0; i < total; i++) {
+                    promises.push(getDoc(doc(db, "SystemConfig", `MapImage_${i}`)));
+                }
+                const chunks = await Promise.all(promises);
+                mapImage = chunks.map(c => c.exists() ? c.data().data : '').join('');
+            }
+        }
+
+        return { mapImage, zones };
+    } catch (e) {
+        console.error("Firebase Map Config Error", e);
+        return { mapImage: null, zones: [] };
+    }
+}
+
+export async function syncZonesToDB(config: any, zones: any[]) {
+    const db = getFirebaseStore(config);
+    try {
+        const batch = writeBatch(db);
+
+        // Naive sync: Upsert based on ID
+        for (const zone of zones) {
+            const ref = doc(db, "Locations", zone.id);
+            batch.set(ref, {
+                id: zone.id,
+                name: zone.name,
+                type: zone.type || 'Classroom',
+                updatedAt: new Date().toISOString()
+            }, { merge: true });
+        }
+
+        await batch.commit();
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: String(e) };
+    }
+}

@@ -47,13 +47,17 @@ export function AssetZone({ location, device, onClick, onDoubleClick, isSelected
         );
     }
 
+    // AI detected zones usually have names like "구역 1". User wants these transparent.
+    const isTempZone = !location.name || /^구역\s*\d+$/.test(location.name);
+
     const selectModeStyle = isSelectMode
         ? isSelected
             ? 'border-yellow-500 border-4'
-            : 'border-blue-300 border-2 hover:border-blue-400'
-        : 'border-gray-300 dark:border-gray-600';
+            : 'border-blue-500 border-2 hover:border-blue-400'
+        : (isTempZone ? 'border-black/20 dark:border-white/20 border-dashed hover:border-blue-400/50' : 'border-gray-300 dark:border-gray-600 border-solid');
 
     const bgColor = location.color || '#93c5fd';
+    const finalBgColor = isTempZone ? 'rgba(0, 0, 0, 0.02)' : (bgColor + 'CC');
 
     return (
         <div
@@ -64,17 +68,20 @@ export function AssetZone({ location, device, onClick, onDoubleClick, isSelected
                 top: `${location.pinY}%`,
                 width: `${location.width}%`,
                 height: `${location.height}%`,
-                backgroundColor: bgColor + 'CC',
+                backgroundColor: finalBgColor,
             }}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => { e.stopPropagation(); onClick(e); }}
             onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick?.(); }}
+            title={isTempZone ? "임시 구역" : location.name}
         >
-            <div className="p-2 flex flex-col items-center justify-center h-full bg-white/40 dark:bg-gray-900/40 rounded-md backdrop-blur-sm pointer-events-none">
-                <span className="text-sm font-bold text-gray-900 dark:text-white text-center drop-shadow-md whitespace-nowrap">
-                    {location.name}
-                </span>
-            </div>
+            {!isTempZone && (
+                <div className="p-2 flex flex-col items-center justify-center h-full bg-white/40 dark:bg-gray-900/40 rounded-md backdrop-blur-sm pointer-events-none">
+                    <span className="text-sm font-bold text-gray-900 dark:text-white text-center drop-shadow-md whitespace-nowrap">
+                        {location.name}
+                    </span>
+                </div>
+            )}
         </div>
     );
 }

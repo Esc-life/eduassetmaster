@@ -13,6 +13,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { fetchMapConfiguration, saveMapConfiguration, syncZonesToSheet, fetchAssetData, updateDevice, createDeviceInstance, deleteDeviceInstance, updateZoneName } from '@/app/actions';
 import { DeviceEditModal } from '@/components/devices/DeviceEditModal';
 import { ZoneEditModal } from '@/components/map/ZoneEditModal';
+import { ZoneBatchEditModal } from '@/components/map/ZoneBatchEditModal';
 
 // Mock pin locations linked to mock devices (Initial State) by default empty
 const INITIAL_PINS: Location[] = [];
@@ -137,7 +138,13 @@ export default function Home() {
 
     // Sync to Server
     saveMapConfiguration(currentImage || null, newPins)
-      .then(res => console.log('[Client] Server Save Result:', res));
+      .then(res => {
+        console.log('[Client] Server Save Result:', res);
+        if (!res.success) {
+          alert(`[저장 실패] 서버에 데이터가 저장되지 않았습니다.\n원인: ${res.error}\n\n잠시 후 다시 시도하거나 네트워크를 확인해주세요.`);
+        }
+      })
+      .catch(e => alert(`[통신 오류] 서버와 연결할 수 없습니다: ${e}`));
   };
 
   const toggleZoneSelection = (id: string, e: React.MouseEvent) => {
@@ -229,7 +236,7 @@ export default function Home() {
   };
 
   // AI Name Recognition Handler
-  const handleAutoNameZones = async () => {
+  const handleAutoNameZones = async (shouldClose = true) => {
     let targetFile = mapFile;
 
     // Make sure we have a file, even if retrieved from server/localstorage as base64
@@ -259,11 +266,28 @@ export default function Home() {
     try {
       const updatedPins = await recognizeZoneNames(targetFile, pins);
       savePins(updatedPins);
-      alert("이름 추출이 완료되었습니다."); // Success Message
-      setShowNameModal(false);
+      alert("이름 추출이 완료되었습니다. 결과가 마음에 들지 않으면 목록에서 수정해주세요.");
+      if (shouldClose) setShowNameModal(false);
     } catch (error) {
       alert("이름 추출 실패: " + (error as Error).message);
     }
+  };
+
+  // Batch Save Handler (Sync to DB)
+  const handleBatchSave = async (newZones: Location[]) => {
+    savePins(newZones);
+
+    try {
+      const res = await syncZonesToSheet(newZones);
+      if (res.success) {
+        alert("구역 이름이 저장되었습니다.");
+      } else {
+        alert(`맵에는 저장되었으나 DB 동기화 실패: ${res.error}\n(잠시 후 다시 시도하세요)`);
+      }
+    } catch (e) {
+      alert(`DB 동기화 오류: ${e}`);
+    }
+    setShowNameModal(false);
   };
 
   const handleSyncZones = async () => {
@@ -467,7 +491,8 @@ export default function Home() {
               onPinClick={handleZoneClick}
               onBgClick={() => {
                 setSelectedPin(null);
-                if (isEditing) setSelectedZoneIds(new Set());
+                // Keep selections in edit mode to prevent accidental clearing
+                // if (isEditing) setSelectedZoneIds(new Set()); 
               }}
               onPinMove={(id: string, x: number, y: number) => {
                 const newPins = pins.map(p => p.id === id ? { ...p, pinX: x, pinY: y } : p);
@@ -479,7 +504,7 @@ export default function Home() {
               }}
               onZoneCreate={(rect: { x: number, y: number, w: number, h: number }) => {
                 const newPin: Location = {
-                  id: `zone-${Date.now()}`,
+                  id: `zone-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
                   name: `구역 ${pins.length + 1}`,
                   pinX: rect.x,
                   pinY: rect.y,
@@ -616,53 +641,14 @@ export default function Home() {
             </div>
           )}
 
-          {/* Name Management Modal */}
-          {showNameModal && (
-            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-xl max-w-md w-full"
-              >
-                <h3 className="text-xl font-bold mb-2">구역 이름 관리</h3>
-                <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">
-                  구역 이름을 설정하는 두 가지 방법 중 선택하세요.
-                </p>
-
-                <div className="space-y-4">
-                  <button
-                    onClick={handleAutoNameZones}
-                    className="w-full flex items-center gap-4 p-4 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 transition-all group text-left"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-                      <ScanSearch className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="font-semibold text-gray-900 dark:text-white group-hover:text-blue-700">AI 이름 추출</div>
-                      <div className="text-xs text-gray-500">이미지에 적힌 텍스트(예: "과학실")를 자동으로 읽어옵니다.</div>
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={handleSyncZones}
-                    className="w-full flex items-center gap-4 p-4 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-green-50 dark:hover:bg-green-900/20 hover:border-green-300 transition-all group text-left"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600">
-                      <FileSpreadsheet className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="font-semibold text-gray-900 dark:text-white group-hover:text-green-700">엑셀(구글 시트)로 관리</div>
-                      <div className="text-xs text-gray-500">구역 목록을 시트로 내보내고 직접 이름을 입력합니다.</div>
-                    </div>
-                  </button>
-
-
-                </div>
-
-                <button onClick={() => setShowNameModal(false)} className="mt-8 w-full py-2 text-gray-500 hover:text-gray-700 text-sm">닫기</button>
-              </motion.div>
-            </div>
-          )}
+          {/* Zone Batch Edit Modal */}
+          <ZoneBatchEditModal
+            isOpen={showNameModal}
+            zones={pins}
+            onClose={() => setShowNameModal(false)}
+            onSave={handleBatchSave}
+            onAutoDetect={() => handleAutoNameZones(false)}
+          />
         </div>
 
         {/* Footer Stats */}
