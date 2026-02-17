@@ -560,7 +560,7 @@ export async function updateDevice(deviceId: string, updates: Partial<Device>, o
         const rows = await getData('Devices!A2:R', sheetId);
         if (!rows) return { success: false, error: 'No devices found' };
 
-        const deviceIndex = rows.findIndex((row: any[]) => row[0] === deviceId);
+        const deviceIndex = rows.findIndex((row: any[]) => String(row[0]) === String(deviceId));
         if (deviceIndex === -1) return { success: false, error: 'Device not found' };
 
         const rowNumber = deviceIndex + 2;
@@ -707,6 +707,11 @@ export async function deleteBulkDevices(deviceIds: string[]) {
  * Create a new DeviceInstance (deploy device to a location)
  */
 export async function createDeviceInstance(instance: Omit<DeviceInstance, 'id'>) {
+    // 0. Check Firebase Mode
+    const appConfig = await _getAppConfig();
+    if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
+        return await fbActions.createDeviceInstance(appConfig.firebase, instance);
+    }
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
         return { success: false, error: 'Unauthorized' };
@@ -753,6 +758,11 @@ export async function createDeviceInstance(instance: Omit<DeviceInstance, 'id'>)
  * Update an existing DeviceInstance
  */
 export async function updateDeviceInstance(instanceId: string, updates: Partial<DeviceInstance>) {
+    // 0. Check Firebase Mode
+    const appConfig = await _getAppConfig();
+    if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
+        return await fbActions.updateDeviceInstance(appConfig.firebase, instanceId, updates);
+    }
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
         return { success: false, error: 'Unauthorized' };
@@ -1017,7 +1027,7 @@ export async function getMySheetId() {
 async function checkQuantityLimit(deviceId: string, addQty: number, sheetId: string, excludeInstanceId?: string) {
     try {
         const deviceRows = await getData('Devices!A2:R', sheetId);
-        const deviceRow = deviceRows?.find((r: any[]) => r[0] === deviceId);
+        const deviceRow = deviceRows?.find((r: any[]) => String(r[0]) === String(deviceId));
         if (!deviceRow) return { valid: false, error: 'Device not found' };
 
         const totalQty = parseInt(deviceRow[9] || '1'); // Column J
@@ -1063,7 +1073,7 @@ export async function syncDeviceLocationString(deviceId: string, sheetId: string
         const deviceRows = await getData('Devices!A2:R', sheetId);
         if (!deviceRows) return;
 
-        const deviceIndex = deviceRows.findIndex((r: any[]) => r[0] === deviceId);
+        const deviceIndex = deviceRows.findIndex((r: any[]) => String(r[0]) === String(deviceId));
         if (deviceIndex === -1) return;
 
         const rowNumber = deviceIndex + 2;

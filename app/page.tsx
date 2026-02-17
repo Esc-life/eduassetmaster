@@ -7,6 +7,7 @@ import { ImageUploader, ImageUploaderHandle } from '@/components/map/ImageUpload
 import { Device, Location, DeviceInstance } from '@/types';
 import { MOCK_DEVICES, MOCK_SOFTWARE } from '@/lib/mock-data';
 import { useOCR } from '@/hooks/useOCR';
+import { DeleteConfirmModal } from '@/components/devices/DeleteConfirmModal';
 import Link from 'next/link';
 import { Image as ImageIcon, PlusCircle, Check, Trash2, MousePointer2, ScanSearch, Loader2, Save, Minus, RotateCcw, FileSpreadsheet, ScanLine, Edit3, Settings, MoreHorizontal, CheckSquare, Edit } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -31,6 +32,7 @@ export default function Home() {
   const [isLoadingMap, setIsLoadingMap] = useState(true); // Server Data Fetching
   const [isMapLoading, setIsMapLoading] = useState(false); // Image Rendering
   const [isLoadingMessage, setIsLoadingMessage] = useState<string | null>(null);
+  const [showDeleteMapModal, setShowDeleteMapModal] = useState(false);
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const uploaderRef = useRef<ImageUploaderHandle>(null);
@@ -298,16 +300,18 @@ export default function Home() {
     }
   };
 
-  const handleDeleteMap = () => {
-    const input = prompt("배치도를 삭제하시겠습니까?\n삭제하려면 '배치도 삭제'라고 입력하세요.");
-    if (input === '배치도 삭제') {
+  const handleDeleteMap = async () => {
+    try {
+      await saveMapConfiguration(null, []);
       setMapImage(undefined);
       setPins([]);
       setIsEditing(false);
       setIsMapLoading(false);
-      saveMapConfiguration(null, [])
-        .then(() => alert("배치도가 삭제되었습니다."))
-        .catch(e => alert("삭제 중 오류 발생: " + e));
+      alert("배치도가 삭제되었습니다.");
+    } catch (e) {
+      console.error(e);
+      alert("삭제 중 오류 발생: " + e);
+      throw e;
     }
   };
 
@@ -435,7 +439,7 @@ export default function Home() {
 
               {/* 4. Delete Map */}
               <button
-                onClick={handleDeleteMap}
+                onClick={() => setShowDeleteMapModal(true)}
                 className="flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-600 border border-red-200 text-sm font-medium rounded-lg hover:bg-red-100 transition-colors whitespace-nowrap"
               >
                 <Trash2 className="w-4 h-4" />
@@ -575,7 +579,7 @@ export default function Home() {
                     locationName: zoneName,
                     quantity,
                     notes: ''
-                  });
+                  }) as any;
 
                   if (result.success) {
                     const { devices: updatedDevices, deviceInstances: updatedInstances } = await fetchAssetData();
@@ -671,6 +675,13 @@ export default function Home() {
             onSave={handleBatchSave}
             onAutoDetect={() => handleAutoNameZones(false)}
             isScanning={isScanning}
+          />
+          <DeleteConfirmModal
+            isOpen={showDeleteMapModal}
+            type="single"
+            deviceName="현재 배치도"
+            onClose={() => setShowDeleteMapModal(false)}
+            onConfirm={handleDeleteMap}
           />
         </div>
 

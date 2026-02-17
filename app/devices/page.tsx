@@ -397,7 +397,6 @@ export default function DevicesPage() {
                                             <td className="px-6 py-4 text-gray-600 dark:text-gray-300 text-center">{device.category}</td>
                                             <td className="px-6 py-4 text-gray-900 dark:text-white text-left">
                                                 <div className="font-medium">{device.name}</div>
-                                                <div className="text-xs text-gray-500">{device.model}</div>
                                             </td>
                                             <td className="px-6 py-4 text-gray-600 dark:text-gray-300 whitespace-nowrap text-center">{device.purchaseDate}</td>
                                             <td className="px-6 py-4 text-gray-600 dark:text-gray-300 text-center">{device.acquisitionDivision}</td>

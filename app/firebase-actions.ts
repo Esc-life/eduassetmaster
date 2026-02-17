@@ -119,6 +119,15 @@ export async function createDeviceInstance(config: any, data: any) {
         const ref = await addDoc(collection(db, "DeviceInstances"), data);
         return { success: true, id: ref.id };
     } catch (e) {
+    }
+}
+
+export async function updateDeviceInstance(config: any, instanceId: string, updates: any) {
+    const db = getFirebaseStore(config);
+    try {
+        await updateDoc(doc(db, "DeviceInstances", instanceId), updates);
+        return { success: true };
+    } catch (e) {
         return { success: false, error: String(e) };
     }
 }
