@@ -19,7 +19,20 @@ export function ZoneBatchEditModal({ isOpen, zones, onClose, onSave, onAutoDetec
 
     useEffect(() => {
         if (isOpen) {
-            setEditedZones(JSON.parse(JSON.stringify(zones))); // Deep copy
+            // Initial Sort and Set
+            const sorted = JSON.parse(JSON.stringify(zones)).sort((a: Location, b: Location) => {
+                const isTempA = !a.name || /^구역\s*\d+$/.test(a.name);
+                const isTempB = !b.name || /^구역\s*\d+$/.test(b.name);
+                if (isTempA && !isTempB) return -1;
+                if (!isTempA && isTempB) return 1;
+
+                const numA = parseInt(a.name?.replace(/[^0-9]/g, '') || '9999');
+                const numB = parseInt(b.name?.replace(/[^0-9]/g, '') || '9999');
+                if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
+
+                return (a.name || '').localeCompare(b.name || '');
+            });
+            setEditedZones(sorted);
         }
     }, [isOpen, zones]);
 
@@ -32,20 +45,8 @@ export function ZoneBatchEditModal({ isOpen, zones, onClose, onSave, onAutoDetec
         onClose();
     };
 
-    // Sort logic: Temp zones ("구역 ...") first, then numeric sort
-    const displayedZones = [...editedZones].sort((a, b) => {
-        const isTempA = !a.name || /^구역\s*\d+$/.test(a.name);
-        const isTempB = !b.name || /^구역\s*\d+$/.test(b.name);
-        if (isTempA && !isTempB) return -1;
-        if (!isTempA && isTempB) return 1;
-
-        // Try numeric sort by extracting numbers
-        const numA = parseInt(a.name?.replace(/[^0-9]/g, '') || '9999');
-        const numB = parseInt(b.name?.replace(/[^0-9]/g, '') || '9999');
-        if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
-
-        return (a.name || '').localeCompare(b.name || '');
-    });
+    // Use editedZones directly for rendering to prevent re-sorting during typing
+    const displayedZones = editedZones;
 
     if (!isOpen) return null;
 

@@ -366,3 +366,53 @@ export async function deleteAllDevicesFromDB(config: any) {
         return { success: false, error: String(e) };
     }
 }
+
+// --- Software Management ---
+export async function fetchSoftwareList(config: any) {
+    const db = getFirebaseStore(config);
+    try {
+        const snap = await getDocs(collection(db, "Software"));
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (e) { return []; }
+}
+export async function registerSoftware(config: any, item: any) {
+    const db = getFirebaseStore(config);
+    try {
+        const id = item.id || crypto.randomUUID();
+        const ref = doc(db, "Software", id);
+        await setDoc(ref, { ...item, id, updatedAt: new Date().toISOString() }, { merge: true });
+        return { success: true };
+    } catch (e) { return { success: false, error: String(e) }; }
+}
+export async function deleteSoftwareFromDB(config: any, id: string) {
+    const db = getFirebaseStore(config);
+    try {
+        await deleteDoc(doc(db, "Software", id));
+        return { success: true };
+    } catch (e) { return { success: false, error: String(e) }; }
+}
+
+// --- Account Management ---
+export async function fetchAccountList(config: any) {
+    const db = getFirebaseStore(config);
+    try {
+        const snap = await getDocs(collection(db, "Accounts"));
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (e) { return []; }
+}
+export async function saveAccountToDB(config: any, item: any) {
+    const db = getFirebaseStore(config);
+    try {
+        const id = item.id || crypto.randomUUID();
+        const ref = doc(db, "Accounts", id);
+        await setDoc(ref, { ...item, id, updatedAt: new Date().toISOString() }, { merge: true });
+        return { success: true };
+    } catch (e) { return { success: false, error: String(e) }; }
+}
+export async function deleteAccountFromDB(config: any, id: string) {
+    const db = getFirebaseStore(config);
+    try {
+        await deleteDoc(doc(db, "Accounts", id));
+        return { success: true };
+    } catch (e) { return { success: false, error: String(e) }; }
+}

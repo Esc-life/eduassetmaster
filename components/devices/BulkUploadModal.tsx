@@ -121,8 +121,18 @@ export function BulkUploadModal({ isOpen, onClose, onSave }: BulkUploadModalProp
                                 return obj;
                             })
                             .filter((obj: any) => {
-                                // Filter out empty rows: keep row if at least one value is non-empty
-                                return Object.keys(obj).some(k => k !== '_raw' && obj[k] !== undefined && obj[k] !== null && String(obj[k]).trim() !== '');
+                                // 1. Filter out empty rows
+                                const hasData = Object.keys(obj).some(k => k !== '_raw' && obj[k] !== undefined && obj[k] !== null && String(obj[k]).trim() !== '');
+                                if (!hasData) return false;
+
+                                // 2. Filter out summary rows
+                                const values = Object.values(obj).map(v => String(v).trim().toLowerCase());
+                                const invalidKeywords = ['합계', '소계', '총계', '누계', 'total', 'subtotal'];
+                                // Check if any value exactly matches or contains keywords (safer to match strictly or startWith usually, but contains is safer for 'Total Amount')
+                                // But 'Total Amount' might be a header. Here we check values. '합계' usually is in the first column.
+                                if (values.some(v => invalidKeywords.includes(v))) return false;
+
+                                return true;
                             });
 
                         setHeaders(headerRow.filter(h => h !== ''));
@@ -206,8 +216,8 @@ export function BulkUploadModal({ isOpen, onClose, onSave }: BulkUploadModalProp
 
     const getPreviewData = () => {
         return parsedData.map(row => {
-            // Explicitly set installLocation to empty string to overwrite existing values in DB
-            const newRow: any = { installLocation: '' };
+            // Do not initialize installLocation to empty string to prevent overwriting existing data
+            const newRow: any = {};
             mappings.forEach(m => {
                 // User Request: Do not import installLocation from Excel
                 if (m.target === 'installLocation') return;

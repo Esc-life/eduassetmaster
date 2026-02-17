@@ -257,6 +257,11 @@ export async function saveMapConfiguration(mapImage: string | null, zones: Locat
 // --- Software Management ---
 
 export async function getSoftwareList() {
+    const appConfig = await _getAppConfig();
+    if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
+        return fbActions.fetchSoftwareList(appConfig.firebase);
+    }
+
     const sheetId = await getUserSheetId();
     if (sheetId === 'NO_SHEET') return [];
     if (isGlobalMockMode && !sheetId) return [];
@@ -280,6 +285,11 @@ export async function getSoftwareList() {
 }
 
 export async function saveSoftware(item: any) {
+    const appConfig = await _getAppConfig();
+    if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
+        return fbActions.registerSoftware(appConfig.firebase, item);
+    }
+
     const sheetId = await getUserSheetId();
     if (sheetId === 'NO_SHEET') return { success: false, error: '?ㅽ봽?덈뱶?쒗듃 ID媛 ?놁뒿?덈떎.' };
     if (isGlobalMockMode && !sheetId) return { success: true };
@@ -318,6 +328,11 @@ export async function saveSoftware(item: any) {
 }
 
 export async function deleteSoftware(id: string) {
+    const appConfig = await _getAppConfig();
+    if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
+        return fbActions.deleteSoftwareFromDB(appConfig.firebase, id);
+    }
+
     const sheetId = await getUserSheetId();
     if (sheetId === 'NO_SHEET') return { success: false };
     if (isGlobalMockMode && !sheetId) return { success: true };
@@ -343,6 +358,11 @@ export async function deleteSoftware(id: string) {
 // Let's include Account functions to be safe.
 
 export async function getAccountList() {
+    const appConfig = await _getAppConfig();
+    if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
+        return fbActions.fetchAccountList(appConfig.firebase);
+    }
+
     const sheetId = await getUserSheetId();
     if (sheetId === 'NO_SHEET') return [];
     if (isGlobalMockMode && !sheetId) return [];
@@ -365,6 +385,11 @@ export async function getAccountList() {
 }
 
 export async function saveAccount(item: any) {
+    const appConfig = await _getAppConfig();
+    if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
+        return fbActions.saveAccountToDB(appConfig.firebase, item);
+    }
+
     const sheetId = await getUserSheetId();
     if (sheetId === 'NO_SHEET') return { success: false };
     if (isGlobalMockMode && !sheetId) return { success: true };
@@ -401,6 +426,11 @@ export async function saveAccount(item: any) {
 }
 
 export async function deleteAccount(id: string) {
+    const appConfig = await _getAppConfig();
+    if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
+        return fbActions.deleteAccountFromDB(appConfig.firebase, id);
+    }
+
     const sheetId = await getUserSheetId();
     if (sheetId === 'NO_SHEET') return { success: false };
     if (isGlobalMockMode && !sheetId) return { success: true };

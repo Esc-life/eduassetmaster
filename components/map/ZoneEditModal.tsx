@@ -45,7 +45,17 @@ export function ZoneEditModal({ isOpen, zone, onClose, onSave }: ZoneEditModalPr
         e.preventDefault();
         if (!zone) return;
 
-        onSave(zone.id, formData);
+        // Auto-correct values (Clamp between 1 and 100, default to 10 if NaN)
+        const width = isNaN(formData.width) ? 10 : Math.min(100, Math.max(1, formData.width));
+        const height = isNaN(formData.height) ? 10 : Math.min(100, Math.max(1, formData.height));
+
+        const correctedData = {
+            ...formData,
+            width,
+            height
+        };
+
+        onSave(zone.id, correctedData);
         onClose();
     };
 
@@ -87,8 +97,8 @@ export function ZoneEditModal({ isOpen, zone, onClose, onSave }: ZoneEditModalPr
                                     type="button"
                                     onClick={() => setFormData({ ...formData, color: preset.value })}
                                     className={`h-12 rounded-lg border-2 transition-all ${formData.color === preset.value
-                                            ? 'border-blue-500 ring-2 ring-blue-200'
-                                            : 'border-gray-300 hover:border-gray-400'
+                                        ? 'border-blue-500 ring-2 ring-blue-200'
+                                        : 'border-gray-300 hover:border-gray-400'
                                         }`}
                                     style={{ backgroundColor: preset.value }}
                                     title={preset.name}
