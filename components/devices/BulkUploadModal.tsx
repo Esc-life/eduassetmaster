@@ -206,7 +206,8 @@ export function BulkUploadModal({ isOpen, onClose, onSave }: BulkUploadModalProp
 
     const getPreviewData = () => {
         return parsedData.map(row => {
-            const newRow: any = {};
+            // Explicitly set installLocation to empty string to overwrite existing values in DB
+            const newRow: any = { installLocation: '' };
             mappings.forEach(m => {
                 // User Request: Do not import installLocation from Excel
                 if (m.target === 'installLocation') return;
