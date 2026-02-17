@@ -179,24 +179,23 @@ export default function Home() {
     }
   };
 
-  const handleZoneSave = async (zoneId: string, updates: Partial<Location>) => {
-    // 1. Update Google Sheet (Custom Name) if name changed
-    if (updates.name) {
-      const targetPin = pins.find(p => p.id === zoneId);
-      if (targetPin && targetPin.name !== updates.name) {
-        try {
-          await updateZoneName(zoneId, targetPin.name, updates.name);
-        } catch (err) {
-          console.error('Failed to update sheet name:', err);
-        }
-      }
-    }
-
+  const handleZoneSave = (zoneId: string, updates: Partial<Location>) => {
+    // 1. Update State Optimistically
     const newPins = pins.map(p =>
       p.id === zoneId ? { ...p, ...updates } : p
     );
     savePins(newPins);
     setEditingZone(null);
+
+    // 2. Background Sync (Google Sheet) - Non-blocking
+    if (updates.name) {
+      const targetPin = pins.find(p => p.id === zoneId);
+      if (targetPin && targetPin.name !== updates.name) {
+        // Fire and forget (or catch error)
+        updateZoneName(zoneId, targetPin.name, updates.name)
+          .catch(err => console.error('Failed to update sheet name:', err));
+      }
+    }
   };
 
   const deleteSelectedZones = () => {
@@ -370,77 +369,74 @@ export default function Home() {
               {statusText}
             </div>
           ) : mapImage ? (
-            <div className="flex flex-col md:flex-row items-center justify-between w-full gap-2">
-              {/* Left Actions */}
-              <div className="flex items-center gap-2 flex-wrap flex-1">
-                {/* 1. AI Structure Detection */}
-                <button
-                  onClick={handleAIScan}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-indigo-700 transition-colors whitespace-nowrap"
-                >
-                  <ScanSearch className="w-4 h-4" />
-                  1. AI 구역 인식
-                </button>
+            <div className="flex flex-wrap items-center justify-end w-full gap-2">
+              {/* 1. AI Structure Detection */}
+              <button
+                onClick={handleAIScan}
+                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-indigo-700 transition-colors whitespace-nowrap"
+              >
+                <ScanSearch className="w-4 h-4" />
+                1. AI 구역 인식
+              </button>
 
-                {/* 2. Edit Mode Toggle */}
-                <button
-                  onClick={() => {
-                    setIsEditing(!isEditing);
-                    setSelectedZoneIds(new Set());
-                  }}
-                  className={`flex items-center gap-2 px-3 py-1.5 border rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${isEditing
-                    ? 'bg-orange-100 border-orange-200 text-orange-700'
-                    : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-                    }`}
-                >
-                  {isEditing ? (
-                    <>
-                      <Check className="w-4 h-4" />
-                      2. 편집 완료
-                    </>
-                  ) : (
-                    <>
-                      <Edit3 className="w-4 h-4" />
-                      2. 구역 편집
-                    </>
-                  )}
-                </button>
-
-                {/* 3. Name Management */}
-                <button
-                  onClick={() => setShowNameModal(true)}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-green-700 transition-colors whitespace-nowrap"
-                >
-                  <Settings className="w-4 h-4" />
-                  3. 이름 관리
-                </button>
-
-                {/* Selection Actions (Only in Edit Mode) */}
-                {isEditing && selectedZoneIds.size > 0 && (
-                  <button
-                    onClick={deleteSelectedZones}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-red-100 text-red-600 text-sm font-medium rounded-lg hover:bg-red-200 transition-colors animate-in fade-in whitespace-nowrap border border-red-200"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    선택 삭제 ({selectedZoneIds.size})
-                  </button>
+              {/* 2. Edit Mode Toggle */}
+              <button
+                onClick={() => {
+                  setIsEditing(!isEditing);
+                  setSelectedZoneIds(new Set());
+                }}
+                className={`flex items-center gap-2 px-3 py-1.5 border rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${isEditing
+                  ? 'bg-orange-100 border-orange-200 text-orange-700'
+                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                  }`}
+              >
+                {isEditing ? (
+                  <>
+                    <Check className="w-4 h-4" />
+                    2. 편집 완료
+                  </>
+                ) : (
+                  <>
+                    <Edit3 className="w-4 h-4" />
+                    2. 구역 편집
+                  </>
                 )}
+              </button>
 
-                {isEditing && (
-                  <button
-                    onClick={handleSelectAll}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 text-sm font-medium rounded-lg hover:bg-blue-100 transition-colors whitespace-nowrap border border-blue-200"
-                  >
-                    <CheckSquare className="w-4 h-4" />
-                    전체 선택
-                  </button>
-                )}
-              </div>
+              {/* 3. Name Management */}
+              <button
+                onClick={() => setShowNameModal(true)}
+                className="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-green-700 transition-colors whitespace-nowrap"
+              >
+                <Settings className="w-4 h-4" />
+                3. 이름 관리
+              </button>
 
-              {/* Right Action: Delete Map */}
+              {/* Selection Actions (Only in Edit Mode) */}
+              {isEditing && selectedZoneIds.size > 0 && (
+                <button
+                  onClick={deleteSelectedZones}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-red-100 text-red-600 text-sm font-medium rounded-lg hover:bg-red-200 transition-colors animate-in fade-in whitespace-nowrap border border-red-200"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  선택 삭제 ({selectedZoneIds.size})
+                </button>
+              )}
+
+              {isEditing && (
+                <button
+                  onClick={handleSelectAll}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 text-sm font-medium rounded-lg hover:bg-blue-100 transition-colors whitespace-nowrap border border-blue-200"
+                >
+                  <CheckSquare className="w-4 h-4" />
+                  전체 선택
+                </button>
+              )}
+
+              {/* 4. Delete Map */}
               <button
                 onClick={handleDeleteMap}
-                className="flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-600 border border-red-200 text-sm font-medium rounded-lg hover:bg-red-100 transition-colors whitespace-nowrap flex-none"
+                className="flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-600 border border-red-200 text-sm font-medium rounded-lg hover:bg-red-100 transition-colors whitespace-nowrap"
               >
                 <Trash2 className="w-4 h-4" />
                 4. 배치도 삭제

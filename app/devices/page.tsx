@@ -345,7 +345,7 @@ export default function DevicesPage() {
                                     />
                                 </th>
                                 {[
-                                    { key: 'id', label: '물품목록번호', align: 'center' },
+                                    { key: 'model', label: '물품목록번호', align: 'center' },
                                     { key: 'category', label: '물품분류명', align: 'center' },
                                     { key: 'name', label: '품명/규격', align: 'left' },
                                     { key: 'purchaseDate', label: '취득일', align: 'center' },
@@ -393,7 +393,7 @@ export default function DevicesPage() {
                                                     className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 cursor-pointer"
                                                 />
                                             </td>
-                                            <td className="px-6 py-4 text-gray-900 dark:text-white font-medium text-center">{device.id}</td>
+                                            <td className="px-6 py-4 text-gray-900 dark:text-white font-medium text-center">{device.model || '-'}</td>
                                             <td className="px-6 py-4 text-gray-600 dark:text-gray-300 text-center">{device.category}</td>
                                             <td className="px-6 py-4 text-gray-900 dark:text-white text-left">
                                                 <div className="font-medium">{device.name}</div>

@@ -131,8 +131,6 @@ export function ZoneEditModal({ isOpen, zone, onClose, onSave }: ZoneEditModalPr
                                 value={formData.width}
                                 onChange={(e) => setFormData({ ...formData, width: parseFloat(e.target.value) })}
                                 className="w-full px-4 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700"
-                                min="1"
-                                max="100"
                                 step="0.5"
                             />
                         </div>
@@ -143,8 +141,6 @@ export function ZoneEditModal({ isOpen, zone, onClose, onSave }: ZoneEditModalPr
                                 value={formData.height}
                                 onChange={(e) => setFormData({ ...formData, height: parseFloat(e.target.value) })}
                                 className="w-full px-4 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700"
-                                min="1"
-                                max="100"
                                 step="0.5"
                             />
                         </div>
