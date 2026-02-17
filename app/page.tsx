@@ -680,6 +680,7 @@ export default function Home() {
             isOpen={showDeleteMapModal}
             type="single"
             deviceName="현재 배치도"
+            validationText="배치도 삭제"
             onClose={() => setShowDeleteMapModal(false)}
             onConfirm={handleDeleteMap}
           />

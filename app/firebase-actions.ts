@@ -85,9 +85,24 @@ export async function fetchAssetData(config: any) {
             getDocs(collection(db, "Locations"))
         ]);
 
-        const devices = devSnap.docs.map(d => ({ id: d.id, ...d.data() }));
         const instances = instSnap.docs.map(d => ({ id: d.id, ...d.data() }));
         const zones = locSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        const devices = devSnap.docs.map(d => {
+            const data = d.data();
+            const id = d.id;
+            const myInsts = instances.filter((i: any) => i.deviceId === id);
+            let installLocation = data.installLocation || '';
+
+            if (myInsts.length > 0) {
+                installLocation = myInsts.map((i: any) => {
+                    const qty = Number(i.quantity || 1);
+                    return qty > 0 ? `${i.locationName}(${qty})` : i.locationName;
+                }).join(', ');
+            }
+
+            return { id, ...data, installLocation };
+        });
 
         return {
             ok: true,

@@ -129,6 +129,17 @@ export async function fetchAssetData(overrideSheetId?: string) {
                 notes: row[5],
             }));
 
+            // Dynamic installLocation computation
+            devices.forEach(d => {
+                const myInst = deviceInstances.filter(i => i.deviceId === d.id);
+                if (myInst.length > 0) {
+                    d.installLocation = myInst.map(i => {
+                        const qty = Number(i.quantity || 1);
+                        return qty > 0 ? `${i.locationName}(${qty})` : i.locationName;
+                    }).join(', ');
+                }
+            });
+
             return { devices, software, credentials, deviceInstances };
 
         } catch (error) {
