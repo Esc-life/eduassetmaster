@@ -98,21 +98,7 @@ export default function DevicesPage() {
         );
     };
 
-    const toggleSelectAll = () => {
-        setSelectedDevices(prev =>
-            prev.length === filteredDevices.length ? [] : filteredDevices.map(d => d.id)
-        );
-    };
-
-    const handleDeleteSelected = async () => {
-        const result = await deleteBulkDevices(selectedDevices);
-        if (result.success) {
-            alert(`${selectedDevices.length}개 기기가 삭제되었습니다.`);
-            window.location.reload();
-        } else {
-            alert('일괄 삭제 실패: ' + result.error);
-        }
-    };
+    // toggleSelectAll & handleDeleteSelected moved below sortedDevices definition
 
     const [itemsPerPage, setItemsPerPage] = useState(30);
     const [currentPage, setCurrentPage] = useState(1);
@@ -169,6 +155,22 @@ export default function DevicesPage() {
     }, [sortedDevices, currentPage, itemsPerPage]);
 
     const totalPages = Math.ceil(sortedDevices.length / itemsPerPage);
+
+    const toggleSelectAll = () => {
+        setSelectedDevices(prev =>
+            prev.length === sortedDevices.length ? [] : sortedDevices.map(d => d.id)
+        );
+    };
+
+    const handleDeleteSelected = async () => {
+        const result = await deleteBulkDevices(selectedDevices);
+        if (result.success) {
+            alert(`${selectedDevices.length}개 기기가 삭제되었습니다.`);
+            window.location.reload();
+        } else {
+            alert('일괄 삭제 실패: ' + result.error);
+        }
+    };
 
     const formatNumber = (value: number | string | undefined) => {
         if (!value) return '0';
