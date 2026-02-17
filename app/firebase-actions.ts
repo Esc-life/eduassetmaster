@@ -331,3 +331,38 @@ export async function registerBulkDevicesToDB(config: any, devices: any[]) {
         return { success: false, error: String(e) };
     }
 }
+
+export async function deleteAllDevicesFromDB(config: any) {
+    const db = getFirebaseStore(config);
+    try {
+        // Delete Devices
+        const devSnap = await getDocs(collection(db, "Devices"));
+        const devChunks = [];
+        for (let i = 0; i < devSnap.docs.length; i += 400) {
+            devChunks.push(devSnap.docs.slice(i, i + 400));
+        }
+
+        for (const chunk of devChunks) {
+            const batch = writeBatch(db);
+            chunk.forEach(d => batch.delete(d.ref));
+            await batch.commit();
+        }
+
+        // Delete Instances
+        const instSnap = await getDocs(collection(db, "DeviceInstances"));
+        const instChunks = [];
+        for (let i = 0; i < instSnap.docs.length; i += 400) {
+            instChunks.push(instSnap.docs.slice(i, i + 400));
+        }
+
+        for (const chunk of instChunks) {
+            const batch = writeBatch(db);
+            chunk.forEach(d => batch.delete(d.ref));
+            await batch.commit();
+        }
+
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: String(e) };
+    }
+}

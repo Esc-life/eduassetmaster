@@ -630,8 +630,14 @@ export async function deleteDevice(deviceId: string) {
 }
 
 export async function deleteAllDevices() {
+    // 0. Check Firebase Mode
+    const appConfig = await _getAppConfig();
+    if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
+        return await fbActions.deleteAllDevicesFromDB(appConfig.firebase);
+    }
+
     const sheetId = await getUserSheetId();
-    if (sheetId === 'NO_SHEET') return { success: false, error: '?ㅽ봽?덈뱶?쒗듃媛 ?곕룞?섏? ?딆븯?듬땲??' };
+    if (sheetId === 'NO_SHEET') return { success: false, error: '스프레드시트 설정이 되어있지 않습니다.' };
     if (isGlobalMockMode && !sheetId) return { success: true };
 
     try {

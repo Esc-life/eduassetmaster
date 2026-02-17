@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { fetchAssetData, registerBulkDevices, updateDevice, deleteDevice, deleteAllDevices, deleteBulkDevices, fetchMapConfiguration, setDevicesStatus } from '@/app/actions';
 import { Device, DeviceStatus, Location } from '@/types';
-import { Search, Filter, MoreHorizontal, Laptop, Tablet, Smartphone, Monitor, Loader2, FileSpreadsheet, Plus, Edit, Trash2, AlertTriangle, Minus } from 'lucide-react';
+import { Search, Filter, MoreHorizontal, Laptop, Tablet, Smartphone, Monitor, Loader2, FileSpreadsheet, Plus, Edit, Trash2, AlertTriangle, Minus, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { BulkUploadModal } from '@/components/devices/BulkUploadModal';
 import { DeviceEditModal } from '@/components/devices/DeviceEditModal';
 import { DeleteConfirmModal } from '@/components/devices/DeleteConfirmModal';
@@ -114,8 +114,23 @@ export default function DevicesPage() {
         }
     };
 
-    const filteredDevices = useMemo(() => {
-        return devices.filter((device) => {
+    const [itemsPerPage, setItemsPerPage] = useState(30);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [sortConfig, setSortConfig] = useState<{ key: keyof Device, direction: 'asc' | 'desc' } | null>(null);
+
+    const handleSort = (key: keyof Device) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const sortedDevices = useMemo(() => {
+        let result = [...devices];
+
+        // 1. Filter
+        result = result.filter((device) => {
             const matchesStatus = filterStatus === 'All' || device.status === filterStatus;
             const searchLower = searchTerm.toLowerCase();
             const matchesSearch =
@@ -124,7 +139,36 @@ export default function DevicesPage() {
                 (device.id || '').toLowerCase().includes(searchLower);
             return matchesStatus && matchesSearch;
         });
-    }, [devices, filterStatus, searchTerm]);
+
+        // 2. Sort
+        if (sortConfig) {
+            result.sort((a, b) => {
+                const aValue = a[sortConfig.key] || '';
+                const bValue = b[sortConfig.key] || '';
+
+                // Handle numbers
+                const aNum = parseFloat(String(aValue).replace(/,/g, ''));
+                const bNum = parseFloat(String(bValue).replace(/,/g, ''));
+
+                if (!isNaN(aNum) && !isNaN(bNum)) {
+                    return sortConfig.direction === 'asc' ? aNum - bNum : bNum - aNum;
+                }
+
+                // Handle strings
+                if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+                if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+        return result;
+    }, [devices, filterStatus, searchTerm, sortConfig]);
+
+    const paginatedDevices = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        return sortedDevices.slice(startIndex, startIndex + itemsPerPage);
+    }, [sortedDevices, currentPage, itemsPerPage]);
+
+    const totalPages = Math.ceil(sortedDevices.length / itemsPerPage);
 
     const formatNumber = (value: number | string | undefined) => {
         if (!value) return '0';
@@ -293,23 +337,36 @@ export default function DevicesPage() {
                                 <th className="px-6 py-4 w-12 text-center">
                                     <input
                                         type="checkbox"
-                                        checked={selectedDevices.length === filteredDevices.length && filteredDevices.length > 0}
+                                        checked={selectedDevices.length === sortedDevices.length && sortedDevices.length > 0}
                                         onChange={toggleSelectAll}
                                         className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 cursor-pointer"
                                     />
                                 </th>
-                                <th className="px-6 py-4 font-medium whitespace-nowrap">물품목록번호</th>
-                                <th className="px-6 py-4 font-medium whitespace-nowrap">물품분류명</th>
-                                <th className="px-6 py-4 font-medium whitespace-nowrap">품명/규격</th>
-                                <th className="px-6 py-4 font-medium whitespace-nowrap">취득일</th>
-                                <th className="px-6 py-4 font-medium whitespace-nowrap">취득구분</th>
-                                <th className="px-6 py-4 font-medium whitespace-nowrap">운용부서</th>
-                                <th className="px-6 py-4 font-medium whitespace-nowrap">수량</th>
-                                <th className="px-6 py-4 font-medium whitespace-nowrap">단가</th>
-                                <th className="px-6 py-4 font-medium whitespace-nowrap">취득금액</th>
-                                <th className="px-6 py-4 font-medium whitespace-nowrap">내용연수 중 변경</th>
-                                <th className="px-6 py-4 font-medium whitespace-nowrap">설치장소</th>
-                                <th className="px-6 py-4 font-medium whitespace-nowrap text-right">관리</th>
+                                {[
+                                    { key: 'id', label: '물품목록번호', align: 'center' },
+                                    { key: 'category', label: '물품분류명', align: 'center' },
+                                    { key: 'name', label: '품명/규격', align: 'left' },
+                                    { key: 'purchaseDate', label: '취득일', align: 'center' },
+                                    { key: 'acquisitionDivision', label: '취득구분', align: 'center' },
+                                    { key: 'groupId', label: '운용부서', align: 'center' },
+                                    { key: 'quantity', label: '수량', align: 'right' },
+                                    { key: 'unitPrice', label: '단가', align: 'right' },
+                                    { key: 'totalAmount', label: '취득금액', align: 'right' },
+                                    { key: 'serviceLifeChange', label: '내용연수', align: 'center' },
+                                    { key: 'installLocation', label: '설치장소', align: 'left' },
+                                ].map((col) => (
+                                    <th
+                                        key={col.key}
+                                        className={`px-6 py-4 font-medium whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-${col.align}`}
+                                        onClick={() => handleSort(col.key as keyof Device)}
+                                    >
+                                        <div className={`flex items-center gap-1 ${col.align === 'center' ? 'justify-center' : col.align === 'right' ? 'justify-end' : 'justify-start'}`}>
+                                            {col.label}
+                                            <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                                        </div>
+                                    </th>
+                                ))}
+                                <th className="px-6 py-4 font-medium whitespace-nowrap text-center">관리</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
@@ -324,9 +381,9 @@ export default function DevicesPage() {
                                 </tr>
                             ) : (
                                 <>
-                                    {filteredDevices.map((device) => (
+                                    {paginatedDevices.map((device) => (
                                         <tr key={device.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group">
-                                            <td className="px-6 py-4">
+                                            <td className="px-6 py-4 text-center">
                                                 <input
                                                     type="checkbox"
                                                     checked={selectedDevices.includes(device.id)}
@@ -334,19 +391,22 @@ export default function DevicesPage() {
                                                     className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 cursor-pointer"
                                                 />
                                             </td>
-                                            <td className="px-6 py-4 text-gray-900 dark:text-white font-medium">{device.model}</td>
-                                            <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.category}</td>
-                                            <td className="px-6 py-4 text-gray-900 dark:text-white">{device.name}</td>
-                                            <td className="px-6 py-4 text-gray-600 dark:text-gray-300 whitespace-nowrap">{device.purchaseDate}</td>
-                                            <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.acquisitionDivision}</td>
-                                            <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.groupId}</td>
+                                            <td className="px-6 py-4 text-gray-900 dark:text-white font-medium text-center">{device.id}</td>
+                                            <td className="px-6 py-4 text-gray-600 dark:text-gray-300 text-center">{device.category}</td>
+                                            <td className="px-6 py-4 text-gray-900 dark:text-white text-left">
+                                                <div className="font-medium">{device.name}</div>
+                                                <div className="text-xs text-gray-500">{device.model}</div>
+                                            </td>
+                                            <td className="px-6 py-4 text-gray-600 dark:text-gray-300 whitespace-nowrap text-center">{device.purchaseDate}</td>
+                                            <td className="px-6 py-4 text-gray-600 dark:text-gray-300 text-center">{device.acquisitionDivision}</td>
+                                            <td className="px-6 py-4 text-gray-600 dark:text-gray-300 text-center">{device.groupId}</td>
                                             <td className="px-6 py-4 text-gray-600 dark:text-gray-300 text-right">{formatNumber(device.quantity)}</td>
                                             <td className="px-6 py-4 text-gray-600 dark:text-gray-300 text-right">{formatNumber(device.unitPrice)}</td>
                                             <td className="px-6 py-4 text-gray-600 dark:text-gray-300 text-right">{formatNumber(device.totalAmount)}</td>
-                                            <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.serviceLifeChange}</td>
-                                            <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{device.installLocation}</td>
-                                            <td className="px-6 py-4 text-right relative">
-                                                <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <td className="px-6 py-4 text-gray-600 dark:text-gray-300 text-center">{device.serviceLifeChange}</td>
+                                            <td className="px-6 py-4 text-gray-600 dark:text-gray-300 text-left">{device.installLocation}</td>
+                                            <td className="px-6 py-4 text-center relative">
+                                                <div className="flex items-center justify-center gap-2 opacity-30 group-hover:opacity-100 transition-opacity">
                                                     <button
                                                         onClick={() => setEditDevice(device)}
                                                         className="cursor-pointer p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
@@ -365,10 +425,10 @@ export default function DevicesPage() {
                                             </td>
                                         </tr>
                                     ))}
-                                    {filteredDevices.length === 0 && (
+                                    {paginatedDevices.length === 0 && (
                                         <tr>
-                                            <td colSpan={7} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                                                등록된 기기가 없습니다. '일괄 등록' 버튼을 눌러 데이터를 추가해보세요!
+                                            <td colSpan={13} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                                                데이터가 없습니다.
                                             </td>
                                         </tr>
                                     )}
@@ -377,6 +437,51 @@ export default function DevicesPage() {
                         </tbody>
                     </table>
                 </div>
+                {/* Pagination Controls */}
+                {sortedDevices.length > 0 && (
+                    <div className="flex items-center justify-between p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 rounded-b-xl shadow-sm">
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm text-gray-500">페이지 당 항목:</span>
+                            <select
+                                value={itemsPerPage}
+                                onChange={(e) => {
+                                    setItemsPerPage(Number(e.target.value));
+                                    setCurrentPage(1);
+                                }}
+                                className="text-sm border border-gray-300 rounded px-2 py-1 bg-white dark:bg-gray-800 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                                <option value={30}>30</option>
+                                <option value={50}>50</option>
+                                <option value={70}>70</option>
+                                <option value={100}>100</option>
+                            </select>
+                            <span className="text-sm text-gray-500 ml-2">
+                                총 {sortedDevices.length}개 중 {(currentPage - 1) * itemsPerPage + 1}-
+                                {Math.min(currentPage * itemsPerPage, sortedDevices.length)}
+                            </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                                disabled={currentPage === 1}
+                                className="p-2 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-700 dark:hover:bg-gray-800 transition-colors"
+                            >
+                                <ChevronLeft className="w-4 h-4" />
+                            </button>
+                            <span className="text-sm">
+                                {currentPage} / {totalPages}
+                            </span>
+                            <button
+                                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                                disabled={currentPage === totalPages}
+                                className="p-2 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-700 dark:hover:bg-gray-800 transition-colors"
+                            >
+                                <ChevronRight className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div >
     );
