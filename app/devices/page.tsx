@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { fetchAssetData, registerBulkDevices, updateDevice, deleteDevice, deleteAllDevices, deleteBulkDevices, fetchMapConfiguration, setDevicesStatus } from '@/app/actions';
 import { Device, DeviceStatus, Location } from '@/types';
 import { Search, Filter, MoreHorizontal, Laptop, Tablet, Smartphone, Monitor, Loader2, FileSpreadsheet, Plus, Edit, Trash2, AlertTriangle, Minus, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -24,24 +24,25 @@ export default function DevicesPage() {
     const [zones, setZones] = useState<Location[]>([]); // Available zones
     const [isDisposalModalOpen, setIsDisposalModalOpen] = useState(false);
 
-    useEffect(() => {
-        const loadData = async () => {
-            try {
-                const data = await fetchAssetData();
-                setDevices(data.devices);
-
-                // Load zones for dropdown
-                const mapConfig = await fetchMapConfiguration();
-                setZones(mapConfig.zones);
-            } catch (error) {
-                console.warn('[Devices] Server data fetch failed:', error);
-                setDevices([]);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        loadData();
+    const fetchData = useCallback(async () => {
+        try {
+            // setDevices check not needed if loading handled by callers mostly, or initial
+            // But to simulate loadData logic: 
+            const data = await fetchAssetData();
+            setDevices(data.devices);
+            const mapConfig = await fetchMapConfiguration();
+            setZones(mapConfig.zones);
+        } catch (error) {
+            console.warn('[Devices] Server data fetch failed:', error);
+        } finally {
+            setIsLoading(false);
+        }
     }, []);
+
+    useEffect(() => {
+        setIsLoading(true);
+        fetchData();
+    }, [fetchData]);
 
     const handleBulkSave = async (data: any[]) => {
         setIsLoading(true);
@@ -49,7 +50,7 @@ export default function DevicesPage() {
         if (result.success) {
             alert(`${(result as any).count}개 기기가 성공적으로 등록되었습니다.`);
             // Reload page to reflect changes
-            window.location.reload();
+            fetchData();
         } else {
             alert('등록 실패: ' + result.error);
             setIsLoading(false);
@@ -60,33 +61,36 @@ export default function DevicesPage() {
         if (!editDevice) return;
         setIsLoading(true);
         const result = await updateDevice(editDevice.id, updates);
+        setIsLoading(false);
         if (result.success) {
+            setDevices(prev => prev.map(d => d.id === editDevice.id ? { ...d, ...updates } : d));
+            setEditDevice(null);
             alert('수정이 저장되었습니다.');
-            window.location.reload();
         } else {
             alert('수정 실패: ' + result.error);
-            setIsLoading(false);
         }
     };
 
     const handleDeleteDevice = async () => {
         if (!deleteModal.device) return;
-        const result = await deleteDevice(deleteModal.device.id);
+        const idToDelete = deleteModal.device.id;
+        const result = await deleteDevice(idToDelete);
         if (result.success) {
-            alert('삭제되었습니다.');
-            window.location.reload();
+            setDevices(prev => prev.filter(d => d.id !== idToDelete));
         } else {
             alert('삭제 실패: ' + result.error);
+            throw new Error(result.error);
         }
     };
 
     const handleDeleteAll = async () => {
         const result = await deleteAllDevices();
         if (result.success) {
+            setDevices([]);
             alert('모든 기기가 삭제되었습니다.');
-            window.location.reload();
         } else {
             alert('전체 삭제 실패: ' + result.error);
+            throw new Error(result.error);
         }
     };
 
@@ -163,10 +167,14 @@ export default function DevicesPage() {
     };
 
     const handleDeleteSelected = async () => {
+        if (!confirm(`${selectedDevices.length}개 기기를 삭제하시겠습니까?`)) return;
+        setIsLoading(true);
         const result = await deleteBulkDevices(selectedDevices);
+        setIsLoading(false);
         if (result.success) {
-            alert(`${selectedDevices.length}개 기기가 삭제되었습니다.`);
-            window.location.reload();
+            setDevices(prev => prev.filter(d => !selectedDevices.includes(d.id)));
+            setSelectedDevices([]);
+            alert('선택한 기기가 삭제되었습니다.');
         } else {
             alert('일괄 삭제 실패: ' + result.error);
         }
@@ -211,9 +219,10 @@ export default function DevicesPage() {
                 device={null}
                 onClose={() => setIsAddDeviceOpen(false)}
                 onSave={async (device) => {
+                    setIsLoading(true);
                     await registerBulkDevices([device]);
                     setIsAddDeviceOpen(false);
-                    window.location.reload();
+                    fetchData();
                 }}
                 zones={zones}
             />
@@ -242,8 +251,10 @@ export default function DevicesPage() {
                 onConfirm={async (ids) => {
                     const res = await setDevicesStatus(ids, '고장/폐기');
                     if (res.success) {
+                        setDevices(prev => prev.map(d => ids.includes(d.id) ? { ...d, status: '고장/폐기' } : d));
+                        setIsDisposalModalOpen(false);
+                        setSelectedDevices([]);
                         alert('상태가 변경되었습니다.');
-                        window.location.reload();
                     } else {
                         alert('변경 실패: ' + res.error);
                     }
