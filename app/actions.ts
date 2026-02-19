@@ -1270,8 +1270,20 @@ export async function createLoan(deviceId: string, userId: string, userName: str
     if (sheetId === 'NO_SHEET') return { success: false, error: '시트가 없습니다.' };
 
     try {
-        const deviceRows = await getData('Devices!A2:R', sheetId);
-        if (!deviceRows) return { success: false, error: 'Device DB Error' };
+        let deviceRows = await getData('Devices!A2:R', sheetId);
+        if (!deviceRows) {
+            // Retry once
+            await new Promise(r => setTimeout(r, 1000));
+            deviceRows = await getData('Devices!A2:R', sheetId);
+        }
+        if (!deviceRows) return { success: false, error: 'Device DB Error (기기 목록 호출 실패 - 데이터 없음)' };
+
+        // Check & Create Loans Sheet if missing
+        const loanCheck = await getData('Loans!A1', sheetId);
+        if (!loanCheck) {
+            await addSheet('Loans', sheetId);
+            await updateData('Loans!A1', [['ID', 'DeviceID', 'DeviceName', 'UserID', 'UserName', 'LoanDate', 'DueDate', 'ReturnDate', 'Status', 'Notes']], sheetId);
+        }
 
         const deviceIndex = deviceRows.findIndex((r: any[]) => r[0] === deviceId);
         if (deviceIndex === -1) return { success: false, error: '기기를 찾을 수 없습니다.' };
