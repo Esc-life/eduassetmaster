@@ -212,7 +212,13 @@ export async function updateDeviceWithDistribution(config: any, deviceId: string
         const zones = locSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
 
         distributions.forEach(dist => {
-            const zone = zones.find(z => (z.name || '').trim() === (dist.locationName || '').trim());
+            let zone = null;
+            if (dist.locationId && dist.locationId !== 'TEXT_ONLY') {
+                zone = zones.find(z => z.id === dist.locationId);
+            }
+            if (!zone) {
+                zone = zones.find(z => (z.name || '').trim() === (dist.locationName || '').trim());
+            }
             const newRef = doc(collection(db, "DeviceInstances"));
             batch.set(newRef, {
                 deviceId,

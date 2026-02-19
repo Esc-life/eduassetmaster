@@ -37,7 +37,7 @@ export function DeviceEditModal({ isOpen, device, onClose, onSave, zones = [] }:
     });
 
     // 배치 정보 관리
-    const [distributions, setDistributions] = useState<{ locationName: string, quantity: number }[]>([]);
+    const [distributions, setDistributions] = useState<{ locationId?: string, locationName: string, quantity: number }[]>([]);
     const [isLoadingDist, setIsLoadingDist] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
@@ -67,7 +67,7 @@ export function DeviceEditModal({ isOpen, device, onClose, onSave, zones = [] }:
             setIsLoadingDist(true);
             getDeviceInstances(device.id).then((insts: any[]) => {
                 if (insts && insts.length > 0) {
-                    setDistributions(insts.map((i: any) => ({ locationName: i.locationName, quantity: i.quantity })));
+                    setDistributions(insts.map((i: any) => ({ locationId: i.locationId, locationName: i.locationName, quantity: i.quantity })));
                 } else {
                     const qty = parseInt(String(device.quantity || '1'));
                     if (device.installLocation && device.installLocation.trim() !== '') {
@@ -113,19 +113,37 @@ export function DeviceEditModal({ isOpen, device, onClose, onSave, zones = [] }:
 
     const handleDistChange = (index: number, field: 'locationName' | 'quantity', value: any) => {
         const newDist = [...distributions];
-        newDist[index] = { ...newDist[index], [field]: value };
+        // If updating location from Select (ID based)
+        if (field === 'locationName' && zones.length > 0) {
+            // This handler might be called with ID if we change the Select value to ID.
+            // But for safety, let's create a dedicated handler for location.
+            newDist[index] = { ...newDist[index], [field]: value };
+        } else {
+            newDist[index] = { ...newDist[index], [field]: value };
+        }
+        setDistributions(newDist);
+    };
+
+    const handleLocationSelect = (index: number, zoneId: string) => {
+        const newDist = [...distributions];
+        const zone = zones.find(z => z.id === zoneId);
+        newDist[index] = {
+            ...newDist[index],
+            locationId: zoneId,
+            locationName: zone ? zone.name : ''
+        };
         setDistributions(newDist);
     };
 
     const addDistRow = () => {
-        setDistributions([...distributions, { locationName: '', quantity: 0 }]);
+        setDistributions([...distributions, { locationId: '', locationName: '', quantity: 0 }]);
     };
 
     const removeDistRow = (index: number) => {
         if (distributions.length > 1) {
             setDistributions(distributions.filter((_, i) => i !== index));
         } else {
-            setDistributions([{ locationName: '', quantity: 0 }]);
+            setDistributions([{ locationId: '', locationName: '', quantity: 0 }]);
         }
     };
 
@@ -264,13 +282,13 @@ export function DeviceEditModal({ isOpen, device, onClose, onSave, zones = [] }:
                                                 <label className="block text-xs text-gray-500 mb-1">설치장소 {idx + 1}</label>
                                                 {zones.length > 0 ? (
                                                     <select
-                                                        value={dist.locationName}
-                                                        onChange={(e) => handleDistChange(idx, 'locationName', e.target.value)}
+                                                        value={dist.locationId || ''}
+                                                        onChange={(e) => handleLocationSelect(idx, e.target.value)}
                                                         className="w-full px-3 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700 text-sm"
                                                     >
                                                         <option value="">-- 구역 선택 --</option>
                                                         {[...zones].sort((a, b) => a.name.localeCompare(b.name, 'ko')).map((zone) => (
-                                                            <option key={zone.id} value={zone.name}>{zone.name}</option>
+                                                            <option key={zone.id} value={zone.id}>{zone.name}</option>
                                                         ))}
                                                     </select>
                                                 ) : (

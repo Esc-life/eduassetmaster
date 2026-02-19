@@ -1133,7 +1133,7 @@ export async function getDeviceInstances(deviceId: string) {
 export async function updateDeviceWithDistribution(
     deviceId: string,
     deviceUpdates: Partial<Device>,
-    distributions: { locationName: string, quantity: number }[]
+    distributions: { locationId?: string, locationName: string, quantity: number }[]
 ) {
     // 0. Check Firebase Mode
     const appConfig = await _getAppConfig();
@@ -1182,7 +1182,13 @@ export async function updateDeviceWithDistribution(
         }
 
         const newInstanceRows = distributions.map(dist => {
-            const zone = mapConfig.zones.find((z: Location) => (z.name || '').trim() === (dist.locationName || '').trim());
+            let zone = null;
+            if (dist.locationId && dist.locationId !== 'TEXT_ONLY') {
+                zone = mapConfig.zones.find((z: Location) => z.id === dist.locationId);
+            }
+            if (!zone) {
+                zone = mapConfig.zones.find((z: Location) => (z.name || '').trim() === (dist.locationName || '').trim());
+            }
             return [
                 `inst-${Math.random().toString(36).substr(2, 9)}`,
                 deviceId,
