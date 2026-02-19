@@ -620,7 +620,7 @@ export async function updateDevice(deviceId: string, updates: Partial<Device>, o
                 // If new location is valid, create ONE instance with TOTAL quantity
                 if (updates.installLocation && updates.installLocation.trim() !== '') {
                     const mapConfig = await fetchMapConfiguration(sheetId);
-                    const targetZone = mapConfig.zones.find((z: Location) => z.name === updates.installLocation);
+                    const targetZone = mapConfig.zones.find((z: Location) => (z.name || '').trim() === (updates.installLocation || '').trim());
 
                     const totalQty = updates.quantity !== undefined ? Number(updates.quantity) : Number(currentDevice[9] || 1);
                     const newId = `inst-${Date.now()}`;
@@ -1182,7 +1182,7 @@ export async function updateDeviceWithDistribution(
         }
 
         const newInstanceRows = distributions.map(dist => {
-            const zone = mapConfig.zones.find((z: Location) => z.name === dist.locationName);
+            const zone = mapConfig.zones.find((z: Location) => (z.name || '').trim() === (dist.locationName || '').trim());
             return [
                 `inst-${Math.random().toString(36).substr(2, 9)}`,
                 deviceId,
