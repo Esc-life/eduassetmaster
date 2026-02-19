@@ -446,3 +446,71 @@ export async function deleteAccountFromDB(config: any, id: string) {
         return { success: true };
     } catch (e) { return { success: false, error: String(e) }; }
 }
+
+// --- Loan Management ---
+export async function fetchLoans(config: any) {
+    const db = getFirebaseStore(config);
+    try {
+        const snap = await getDocs(collection(db, "Loans"));
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (e) { return []; }
+}
+
+export async function createLoanToDB(config: any, deviceId: string, userId: string, userName: string, dueDate: string, notes: string) {
+    const db = getFirebaseStore(config);
+    try {
+        const devRef = doc(db, "Devices", deviceId);
+        const devSnap = await getDoc(devRef);
+        if (!devSnap.exists()) return { success: false, error: "Device not found" };
+
+        const device = devSnap.data();
+        if (device.status === '고장/폐기' || device.status === '분실' || device.status === '대여중') {
+            return { success: false, error: `기기가 대여 가능한 상태가 아닙니다. (현재 상태: ${device.status})` };
+        }
+
+        const loanRef = doc(collection(db, "Loans"));
+        const loanData = {
+            id: loanRef.id,
+            deviceId,
+            deviceName: device.name || '',
+            userId,
+            userName,
+            loanDate: new Date().toISOString().split('T')[0],
+            dueDate,
+            returnDate: '',
+            status: 'Active',
+            notes
+        };
+
+        const batch = writeBatch(db);
+        batch.set(loanRef, loanData);
+        batch.update(devRef, { status: '대여중', userName: userName });
+
+        await batch.commit();
+        return { success: true };
+    } catch (e) { return { success: false, error: String(e) }; }
+}
+
+export async function returnLoanInDB(config: any, loanId: string, returnCondition: string) {
+    const db = getFirebaseStore(config);
+    try {
+        const loanRef = doc(db, "Loans", loanId);
+        const loanSnap = await getDoc(loanRef);
+        if (!loanSnap.exists()) return { success: false, error: "Loan record not found" };
+
+        const loan = loanSnap.data();
+        const devRef = doc(db, "Devices", loan.deviceId);
+
+        const batch = writeBatch(db);
+        batch.update(loanRef, {
+            returnDate: new Date().toISOString().split('T')[0],
+            status: 'Returned'
+        });
+
+        const newStatus = returnCondition === 'Broken' ? '수리/점검' : '사용 가능';
+        batch.update(devRef, { status: newStatus, userName: '' });
+
+        await batch.commit();
+        return { success: true };
+    } catch (e) { return { success: false, error: String(e) }; }
+}

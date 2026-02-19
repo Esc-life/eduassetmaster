@@ -1231,6 +1231,11 @@ export interface LoanRecord {
 }
 
 export async function getLoans() {
+    const appConfig = await _getAppConfig();
+    if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
+        return await fbActions.fetchLoans(appConfig.firebase);
+    }
+
     const sheetId = await getUserSheetId();
     if (sheetId === 'NO_SHEET') return [];
 
@@ -1256,6 +1261,11 @@ export async function getLoans() {
 }
 
 export async function createLoan(deviceId: string, userId: string, userName: string, dueDate: string, notes: string = '') {
+    const appConfig = await _getAppConfig();
+    if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
+        return await fbActions.createLoanToDB(appConfig.firebase, deviceId, userId, userName, dueDate, notes);
+    }
+
     const sheetId = await getUserSheetId();
     if (sheetId === 'NO_SHEET') return { success: false, error: '시트가 없습니다.' };
 
@@ -1267,7 +1277,7 @@ export async function createLoan(deviceId: string, userId: string, userName: str
         if (deviceIndex === -1) return { success: false, error: '기기를 찾을 수 없습니다.' };
 
         const device = deviceRows[deviceIndex];
-        if (device[4] !== '사용 가능') {
+        if (device[4] === '고장/폐기' || device[4] === '분실' || device[4] === '대여중') {
             return { success: false, error: `기기가 대여 가능한 상태가 아닙니다. (현재 상태: ${device[4]})` };
         }
 
@@ -1303,6 +1313,11 @@ export async function createLoan(deviceId: string, userId: string, userName: str
 }
 
 export async function returnLoan(loanId: string, returnCondition: string = 'Good') {
+    const appConfig = await _getAppConfig();
+    if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
+        return await fbActions.returnLoanInDB(appConfig.firebase, loanId, returnCondition);
+    }
+
     const sheetId = await getUserSheetId();
     if (sheetId === 'NO_SHEET') return { success: false };
 
@@ -1329,7 +1344,7 @@ export async function returnLoan(loanId: string, returnCondition: string = 'Good
             if (deviceIndex !== -1) {
                 const device = deviceRows[deviceIndex];
                 const updatedDevice = [...device];
-                updatedDevice[4] = returnCondition === 'Broken' ? '수리 필요' : '사용 가능';
+                updatedDevice[4] = returnCondition === 'Broken' ? '수리/점검' : '사용 가능';
                 updatedDevice[16] = ''; // Clear User Name
 
                 await updateData(`Devices!A${deviceIndex + 2}`, [updatedDevice], sheetId);
