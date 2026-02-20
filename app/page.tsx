@@ -262,9 +262,9 @@ export default function Home() {
 
     try {
       const updatedPins = await recognizeZoneNames(targetFile, pins);
-      savePins(updatedPins);
+      // Use handleBatchSave to sync names to all DB locations
+      await handleBatchSave(updatedPins);
       alert("이름 추출이 완료되었습니다. 결과가 마음에 들지 않으면 목록에서 수정해주세요.");
-      if (shouldClose) setShowNameModal(false);
     } catch (error) {
       alert("이름 추출 실패: " + (error as Error).message);
     }
@@ -273,20 +273,33 @@ export default function Home() {
   // Batch Save Handler (Sync to DB)
   const handleBatchSave = async (newZones: Location[]) => {
     setIsLoadingMessage('구역 이름을 수정하는 중입니다...');
+    const oldPins = pins;
     savePins(newZones);
 
     try {
+      // 1. Find zones whose names changed and call updateZoneName for each
+      const nameChanges: { zoneId: string, oldName: string, newName: string }[] = [];
+      newZones.forEach(nz => {
+        const oldZone = oldPins.find(op => op.id === nz.id);
+        if (oldZone && oldZone.name !== nz.name && nz.name.trim()) {
+          nameChanges.push({ zoneId: nz.id, oldName: oldZone.name, newName: nz.name });
+        }
+      });
+
+      // 2. Apply each name change (updates DeviceInstances, Devices, Locations, MapZones JSON)
+      for (const change of nameChanges) {
+        await updateZoneName(change.zoneId, change.oldName, change.newName);
+      }
+
+      // 3. Also sync the full zone list to Locations sheet/collection
       const res = await syncZonesToSheet(newZones);
-      if (res.success) {
-        // Success
-      } else {
-        alert(`맵에는 저장되었으나 DB 동기화 실패: ${res.error}\n(잠시 후 다시 시도하세요)`);
+      if (!res.success) {
+        console.warn('Locations sync warning:', res.error);
       }
     } catch (e) {
       alert(`DB 동기화 오류: ${e}`);
     } finally {
       setIsLoadingMessage(null);
-      alert('이름 수정이 완료되었습니다.');
     }
     setShowNameModal(false);
   };
