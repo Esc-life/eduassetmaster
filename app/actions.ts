@@ -1105,7 +1105,7 @@ ${zoneDescriptions}
         const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
         // Parse JSON from response (Gemini may wrap in ```json ... ```)
-        const jsonMatch = rawText.match(/\[.*\]/s);
+        const jsonMatch = rawText.match(/\[[\s\S]*\]/);
         if (!jsonMatch) {
             console.warn('Gemini zone name response not parseable:', rawText);
             return { success: false, error: '응답을 파싱할 수 없습니다.', zones };
