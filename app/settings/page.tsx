@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Save, RefreshCw, Database, Key, User, Copy, Check, Link as LinkIcon, Server, HelpCircle, X, ExternalLink } from 'lucide-react';
-import { fetchSystemConfig, saveSystemConfig, getMySheetId, changePassword, getServerType } from '@/app/actions';
+import { RefreshCw, Key, User, Copy, Check, Link as LinkIcon, HelpCircle, X, ExternalLink, Trash2, AlertTriangle, Shield, Loader2 } from 'lucide-react';
+import { fetchSystemConfig, saveSystemConfig, getMySheetId, changePassword, getServerType, deleteMyAccount } from '@/app/actions';
+import { signOut } from 'next-auth/react';
 
+// --- Guide Modal ---
 function GuideModal({ onClose }: { onClose: () => void }) {
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
@@ -59,6 +61,80 @@ function GuideModal({ onClose }: { onClose: () => void }) {
     );
 }
 
+// --- Delete Account Confirmation Modal ---
+function DeleteAccountModal({ onClose, onConfirm, isDeleting }: { onClose: () => void, onConfirm: () => void, isDeleting: boolean }) {
+    const [confirmText, setConfirmText] = useState('');
+    const isValid = confirmText === '계정 탈퇴하기';
+
+    return (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-200 dark:border-gray-700 animate-in zoom-in-95">
+                <div className="flex justify-between items-start mb-4 pb-3 border-b border-red-100 dark:border-red-900/50">
+                    <h3 className="text-lg font-bold text-red-600 dark:text-red-400 flex items-center gap-2">
+                        <AlertTriangle className="w-5 h-5" />
+                        계정 탈퇴
+                    </h3>
+                    <button onClick={onClose} disabled={isDeleting} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors disabled:opacity-50">
+                        <X className="w-5 h-5 text-gray-500" />
+                    </button>
+                </div>
+
+                <div className="space-y-5">
+                    <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-200 dark:border-red-800">
+                        <p className="font-bold text-red-700 dark:text-red-300 mb-2 text-sm flex items-center gap-1.5">
+                            ⚠️ 이 작업은 되돌릴 수 없습니다.
+                        </p>
+                        <ul className="list-disc pl-5 space-y-1 text-xs text-red-600 dark:text-red-300/80">
+                            <li>모든 기기(Devices) 데이터가 삭제됩니다.</li>
+                            <li>소프트웨어, 계정/비밀번호 관리 정보가 삭제됩니다.</li>
+                            <li>대여 기록이 삭제됩니다.</li>
+                            <li>배치도 및 구역 설정이 삭제됩니다.</li>
+                            <li>계정 정보가 영구적으로 삭제됩니다.</li>
+                        </ul>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            확인을 위해 아래에 <span className="font-bold text-red-600 dark:text-red-400">&apos;계정 탈퇴하기&apos;</span>를 정확히 입력하세요.
+                        </label>
+                        <input
+                            type="text"
+                            value={confirmText}
+                            onChange={(e) => setConfirmText(e.target.value)}
+                            disabled={isDeleting}
+                            className="w-full p-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition-all text-sm disabled:opacity-50"
+                            placeholder="계정 탈퇴하기"
+                            autoComplete="off"
+                        />
+                    </div>
+
+                    <div className="flex gap-3">
+                        <button
+                            onClick={onClose}
+                            disabled={isDeleting}
+                            className="flex-1 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all disabled:opacity-50"
+                        >
+                            취소
+                        </button>
+                        <button
+                            onClick={onConfirm}
+                            disabled={!isValid || isDeleting}
+                            className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed text-white rounded-xl font-bold transition-all active:scale-95 text-sm flex items-center justify-center gap-2"
+                        >
+                            {isDeleting ? (
+                                <><Loader2 className="w-4 h-4 animate-spin" /> 삭제 진행 중...</>
+                            ) : (
+                                <><Trash2 className="w-4 h-4" /> 영구 삭제</>
+                            )}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// --- Main Settings Page ---
 export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState<'account' | 'system'>('account');
 
@@ -82,23 +158,22 @@ export default function SettingsPage() {
     const [newPass, setNewPass] = useState('');
     const [cfmPass, setCfmPass] = useState('');
     const [isPwChanging, setIsPwChanging] = useState(false);
-    const [magicLink, setMagicLink] = useState('');
 
+    // Account Deletion
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    // Magic Link (config_sync) handler
     useEffect(() => {
         if (typeof window === 'undefined') return;
-
-        // Check for Magic Link param
         const params = new URLSearchParams(window.location.search);
         const magic = params.get('config_sync');
         if (magic) {
             try {
-                // Decode: Base64 -> URI Component -> JSON
                 const configStr = decodeURIComponent(escape(atob(magic)));
-                JSON.parse(configStr); // Validate JSON
-
+                JSON.parse(configStr);
                 if (confirm('설정 동기화 링크가 감지되었습니다.\n현재 기기에 설정을 적용하시겠습니까?')) {
                     const encoded = encodeURIComponent(configStr);
-                    // Save to Cookie (Available for Server Actions)
                     document.cookie = `edu-asset-config=${encoded}; path=/; max-age=31536000; SameSite=Lax`;
                     alert('설정이 성공적으로 적용되었습니다!');
                     window.location.href = '/settings';
@@ -109,42 +184,6 @@ export default function SettingsPage() {
             }
         }
     }, []);
-
-    const generateMagicLink = () => {
-        if (typeof document === 'undefined') return;
-        const matches = document.cookie.match(new RegExp('(^| )edu-asset-config=([^;]+)'));
-        if (matches) {
-            try {
-                const configStr = decodeURIComponent(matches[2]);
-                const magic = btoa(unescape(encodeURIComponent(configStr)));
-                const link = `${window.location.origin}/settings?config_sync=${magic}`;
-                setMagicLink(link);
-            } catch (e) {
-                alert('설정 생성 중 오류가 발생했습니다.');
-            }
-        } else {
-            alert('내보낼 설정이 없습니다. 먼저 설정을 저장해주세요.');
-        }
-    };
-
-    const handleChangePassword = async () => {
-        if (!curPass || !newPass || !cfmPass) return alert('모든 항목을 입력해주세요.');
-        if (newPass !== cfmPass) return alert('새 비밀번호가 일치하지 않습니다.');
-        if (newPass.length < 4) return alert('비밀번호는 4자 이상이어야 합니다.');
-
-        setIsPwChanging(true);
-        const result = await changePassword(curPass, newPass);
-        setIsPwChanging(false);
-
-        if (result.success) {
-            alert('비밀번호가 변경되었습니다.');
-            setCurPass('');
-            setNewPass('');
-            setCfmPass('');
-        } else {
-            alert('변경 실패: ' + result.error);
-        }
-    };
 
     useEffect(() => {
         const load = async () => {
@@ -190,15 +229,57 @@ export default function SettingsPage() {
         }
     };
 
+    const handleChangePassword = async () => {
+        if (!curPass || !newPass || !cfmPass) return alert('모든 항목을 입력해주세요.');
+        if (newPass !== cfmPass) return alert('새 비밀번호가 일치하지 않습니다.');
+        if (newPass.length < 4) return alert('비밀번호는 4자 이상이어야 합니다.');
+
+        setIsPwChanging(true);
+        const result = await changePassword(curPass, newPass);
+        setIsPwChanging(false);
+
+        if (result.success) {
+            alert('비밀번호가 변경되었습니다.');
+            setCurPass('');
+            setNewPass('');
+            setCfmPass('');
+        } else {
+            alert('변경 실패: ' + result.error);
+        }
+    };
+
+    const handleDeleteAccount = async () => {
+        setIsDeleting(true);
+        try {
+            const result = await deleteMyAccount();
+            if (result.success) {
+                // Clear local config cookie
+                document.cookie = 'edu-asset-config=; path=/; max-age=0';
+                alert('계정이 성공적으로 삭제되었습니다.');
+                await signOut({ callbackUrl: '/login' });
+            } else {
+                alert('삭제 실패: ' + (result.error || '알 수 없는 오류'));
+            }
+        } catch (e) {
+            alert('삭제 중 오류가 발생했습니다.');
+        } finally {
+            setIsDeleting(false);
+            setShowDeleteModal(false);
+        }
+    };
+
     const copyLink = () => {
         navigator.clipboard.writeText(scanLink);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
 
+    const dbLabel = serverType === 'firebase' ? 'Firebase' : 'Google Sheets';
+
     return (
         <div className="max-w-4xl mx-auto py-6 px-4 space-y-6 animate-in fade-in pb-20">
             {showGuide && <GuideModal onClose={() => setShowGuide(false)} />}
+            {showDeleteModal && <DeleteAccountModal onClose={() => setShowDeleteModal(false)} onConfirm={handleDeleteAccount} isDeleting={isDeleting} />}
 
             <div>
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white">설정</h1>
@@ -209,15 +290,15 @@ export default function SettingsPage() {
             <div className="flex border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
                 <button
                     onClick={() => setActiveTab('account')}
-                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'account' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'account' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
                 >
-                    계정 설정 (정보부장)
+                    계정 설정
                 </button>
                 <button
                     onClick={() => setActiveTab('system')}
-                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'system' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'system' ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
                 >
-                    시스템 설정 (데이터)
+                    시스템 관리
                 </button>
             </div>
 
@@ -238,6 +319,10 @@ export default function SettingsPage() {
                                 />
                                 <p className="help-text">이 이름은 스캔 페이지에서 담당자가 확인할 수 있습니다.</p>
                             </div>
+                            <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
+                                <span className="text-xs text-gray-400">데이터베이스:</span>
+                                <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">{dbLabel}</span>
+                            </div>
                         </div>
                     </Section>
 
@@ -252,7 +337,7 @@ export default function SettingsPage() {
                                         className="text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 inline-flex items-center gap-1 text-xs font-normal border border-purple-200 dark:border-purple-800 rounded-full px-2 py-0.5 bg-purple-50 dark:bg-purple-900/30 transition-colors"
                                     >
                                         <HelpCircle className="w-3 h-3" />
-                                        발급 방법 확인
+                                        발급 방법
                                     </button>
                                 </label>
                                 <input
@@ -263,48 +348,15 @@ export default function SettingsPage() {
                                     placeholder="AIzaSyD..."
                                 />
                                 <p className="help-text">
-                                    이미지 텍스트 인식(OCR)을 위해 필요합니다. (서비스 계정 JSON X, API Key O)<br />
-                                    <span className="text-blue-600 dark:text-blue-400 font-medium">* 서버 환경 변수에 키가 있다면 입력하지 않아도 자동 적용됩니다.</span>
+                                    이미지 텍스트 인식(OCR)에 사용됩니다.<br />
+                                    <span className="text-blue-600 dark:text-blue-400 font-medium">* 가입 시 입력한 키는 데이터베이스에 자동 저장되어, 다른 기기에서도 그대로 사용됩니다.</span>
                                 </p>
                             </div>
                         </div>
                     </Section>
 
-                    {/* 2.2 Magic Link (Setting Sync) */}
-                    <Section title="설정 동기화 (PC ↔ 모바일)" icon={<Key className="w-5 h-5 text-green-500" />} color="bg-green-50 dark:bg-green-900/20">
-                        <div className="space-y-4">
-                            <p className="text-sm text-gray-600 dark:text-gray-300">
-                                현재 기기의 설정(API 키, DB 연결정보)을 다른 기기로 복사할 수 있습니다.<br />
-                                <span className="text-xs text-gray-400">* 보안을 위해 비밀번호는 포함되지 않습니다.</span>
-                            </p>
-
-                            {magicLink ? (
-                                <div className="space-y-2 animate-in fade-in">
-                                    <div className="p-3 bg-gray-100 dark:bg-gray-900 rounded-lg break-all text-xs font-mono text-gray-600 dark:text-gray-400 max-h-24 overflow-y-auto">
-                                        {magicLink}
-                                    </div>
-                                    <button
-                                        onClick={() => {
-                                            navigator.clipboard.writeText(magicLink);
-                                            alert('설정 링크가 복사되었습니다! 카카오톡 등으로 모바일에 전송하세요.');
-                                        }}
-                                        className="btn-secondary w-full"
-                                    >
-                                        <Copy className="w-4 h-4 mr-2 inline" />
-                                        링크 복사하기
-                                    </button>
-                                </div>
-                            ) : (
-                                <button onClick={generateMagicLink} className="btn-secondary w-full">
-                                    <LinkIcon className="w-4 h-4 mr-2 inline" />
-                                    설정 내보내기 (매직 링크 생성)
-                                </button>
-                            )}
-                        </div>
-                    </Section>
-
-                    {/* 2.5 Password Change */}
-                    <Section title="계정 보안" icon={<div className="w-5 h-5 flex items-center justify-center text-red-500 font-bold">🔒</div>} color="bg-red-50 dark:bg-red-900/20">
+                    {/* 3. Password Change */}
+                    <Section title="계정 보안" icon={<Shield className="w-5 h-5 text-amber-500" />} color="bg-amber-50 dark:bg-amber-900/20">
                         <div className="space-y-4">
                             <div>
                                 <label className="label">현재 비밀번호</label>
@@ -323,42 +375,22 @@ export default function SettingsPage() {
                             <button
                                 onClick={handleChangePassword}
                                 disabled={isPwChanging}
-                                className="w-full py-2.5 bg-gray-800 hover:bg-gray-900 dark:bg-gray-700 dark:hover:bg-gray-600 text-white rounded-lg font-bold transition-all disabled:opacity-50 text-sm"
+                                className="w-full py-2.5 bg-gray-800 hover:bg-gray-900 dark:bg-gray-600 dark:hover:bg-gray-500 text-white rounded-lg font-bold transition-all disabled:opacity-50 text-sm"
                             >
                                 {isPwChanging ? '변경 중...' : '비밀번호 변경'}
                             </button>
                         </div>
                     </Section>
 
-                    {/* 3. Server Config (Mock) */}
-                    <Section title="서버 설정" icon={<Server className="w-5 h-5 text-green-500" />} color="bg-green-50 dark:bg-green-900/20">
-                        <div className="space-y-4">
-                            <div>
-                                <label className="label">데이터베이스 유형</label>
-                                <div className="relative">
-                                    <select className="input-field bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed" disabled value={serverType}>
-                                        <option value="google-sheets">Google Sheets (기본)</option>
-                                        <option value="firebase">Firebase (준비 중)</option>
-                                        <option value="supabase">Supabase (준비 중)</option>
-                                    </select>
-                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500">
-                                        변경 불가
-                                    </div>
-                                </div>
-                                <p className="help-text">현재 버전에서는 Google Sheets만 지원합니다.</p>
-                            </div>
-                        </div>
-                    </Section>
-
                     {/* 4. Scan Link */}
                     <Section title="담당자용 스캔 링크" icon={<LinkIcon className="w-5 h-5 text-orange-500" />} color="bg-orange-50 dark:bg-orange-900/20">
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                             <p className="text-sm text-gray-600 dark:text-gray-300 break-keep">
                                 아래 링크를 복사하여 구역 담당자(선생님)들에게 공유하세요.<br />
-                                <span className="font-semibold text-orange-600">이 링크로 접속하면 별도의 ID 입력 없이 바로 등록 가능합니다.</span>
+                                <span className="font-semibold text-orange-600 dark:text-orange-400">이 링크로 접속하면 별도의 ID 입력 없이 바로 등록 가능합니다.</span>
                             </p>
                             <div className="flex flex-col md:flex-row gap-2">
-                                <input type="text" readOnly value={scanLink} className="input-field bg-gray-50 dark:bg-gray-800 text-xs font-mono" />
+                                <input type="text" readOnly value={scanLink} className="input-field bg-gray-50 dark:bg-gray-900 text-xs font-mono" />
                                 <button onClick={copyLink} className="btn-secondary whitespace-nowrap min-w-[80px] flex justify-center items-center">
                                     {copied ? <><Check className="w-4 h-4 mr-1" /> 복사됨</> : <><Copy className="w-4 h-4 mr-1" /> 복사</>}
                                 </button>
@@ -374,14 +406,34 @@ export default function SettingsPage() {
                 </div>
             ) : (
                 <div className="space-y-6">
-                    {/* System Settings */}
-                    <Section title="데이터 초기화" icon={<RefreshCw className="w-5 h-5 text-red-500" />} color="bg-red-50 dark:bg-red-900/20">
-                        <p className="text-sm text-gray-500 mb-4 break-keep">
-                            시스템 오류 발생 시 데이터를 강제로 초기화할 수 있습니다. (주의: 복구 불가능)
+                    {/* Data Reset */}
+                    <Section title="데이터 초기화" icon={<RefreshCw className="w-5 h-5 text-orange-500" />} color="bg-orange-50 dark:bg-orange-900/20">
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 break-keep">
+                            시스템 오류 발생 시 특정 데이터를 강제로 초기화할 수 있습니다.<br />
+                            <span className="text-xs text-orange-500 font-medium">⚠️ 초기화된 데이터는 복구할 수 없습니다.</span>
                         </p>
                         <div className="flex flex-wrap gap-2">
                             <button onClick={() => alert('준비 중')} className="btn-danger-outline">Devices 초기화</button>
                             <button onClick={() => alert('준비 중')} className="btn-danger-outline">Software 초기화</button>
+                        </div>
+                    </Section>
+
+                    {/* Account Deletion */}
+                    <Section title="계정 탈퇴" icon={<Trash2 className="w-5 h-5 text-red-500" />} color="bg-red-50 dark:bg-red-900/20">
+                        <div className="space-y-4">
+                            <div className="bg-red-50 dark:bg-red-950/30 p-4 rounded-xl border border-red-100 dark:border-red-900/50">
+                                <p className="text-sm text-red-700 dark:text-red-300 break-keep">
+                                    계정을 탈퇴하면 <strong>데이터베이스의 모든 데이터</strong>가 영구적으로 삭제되며,
+                                    이 계정으로는 더 이상 로그인할 수 없습니다.
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setShowDeleteModal(true)}
+                                className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold transition-all active:scale-[0.98] text-sm flex items-center justify-center gap-2"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                계정 탈퇴하기
+                            </button>
                         </div>
                     </Section>
                 </div>
@@ -389,11 +441,11 @@ export default function SettingsPage() {
 
             <style jsx>{`
                 .label { @apply block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1; }
-                .input-field { @apply w-full p-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all; }
-                .help-text { @apply text-xs text-gray-400 mt-1; }
+                .input-field { @apply w-full p-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all text-gray-900 dark:text-gray-100; }
+                .help-text { @apply text-xs text-gray-400 mt-1.5; }
                 .btn-primary { @apply py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-md active:scale-95 transition-all text-sm; }
-                .btn-secondary { @apply px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-sm font-medium bg-white dark:bg-gray-800; }
-                .btn-danger-outline { @apply px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg transition-colors text-sm font-medium bg-white dark:bg-gray-800; }
+                .btn-secondary { @apply px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium bg-white dark:bg-gray-800; }
+                .btn-danger-outline { @apply px-4 py-2 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors text-sm font-medium bg-white dark:bg-gray-800; }
             `}</style>
         </div>
     );
@@ -401,7 +453,7 @@ export default function SettingsPage() {
 
 function Section({ title, icon, color, children }: any) {
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-start gap-4">
                 <div className={`p-3 rounded-lg shrink-0 ${color}`}>
                     {icon}

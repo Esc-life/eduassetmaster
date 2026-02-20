@@ -522,3 +522,33 @@ export async function returnLoanInDB(config: any, loanId: string, returnConditio
         return { success: true };
     } catch (e) { return { success: false, error: String(e) }; }
 }
+
+// --- Account Deletion (Full Wipe) ---
+export async function deleteEntireUserData(config: any, userEmail: string) {
+    const db = getFirebaseStore(config);
+    try {
+        const collectionsToDelete = ['Devices', 'DeviceInstances', 'Software', 'Accounts', 'Loans', 'Locations', 'SystemConfig'];
+
+        for (const collName of collectionsToDelete) {
+            const snap = await getDocs(collection(db, collName));
+            const chunks = [];
+            for (let i = 0; i < snap.docs.length; i += 400) {
+                chunks.push(snap.docs.slice(i, i + 400));
+            }
+            for (const chunk of chunks) {
+                const batch = writeBatch(db);
+                chunk.forEach(d => batch.delete(d.ref));
+                await batch.commit();
+            }
+        }
+
+        // Delete user record
+        if (userEmail) {
+            await deleteDoc(doc(db, "Users", userEmail));
+        }
+
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: String(e) };
+    }
+}

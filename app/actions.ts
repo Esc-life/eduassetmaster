@@ -1560,3 +1560,44 @@ export async function getServerType() {
     }
     return 'google-sheets';
 }
+
+export async function deleteMyAccount() {
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user?.email) return { success: false, error: '로그인이 필요합니다.' };
+
+    const email = session.user.email;
+    const appConfig = await _getAppConfig();
+
+    // Firebase mode
+    if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
+        return await fbActions.deleteEntireUserData(appConfig.firebase, email);
+    }
+
+    // Google Sheets mode
+    const sheetId = await getUserSheetId();
+
+    try {
+        // 1. Clear all data in user's spreadsheet
+        if (sheetId && sheetId !== 'NO_SHEET') {
+            const sheetsToClean = ['Devices', 'DeviceInstances', 'Software', 'Accounts', 'Config', 'Locations', 'Credentials', 'Loans'];
+            for (const sheet of sheetsToClean) {
+                try { await clearData(`${sheet}!A2:Z`, sheetId); } catch (e) { /* sheet may not exist */ }
+            }
+        }
+
+        // 2. Remove user from master Users sheet
+        const masterRows = await getData('Users!A:F');
+        if (masterRows) {
+            const idx = masterRows.findIndex((r: any[]) => r[2] === email);
+            if (idx >= 0) {
+                // Clear the user row in master sheet
+                const emptyRow = masterRows[idx].map(() => '');
+                await updateData(`Users!A${idx + 1}`, [emptyRow]);
+            }
+        }
+
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: String(e) };
+    }
+}
