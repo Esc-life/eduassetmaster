@@ -3,7 +3,7 @@ import { getData, updateData, appendData, addSheet, initializeUserSheet } from "
 
 export async function POST(req: Request) {
     try {
-        const { email, password, name, spreadsheetId } = await req.json();
+        const { email, password, name, spreadsheetId, visionApiKey } = await req.json();
 
         if (!email || !password || !name) {
             return NextResponse.json({ message: "필수 정보가 누락되었습니다." }, { status: 400 });
@@ -15,6 +15,17 @@ export async function POST(req: Request) {
                 // Try to initialize (create tabs/headers)
                 // This will throw if we don't have edit access
                 await initializeUserSheet(spreadsheetId);
+
+                // Save Initial Config (Vision Key, Manager Name)
+                if (visionApiKey || name) {
+                    const configRows = [
+                        ['GOOGLE_VISION_KEY', visionApiKey || ''],
+                        ['ManagerName', name || '']
+                    ];
+                    // Use appendData or updateData. Config sheet has header at A1.
+                    // Initial save: A2
+                    await appendData('Config!A2', configRows, spreadsheetId);
+                }
             } catch (initError: any) {
                 console.error("Sheet Init Error:", initError);
                 if (initError.message === 'PERMISSION_DENIED' || initError.code === 403) {

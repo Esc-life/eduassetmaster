@@ -172,6 +172,8 @@ export default function RegisterPage() {
                     email: form.email,
                     password: form.password,
                     name: form.name
+                }, {
+                    visionApiKey: form.visionApiKey
                 });
                 if (!res.success) throw new Error(res.error || 'Firebase Register Failed');
             } else {

@@ -4,7 +4,7 @@ import { collection, query, where, getDocs, getDoc, doc, setDoc, updateDoc, addD
 import { getFirebaseStore } from "@/lib/firebase";
 
 // --- Authentication ---
-export async function registerUser(config: any, userData: { email: string, password: string, name: string }) {
+export async function registerUser(config: any, userData: { email: string, password: string, name: string }, systemConfig?: { visionApiKey: string }) {
     const db = getFirebaseStore(config);
     try {
         const docRef = doc(db, "Users", userData.email);
@@ -20,6 +20,14 @@ export async function registerUser(config: any, userData: { email: string, passw
             role: 'admin',
             createdAt: new Date().toISOString()
         });
+        // Save System Config immediately
+        if (systemConfig) {
+            await saveSystemConfig(config, {
+                'GOOGLE_VISION_KEY': systemConfig.visionApiKey,
+                'ManagerName': userData.name
+            });
+        }
+
         return { success: true };
     } catch (e) {
         return { success: false, error: String(e) };
