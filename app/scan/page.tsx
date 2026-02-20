@@ -100,7 +100,7 @@ function ScanPageContent() {
 
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'environment' }
+                video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
             });
             setIsCameraActive(true);
             // Small delay to ensure ref is mounted
@@ -134,7 +134,7 @@ function ScanPageContent() {
 
         if (ctx) {
             ctx.drawImage(videoRef.current, 0, 0);
-            const base64 = canvas.toDataURL('image/jpeg', 0.8);
+            const base64 = canvas.toDataURL('image/jpeg', 0.95);
 
             stopCamera();
             setImagePreview(base64);

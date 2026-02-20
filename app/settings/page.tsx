@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { RefreshCw, Key, User, Copy, Check, Link as LinkIcon, HelpCircle, X, ExternalLink, Trash2, AlertTriangle, Shield, Loader2 } from 'lucide-react';
-import { fetchSystemConfig, saveSystemConfig, getMySheetId, changePassword, getServerType, deleteMyAccount } from '@/app/actions';
+import { useState, useEffect, useRef } from 'react';
+import { RefreshCw, Key, User, Copy, Check, Link as LinkIcon, HelpCircle, X, ExternalLink, Trash2, AlertTriangle, Shield, Loader2, Download, Upload, FolderArchive } from 'lucide-react';
+import { fetchSystemConfig, saveSystemConfig, getMySheetId, changePassword, getServerType, deleteMyAccount, exportAllData, importAllData } from '@/app/actions';
 import { signOut } from 'next-auth/react';
 
 // --- Guide Modal ---
@@ -163,6 +163,11 @@ export default function SettingsPage() {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
 
+    // Backup / Restore
+    const [isExporting, setIsExporting] = useState(false);
+    const [isImporting, setIsImporting] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
     // Magic Link (config_sync) handler
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -272,6 +277,79 @@ export default function SettingsPage() {
         navigator.clipboard.writeText(scanLink);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
+    };
+
+    const handleExport = async () => {
+        setIsExporting(true);
+        try {
+            const result = await exportAllData();
+            if (result.success && result.backup) {
+                const json = JSON.stringify(result.backup, null, 2);
+                const blob = new Blob([json], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                const date = new Date().toISOString().slice(0, 10);
+                a.href = url;
+                a.download = `EduAssetMaster_Backup_${date}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                alert('백업 파일이 다운로드되었습니다.');
+            } else {
+                alert('백업 실패: ' + (result.error || ''));
+            }
+        } catch (e) {
+            alert('백업 중 오류 발생');
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
+    const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Reset file input
+        if (fileInputRef.current) fileInputRef.current.value = '';
+
+        try {
+            const text = await file.text();
+            const backup = JSON.parse(text);
+
+            if (!backup.data || !backup.version) {
+                alert('유효하지 않은 백업 파일입니다.');
+                return;
+            }
+
+            const devCount = backup.data.devices?.length || 0;
+            const swCount = backup.data.software?.length || 0;
+            const loanCount = backup.data.loans?.length || 0;
+            const locCount = backup.data.locations?.length || 0;
+            const sourceLabel = backup.sourceType === 'firebase' ? 'Firebase' : 'Google Sheets';
+            const targetLabel = serverType === 'firebase' ? 'Firebase' : 'Google Sheets';
+
+            const msg = `백업 파일 정보:\n` +
+                `- 원본: ${sourceLabel}\n` +
+                `- 내보낸 날짜: ${backup.exportDate?.slice(0, 10) || '알 수 없음'}\n` +
+                `- 기기: ${devCount}건 / 소프트웨어: ${swCount}건 / 대여: ${loanCount}건 / 구역: ${locCount}건\n\n` +
+                `이 데이터를 현재 계정(${targetLabel})에 가져오시겠습니까?\n` +
+                `⚠️ 기존 데이터는 모두 덮어쓰여집니다.`;
+
+            if (!confirm(msg)) return;
+
+            setIsImporting(true);
+            const result = await importAllData(backup);
+
+            if (result.success) {
+                alert('데이터를 성공적으로 가져왔습니다!\n페이지를 새로고침합니다.');
+                window.location.reload();
+            } else {
+                alert('가져오기 실패: ' + (result.error || ''));
+            }
+        } catch (e) {
+            alert('파일을 읽을 수 없습니다. JSON 형식인지 확인해주세요.');
+        } finally {
+            setIsImporting(false);
+        }
     };
 
     const dbLabel = serverType === 'firebase' ? 'Firebase' : 'Google Sheets';
@@ -406,6 +484,59 @@ export default function SettingsPage() {
                 </div>
             ) : (
                 <div className="space-y-6">
+                    {/* Backup / Restore */}
+                    <Section title="데이터 백업 / 인수인계" icon={<FolderArchive className="w-5 h-5 text-blue-500" />} color="bg-blue-50 dark:bg-blue-900/20">
+                        <div className="space-y-4">
+                            <p className="text-sm text-gray-600 dark:text-gray-300 break-keep">
+                                현재 데이터베이스의 모든 데이터를 JSON 파일로 내보내거나,
+                                이전에 백업한 파일을 불러올 수 있습니다.
+                            </p>
+                            <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-lg border border-blue-100 dark:border-blue-900/50">
+                                <p className="text-xs text-blue-700 dark:text-blue-300 flex items-start gap-1.5 break-keep">
+                                    <span className="mt-0.5">💡</span>
+                                    <span>
+                                        <strong>Google Sheets ↔ Firebase 호환:</strong> 어떤 DB에서 내보낸 백업이든
+                                        다른 DB 유형의 계정에서 그대로 가져올 수 있습니다.
+                                        업무 인수인계 시 이 기능을 활용하세요.
+                                    </span>
+                                </p>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <button
+                                    onClick={handleExport}
+                                    disabled={isExporting}
+                                    className="py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition-all active:scale-[0.98] text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+                                >
+                                    {isExporting ? (
+                                        <><Loader2 className="w-4 h-4 animate-spin" /> 내보내는 중...</>
+                                    ) : (
+                                        <><Download className="w-4 h-4" /> 데이터 내보내기 (백업)</>
+                                    )}
+                                </button>
+                                <div className="relative">
+                                    <input
+                                        type="file"
+                                        ref={fileInputRef}
+                                        accept=".json"
+                                        onChange={handleImport}
+                                        className="hidden"
+                                    />
+                                    <button
+                                        onClick={() => fileInputRef.current?.click()}
+                                        disabled={isImporting}
+                                        className="w-full py-3 border-2 border-dashed border-blue-300 dark:border-blue-700 hover:border-blue-500 dark:hover:border-blue-500 text-blue-600 dark:text-blue-400 rounded-lg font-bold transition-all active:scale-[0.98] text-sm flex items-center justify-center gap-2 disabled:opacity-50 bg-white dark:bg-gray-800"
+                                    >
+                                        {isImporting ? (
+                                            <><Loader2 className="w-4 h-4 animate-spin" /> 가져오는 중...</>
+                                        ) : (
+                                            <><Upload className="w-4 h-4" /> 데이터 가져오기 (복원)</>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </Section>
+
                     {/* Data Reset */}
                     <Section title="데이터 초기화" icon={<RefreshCw className="w-5 h-5 text-orange-500" />} color="bg-orange-50 dark:bg-orange-900/20">
                         <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 break-keep">

@@ -552,3 +552,64 @@ export async function deleteEntireUserData(config: any, userEmail: string) {
         return { success: false, error: String(e) };
     }
 }
+
+// --- Bulk Data Import (for backup restore / handover) ---
+export async function importBulkData(config: any, data: {
+    devices: any[], deviceInstances: any[], software: any[], credentials: any[],
+    loans: any[], locations: any[], systemConfig: Record<string, string>
+}) {
+    const db = getFirebaseStore(config);
+    try {
+        // Write Devices
+        for (const device of (data.devices || [])) {
+            const id = device.id || `dev-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+            const { id: _, ...deviceData } = device;
+            await setDoc(doc(db, "Devices", id), deviceData);
+        }
+
+        // Write DeviceInstances
+        for (const inst of (data.deviceInstances || [])) {
+            const id = inst.id || `inst-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+            const { id: _, ...instData } = inst;
+            await setDoc(doc(db, "DeviceInstances", id), instData);
+        }
+
+        // Write Software
+        for (const sw of (data.software || [])) {
+            await addDoc(collection(db, "Software"), sw);
+        }
+
+        // Write Credentials (Accounts)
+        for (const cred of (data.credentials || [])) {
+            await addDoc(collection(db, "Accounts"), cred);
+        }
+
+        // Write Loans
+        for (const loan of (data.loans || [])) {
+            const id = loan.id || `loan-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+            const { id: _, ...loanData } = loan;
+            await setDoc(doc(db, "Loans", id), loanData);
+        }
+
+        // Write Locations
+        for (const loc of (data.locations || [])) {
+            const id = loc.id || `zone-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+            const { id: _, ...locData } = loc;
+            await setDoc(doc(db, "Locations", id), locData);
+        }
+
+        // Write SystemConfig
+        if (data.systemConfig) {
+            for (const [key, value] of Object.entries(data.systemConfig)) {
+                if (key && !key.startsWith('MapImage')) {
+                    await setDoc(doc(db, "SystemConfig", key), { value });
+                }
+            }
+        }
+
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: String(e) };
+    }
+}
+

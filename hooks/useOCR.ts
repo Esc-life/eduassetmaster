@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
-import Tesseract from 'tesseract.js';
 import { Location } from '@/types';
+import { recognizeZoneNamesWithAI } from '@/app/actions';
 
 declare global {
     interface Window {
@@ -118,82 +118,52 @@ export const useOCR = (): UseOCRResult => {
         }
     }, []);
 
-    // 2. Text Recognition (OCR) - Updates names of EXISTING zones
+    // 2. AI Zone Name Recognition (Gemini Vision - Server Side)
     const recognizeZoneNames = useCallback(async (imageFile: File, zones: Location[]): Promise<Location[]> => {
         setIsScanning(true);
         setProgress(0);
-        setStatusText('Preparing OCR Engine...');
+        setStatusText('Gemini Vision으로 구역 이름 분석 중...');
 
         try {
-            // Load Image
-            const imgUrl = URL.createObjectURL(imageFile);
-            const imgElement = new Image();
-            await new Promise<void>((resolve) => {
-                imgElement.onload = () => resolve();
-                imgElement.src = imgUrl;
+            // Convert File to base64
+            const base64 = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const result = reader.result as string;
+                    // Remove data URL prefix (data:image/png;base64,...)
+                    const base64Data = result.split(',')[1];
+                    resolve(base64Data);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(imageFile);
             });
 
-            const naturalW = imgElement.naturalWidth;
-            const naturalH = imgElement.naturalHeight;
-            const scaleFactor = 2.0; // Higher res for OCR
+            setProgress(30);
+            setStatusText('서버에 이미지 전송 중...');
 
-            // Prepare High-Res Gray Image for cropping
-            await waitForOpenCV();
-            const cv = window.cv;
-            const src = cv.imread(imgElement);
-            const srcResized = new cv.Mat();
-            // Upscale
-            const dsize = new cv.Size(naturalW * scaleFactor, naturalH * scaleFactor);
-            cv.resize(src, srcResized, dsize, 0, 0, cv.INTER_CUBIC);
-            // Grayscale
-            const grayMat = new cv.Mat();
-            cv.cvtColor(srcResized, grayMat, cv.COLOR_RGBA2GRAY, 0);
+            // Call server action
+            const result = await recognizeZoneNamesWithAI(base64, zones.map(z => ({
+                id: z.id,
+                pinX: z.pinX,
+                pinY: z.pinY,
+                width: z.width,
+                height: z.height,
+                name: z.name
+            })));
 
-            const updatedZones = [...zones];
-            let processedCount = 0;
-            const cropCanvas = document.createElement('canvas');
+            setProgress(90);
 
-            setStatusText(`Reading text from ${zones.length} zones...`);
-
-            for (let i = 0; i < updatedZones.length; i++) {
-                const zone = updatedZones[i];
-
-                // Calculate ROI in the upscaled image coordinates
-                const x = (zone.pinX / 100) * naturalW * scaleFactor;
-                const y = (zone.pinY / 100) * naturalH * scaleFactor;
-                const w = (zone.width! / 100) * naturalW * scaleFactor;
-                const h = (zone.height! / 100) * naturalH * scaleFactor;
-
-                // Safety check for bounds
-                if (x < 0 || y < 0 || x + w > srcResized.cols || y + h > srcResized.rows) continue;
-
-                const rect = new cv.Rect(x, y, w, h);
-                const roi = grayMat.roi(rect);
-
-                cropCanvas.width = w;
-                cropCanvas.height = h;
-                cv.imshow(cropCanvas, roi);
-
-                // Run Tesseract on ROI
-                const { data: { text } } = await Tesseract.recognize(cropCanvas, 'kor+eng', {
-                    logger: () => { }
-                });
-
-                const cleanText = text.replace(/[^가-힣a-zA-Z0-9\- ]/g, '').trim();
-                if (cleanText.length > 1) {
-                    updatedZones[i] = { ...zone, name: cleanText };
-                }
-
-                roi.delete();
-                processedCount++;
-                setProgress(Math.round((processedCount / updatedZones.length) * 100));
+            if (result.success && result.zones) {
+                setStatusText(`${result.zones.filter((z: any, i: number) => z.name !== zones[i]?.name).length}개 구역 이름 인식 완료`);
+                return result.zones as Location[];
+            } else {
+                console.warn('Gemini zone recognition failed:', result.error);
+                setStatusText('인식 실패: ' + (result.error || ''));
+                return zones; // Return original zones unchanged
             }
 
-            src.delete(); srcResized.delete(); grayMat.delete();
-            return updatedZones;
-
         } catch (error) {
-            console.error('OCR Error:', error);
+            console.error('AI Zone Name Error:', error);
             setStatusText('Error: ' + (error as Error).message);
             return zones;
         } finally {
@@ -202,7 +172,6 @@ export const useOCR = (): UseOCRResult => {
         }
     }, []);
 
-    // For backward compatibility, default export can be detectStructure or we can rename
     return {
         detectStructure,
         recognizeZoneNames,

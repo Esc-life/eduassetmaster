@@ -933,25 +933,37 @@ export async function processScannedImage(imageBase64: string, locationName: str
     }
 
     try {
-        // 1. Google Vision API Call
-        const response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                requests: [{
-                    image: { content: imageBase64 },
-                    features: [{ type: 'TEXT_DETECTION' }]
-                }]
-            })
-        });
+        // 1. Gemini Vision API Call (Text Extraction)
+        const geminiResponse = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [
+                            {
+                                text: '이 이미지에서 보이는 모든 텍스트를 정확하게 추출해주세요. 모델명, 관리번호, 일련번호 등이 포함될 수 있습니다. 텍스트만 줄바꿈으로 구분하여 출력해주세요. 추가 설명이나 마크다운 형식은 사용하지 마세요.'
+                            },
+                            {
+                                inlineData: {
+                                    mimeType: 'image/jpeg',
+                                    data: imageBase64
+                                }
+                            }
+                        ]
+                    }]
+                })
+            }
+        );
 
-        if (!response.ok) {
-            const err = await response.json();
-            return { success: false, error: err.error?.message || 'Vision API call failed' };
+        if (!geminiResponse.ok) {
+            const err = await geminiResponse.json();
+            return { success: false, error: err.error?.message || 'Gemini Vision API call failed' };
         }
 
-        const data = await response.json();
-        const fullText = data.responses[0]?.fullTextAnnotation?.text || '';
+        const geminiData = await geminiResponse.json();
+        const fullText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
         if (!fullText) {
             return { success: false, error: '이미지에서 텍스트를 찾을 수 없습니다.' };
@@ -1026,6 +1038,92 @@ export async function processScannedImage(imageBase64: string, locationName: str
     } catch (e) {
         console.error('OCR Process Error:', e);
         return { success: false, error: '처리 중 오류가 발생했습니다: ' + String(e) };
+    }
+}
+
+// --- Gemini Vision: Floor Plan Zone Name Recognition ---
+export async function recognizeZoneNamesWithAI(imageBase64: string, zones: { id: string, pinX: number, pinY: number, width?: number, height?: number, name: string }[]) {
+    const config = await fetchSystemConfig();
+    const apiKey = config['GOOGLE_VISION_KEY'] || process.env.GOOGLE_VISION_KEY;
+
+    if (!apiKey) {
+        return { success: false, error: 'API Key가 설정되지 않았습니다.', zones };
+    }
+
+    try {
+        // Build zone position descriptions for the prompt
+        const zoneDescriptions = zones.map((z, i) =>
+            `Zone ${i + 1}: 위치(x:${z.pinX.toFixed(1)}%, y:${z.pinY.toFixed(1)}%, w:${(z.width || 5).toFixed(1)}%, h:${(z.height || 5).toFixed(1)}%)`
+        ).join('\n');
+
+        const prompt = `이 건물 배치도(평면도) 이미지를 분석해주세요.
+
+아래는 이미지에서 감지된 구역들의 위치 정보입니다 (이미지 좌상단 기준 백분율 좌표):
+${zoneDescriptions}
+
+각 구역 위치에 해당하는 교실/공간 이름을 읽어주세요.
+반드시 아래 JSON 배열 형식으로만 응답하세요. 다른 텍스트는 포함하지 마세요:
+[{"index":0,"name":"교실이름"},{"index":1,"name":"교실이름"},...]
+
+규칙:
+- index는 0부터 시작합니다.
+- 해당 위치에서 텍스트를 읽을 수 없으면 name을 빈 문자열로 설정하세요.
+- 텍스트가 잘려있어도 추론할 수 있다면 추론해서 이름을 완성하세요.
+- "1-1", "과학실", "교무실" 등 한국어 학교 구역명일 가능성이 높습니다.`;
+
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [
+                            { text: prompt },
+                            {
+                                inlineData: {
+                                    mimeType: 'image/png',
+                                    data: imageBase64
+                                }
+                            }
+                        ]
+                    }],
+                    generationConfig: {
+                        temperature: 0.1,
+                        maxOutputTokens: 2048
+                    }
+                })
+            }
+        );
+
+        if (!response.ok) {
+            const err = await response.json();
+            return { success: false, error: err.error?.message || 'Gemini API call failed', zones };
+        }
+
+        const data = await response.json();
+        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+        // Parse JSON from response (Gemini may wrap in ```json ... ```)
+        const jsonMatch = rawText.match(/\[.*\]/s);
+        if (!jsonMatch) {
+            console.warn('Gemini zone name response not parseable:', rawText);
+            return { success: false, error: '응답을 파싱할 수 없습니다.', zones };
+        }
+
+        const parsed: { index: number, name: string }[] = JSON.parse(jsonMatch[0]);
+        const updatedZones = zones.map((z, i) => {
+            const match = parsed.find(p => p.index === i);
+            if (match && match.name && match.name.trim()) {
+                return { ...z, name: match.name.trim() };
+            }
+            return z;
+        });
+
+        return { success: true, zones: updatedZones };
+    } catch (e) {
+        console.error('Gemini Zone Recognition Error:', e);
+        return { success: false, error: String(e), zones };
     }
 }
 
@@ -1601,3 +1699,167 @@ export async function deleteMyAccount() {
         return { success: false, error: String(e) };
     }
 }
+
+// --- Backup & Restore (Cross-platform) ---
+
+export async function exportAllData() {
+    const appConfig = await _getAppConfig();
+    const serverType = appConfig?.dbType === 'firebase' ? 'firebase' : 'google-sheets';
+
+    try {
+        // Fetch all data using existing unified functions
+        const assetData: any = await fetchAssetData();
+        const mapConfig: any = await fetchMapConfiguration();
+        const systemConfig = await fetchSystemConfig();
+        const loans = await getLoans();
+        const softwareList = await getSoftwareList();
+        const accountList = await getAccountList();
+
+        return {
+            success: true,
+            backup: {
+                exportDate: new Date().toISOString(),
+                sourceType: serverType,
+                version: '1.0',
+                data: {
+                    devices: assetData.devices || [],
+                    deviceInstances: assetData.deviceInstances || [],
+                    software: softwareList || [],
+                    credentials: accountList || [],
+                    loans: loans || [],
+                    locations: mapConfig.zones || [],
+                    systemConfig: systemConfig || {},
+                    mapImage: mapConfig.mapImage || null
+                }
+            }
+        };
+    } catch (e) {
+        console.error('Export Error:', e);
+        return { success: false, error: String(e) };
+    }
+}
+
+export async function importAllData(backup: any) {
+    if (!backup || !backup.data) {
+        return { success: false, error: '유효하지 않은 백업 파일입니다.' };
+    }
+
+    const appConfig = await _getAppConfig();
+    const importData = backup.data;
+
+    try {
+        // Firebase mode
+        if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
+            // Clear existing data first
+            const session = await getServerSession(authOptions);
+            await fbActions.deleteEntireUserData(appConfig.firebase, session?.user?.email || '');
+
+            // Import all data
+            return await fbActions.importBulkData(appConfig.firebase, {
+                devices: importData.devices || [],
+                deviceInstances: importData.deviceInstances || [],
+                software: importData.software || [],
+                credentials: importData.credentials || [],
+                loans: importData.loans || [],
+                locations: importData.locations || [],
+                systemConfig: importData.systemConfig || {}
+            });
+        }
+
+        // Google Sheets mode
+        const sheetId = await getUserSheetId();
+        if (!sheetId || sheetId === 'NO_SHEET') {
+            return { success: false, error: '시트 ID를 찾을 수 없습니다.' };
+        }
+
+        // 1. Clear existing data
+        const sheetsToClear = ['Devices', 'DeviceInstances', 'Software', 'Credentials', 'Loans', 'Locations', 'Config'];
+        for (const sheet of sheetsToClear) {
+            try { await clearData(`${sheet}!A2:Z`, sheetId); } catch (e) { /* sheet may not exist */ }
+        }
+
+        // 2. Import Devices
+        if (importData.devices?.length > 0) {
+            const deviceRows = importData.devices.map((d: any) => [
+                d.id || '', d.category || '', d.model || '', d.ip || '', d.status || '사용 가능',
+                d.purchaseDate || '', d.groupId || '', d.name || '', d.acquisitionDivision || '',
+                d.quantity || '', d.unitPrice || '', d.totalAmount || '', d.serviceLifeChange || '',
+                d.installLocation || '', d.osVersion || '', d.windowsPassword || '',
+                d.userName || '', d.pcName || ''
+            ]);
+            await appendData('Devices!A2', deviceRows, sheetId);
+        }
+
+        // 3. Import DeviceInstances
+        if (importData.deviceInstances?.length > 0) {
+            try { await addSheet('DeviceInstances', sheetId); } catch (e) { /* already exists */ }
+            try { await updateData('DeviceInstances!A1', [['ID', 'DeviceID', 'LocationID', 'LocationName', 'Quantity', 'Notes']], sheetId); } catch (e) { }
+            const instRows = importData.deviceInstances.map((i: any) => [
+                i.id || '', i.deviceId || '', i.locationId || '', i.locationName || '',
+                String(i.quantity || 0), i.notes || ''
+            ]);
+            await appendData('DeviceInstances!A2', instRows, sheetId);
+        }
+
+        // 4. Import Software
+        if (importData.software?.length > 0) {
+            try { await addSheet('Software', sheetId); } catch (e) { }
+            try { await updateData('Software!A1', [['Name', 'LicenseKey', 'Quantity', 'ExpiryDate']], sheetId); } catch (e) { }
+            const swRows = importData.software.map((s: any) => [
+                s.name || '', s.licenseKey || '', String(s.quantity || 0), s.expiryDate || ''
+            ]);
+            await appendData('Software!A2', swRows, sheetId);
+        }
+
+        // 5. Import Credentials (Accounts)
+        if (importData.credentials?.length > 0) {
+            try { await addSheet('Credentials', sheetId); } catch (e) { }
+            try { await updateData('Credentials!A1', [['ServiceName', 'AdminID', 'Contact', 'Note']], sheetId); } catch (e) { }
+            const credRows = importData.credentials.map((c: any) => [
+                c.serviceName || '', c.adminId || '', c.contact || '', c.note || ''
+            ]);
+            await appendData('Credentials!A2', credRows, sheetId);
+        }
+
+        // 6. Import Loans
+        if (importData.loans?.length > 0) {
+            try { await addSheet('Loans', sheetId); } catch (e) { }
+            try { await updateData('Loans!A1', [['ID', 'DeviceID', 'DeviceName', 'UserID', 'UserName', 'LoanDate', 'DueDate', 'ReturnDate', 'Status', 'Notes']], sheetId); } catch (e) { }
+            const loanRows = importData.loans.map((l: any) => [
+                l.id || '', l.deviceId || '', l.deviceName || '', l.userId || '', l.userName || '',
+                l.loanDate || '', l.dueDate || '', l.returnDate || '', l.status || '', l.notes || ''
+            ]);
+            await appendData('Loans!A2', loanRows, sheetId);
+        }
+
+        // 7. Import Locations
+        if (importData.locations?.length > 0) {
+            try { await addSheet('Locations', sheetId); } catch (e) { }
+            try { await updateData('Locations!A1', [['ID', 'Name', 'Type']], sheetId); } catch (e) { }
+            const locRows = importData.locations.map((loc: any) => [
+                loc.id || '', loc.name || '', loc.type || 'Classroom'
+            ]);
+            await appendData('Locations!A2', locRows, sheetId);
+        }
+
+        // 8. Import SystemConfig (except MapImage chunks)
+        if (importData.systemConfig) {
+            try { await addSheet('Config', sheetId); } catch (e) { }
+            const configRows: string[][] = [];
+            for (const [key, value] of Object.entries(importData.systemConfig)) {
+                if (key && !key.startsWith('MapImage')) {
+                    configRows.push([key, String(value)]);
+                }
+            }
+            if (configRows.length > 0) {
+                await appendData('Config!A1', configRows, sheetId);
+            }
+        }
+
+        return { success: true };
+    } catch (e) {
+        console.error('Import Error:', e);
+        return { success: false, error: String(e) };
+    }
+}
+
