@@ -1552,3 +1552,11 @@ export async function updateZoneName(zoneId: string, oldName: string, newName: s
         return { success: false, error: String(e) };
     }
 }
+
+export async function getServerType() {
+    const appConfig = await _getAppConfig();
+    if (appConfig?.dbType === 'firebase') {
+        return 'firebase';
+    }
+    return 'google-sheets';
+}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Save, RefreshCw, Database, Key, User, Copy, Check, Link as LinkIcon, Server, HelpCircle, X, ExternalLink } from 'lucide-react';
-import { fetchSystemConfig, saveSystemConfig, getMySheetId, changePassword } from '@/app/actions';
+import { fetchSystemConfig, saveSystemConfig, getMySheetId, changePassword, getServerType } from '@/app/actions';
 
 function GuideModal({ onClose }: { onClose: () => void }) {
     return (
@@ -66,6 +66,7 @@ export default function SettingsPage() {
     const [managerName, setManagerName] = useState('');
     const [visionKey, setVisionKey] = useState('');
     const [sheetId, setSheetId] = useState('');
+    const [serverType, setServerType] = useState('google-sheets');
 
     // UI States
     const [isLoading, setIsLoading] = useState(true);
@@ -148,10 +149,11 @@ export default function SettingsPage() {
     useEffect(() => {
         const load = async () => {
             try {
-                const [conf, id] = await Promise.all([fetchSystemConfig(), getMySheetId()]);
+                const [conf, id, sType] = await Promise.all([fetchSystemConfig(), getMySheetId(), getServerType()]);
                 setManagerName(conf['ManagerName'] || '');
                 setVisionKey(conf['GOOGLE_VISION_KEY'] || '');
                 setSheetId(id || '');
+                if (sType) setServerType(sType as string);
 
                 if (typeof window !== 'undefined' && id) {
                     const nameParam = conf['ManagerName'] ? `&manager=${encodeURIComponent(conf['ManagerName'])}` : '';
@@ -334,7 +336,7 @@ export default function SettingsPage() {
                             <div>
                                 <label className="label">데이터베이스 유형</label>
                                 <div className="relative">
-                                    <select className="input-field bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed" disabled defaultValue="google-sheets">
+                                    <select className="input-field bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed" disabled value={serverType}>
                                         <option value="google-sheets">Google Sheets (기본)</option>
                                         <option value="firebase">Firebase (준비 중)</option>
                                         <option value="supabase">Supabase (준비 중)</option>
