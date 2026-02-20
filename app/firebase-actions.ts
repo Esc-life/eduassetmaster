@@ -130,6 +130,45 @@ export async function updateDevice(config: any, deviceId: string, data: any) {
     const db = getFirebaseStore(config);
     try {
         await updateDoc(doc(db, "Devices", deviceId), data);
+
+        // Sync DeviceInstance when installLocation changes (same as Google Sheets behavior)
+        if (data.installLocation !== undefined) {
+            try {
+                // 1. Remove old instances for this device
+                const instQ = query(collection(db, "DeviceInstances"), where("deviceId", "==", deviceId));
+                const instSnap = await getDocs(instQ);
+                const deletePromises = instSnap.docs.map(d => deleteDoc(d.ref));
+                await Promise.all(deletePromises);
+
+                // 2. Create new instance if location is set
+                if (data.installLocation && data.installLocation.trim() !== '') {
+                    // Find matching zone by name
+                    const locSnap = await getDocs(collection(db, "Locations"));
+                    let locationId = 'TEXT_ONLY';
+                    locSnap.docs.forEach(d => {
+                        const locData = d.data();
+                        if ((locData.name || '').trim() === data.installLocation.trim()) {
+                            locationId = d.id;
+                        }
+                    });
+
+                    // Get device quantity
+                    const devDoc = await getDoc(doc(db, "Devices", deviceId));
+                    const qty = devDoc.exists() ? Number(devDoc.data().quantity || 1) : 1;
+
+                    await addDoc(collection(db, "DeviceInstances"), {
+                        deviceId,
+                        locationId,
+                        locationName: data.installLocation,
+                        quantity: qty,
+                        notes: 'Moved via Scan/Edit'
+                    });
+                }
+            } catch (syncErr) {
+                console.warn('Firebase DeviceInstance sync error:', syncErr);
+            }
+        }
+
         return { success: true };
     } catch (e) {
         return { success: false, error: String(e) };

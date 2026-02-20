@@ -390,7 +390,7 @@ export default function Home() {
               {/* 1. AI Structure Detection */}
               <button
                 onClick={handleAIScan}
-                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-indigo-700 transition-colors whitespace-nowrap"
+                className="flex items-center gap-2 px-3 py-1.5 bg-violet-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-violet-700 transition-colors whitespace-nowrap"
               >
                 <ScanSearch className="w-4 h-4" />
                 1. AI 구역 인식
@@ -403,8 +403,8 @@ export default function Home() {
                   setSelectedZoneIds(new Set());
                 }}
                 className={`flex items-center gap-2 px-3 py-1.5 border rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${isEditing
-                  ? 'bg-orange-100 border-orange-200 text-orange-700'
-                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                  ? 'bg-amber-100 border-amber-300 text-amber-800 dark:bg-amber-900/30 dark:border-amber-700 dark:text-amber-300 shadow-inner'
+                  : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-amber-50 dark:hover:bg-amber-900/10 hover:border-amber-200'
                   }`}
               >
                 {isEditing ? (
@@ -423,7 +423,7 @@ export default function Home() {
               {/* 3. Name Management */}
               <button
                 onClick={() => setShowNameModal(true)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-green-700 transition-colors whitespace-nowrap"
+                className="flex items-center gap-2 px-3 py-1.5 bg-teal-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-teal-700 transition-colors whitespace-nowrap"
               >
                 <Settings className="w-4 h-4" />
                 3. 이름 관리
@@ -453,7 +453,7 @@ export default function Home() {
               {/* 4. Delete Map */}
               <button
                 onClick={() => setShowDeleteMapModal(true)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-600 border border-red-200 text-sm font-medium rounded-lg hover:bg-red-100 transition-colors whitespace-nowrap"
+                className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-gray-800 text-red-500 border border-red-200 dark:border-red-800 text-sm font-medium rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors whitespace-nowrap"
               >
                 <Trash2 className="w-4 h-4" />
                 4. 배치도 삭제

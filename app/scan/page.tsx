@@ -178,7 +178,10 @@ function ScanPageContent() {
         }
         setIsProcessing(true);
         try {
-            const response = await processScannedImage(base64Content, selectedZone, managerId);
+            // Look up zone name from the selected zone ID
+            const zone = zones.find(z => z.id === selectedZone);
+            const zoneName = zone ? zone.name : selectedZone;
+            const response = await processScannedImage(base64Content, zoneName, managerId);
             setResult(response);
         } catch (error) {
             setResult({ success: false, error: '상세 처리 중 오류가 발생했습니다.' });
@@ -264,7 +267,7 @@ function ScanPageContent() {
                                     >
                                         <option value="">-- 구역을 선택하세요 --</option>
                                         {zones.map((zone) => (
-                                            <option key={zone.id} value={zone.name}>{zone.name}</option>
+                                            <option key={zone.id} value={zone.id}>{zone.name}</option>
                                         ))}
                                     </select>
                                 </div>
