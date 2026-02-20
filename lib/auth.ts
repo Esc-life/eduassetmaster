@@ -44,12 +44,14 @@ export const authOptions: NextAuthOptions = {
                     console.log(`[Auth] Fetched User Rows: ${rows ? rows.length : 'null'}`);
 
                     if (!rows) {
-                        // Fallback for initial Admin
-                        if (credentials.email === 'admin@test.com' && (credentials.password === '1234' || credentials.password === 'ji2499mx')) {
+                        // Fallback Admin: Use environment variables instead of hardcoded credentials
+                        const adminEmail = process.env.ADMIN_EMAIL || 'admin@test.com';
+                        const adminPass = process.env.ADMIN_PASSWORD;
+                        if (adminPass && credentials.email === adminEmail && credentials.password === adminPass) {
                             return {
                                 id: 'admin',
                                 name: 'Admin User',
-                                email: 'admin@test.com',
+                                email: adminEmail,
                                 spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID
                             } as any;
                         }
@@ -82,13 +84,15 @@ export const authOptions: NextAuthOptions = {
                         console.log(`[Auth] ❌ User not found in sheet: ${credentials.email}`);
                     }
 
-                    // Fallback/Legacy Admin support
-                    if (credentials.email === 'admin@test.com' && (credentials.password === '1234' || credentials.password === 'ji2499mx')) {
-                        console.log('[Auth] Using Fallback Admin (Hardcoded)');
+                    // Fallback/Legacy Admin support via env variables
+                    const adminEmail = process.env.ADMIN_EMAIL || 'admin@test.com';
+                    const adminPass = process.env.ADMIN_PASSWORD;
+                    if (adminPass && credentials.email === adminEmail && credentials.password === adminPass) {
+                        console.log('[Auth] Using Fallback Admin (from env)');
                         return {
                             id: 'admin',
                             name: 'Admin User',
-                            email: 'admin@test.com',
+                            email: adminEmail,
                             spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID
                         } as any;
                     }

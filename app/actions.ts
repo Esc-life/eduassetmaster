@@ -230,7 +230,7 @@ export async function saveMapConfiguration(mapImage: string | null, zones: Locat
     }
 
     const sheetId = await getUserSheetId();
-    if (sheetId === 'NO_SHEET') return { success: false, error: '?ㅽ봽?덈뱶?쒗듃 ID媛 ?ㅼ젙?섏? ?딆븯?듬땲??' };
+    if (sheetId === 'NO_SHEET') return { success: false, error: '스프레드시트가 연동되지 않았습니다.' };
     if (isGlobalMockMode && !sheetId) return { success: true };
 
     try {
@@ -302,7 +302,7 @@ export async function saveSoftware(item: any) {
     }
 
     const sheetId = await getUserSheetId();
-    if (sheetId === 'NO_SHEET') return { success: false, error: '?ㅽ봽?덈뱶?쒗듃 ID媛 ?놁뒿?덈떎.' };
+    if (sheetId === 'NO_SHEET') return { success: false, error: '스프레드시트가 연동되지 않았습니다.' };
     if (isGlobalMockMode && !sheetId) return { success: true };
 
     try {
@@ -466,7 +466,7 @@ export async function registerBulkDevices(devices: any[]) {
     }
 
     const sheetId = await getUserSheetId();
-    if (sheetId === 'NO_SHEET') return { success: false, error: '?ㅽ봽?덈뱶?쒗듃媛 ?곕룞?섏? ?딆븯?듬땲??' };
+    if (sheetId === 'NO_SHEET') return { success: false, error: '스프레드시트가 연동되지 않았습니다.' };
     if (isGlobalMockMode && !sheetId) return { success: true, count: 0 };
 
     try {
@@ -564,7 +564,7 @@ export async function updateDevice(deviceId: string, updates: Partial<Device>, o
     }
 
     const sheetId = overrideSheetId || await getUserSheetId();
-    if (sheetId === 'NO_SHEET') return { success: false, error: '?ㅽ봽?덈뱶?쒗듃媛 ?곕룞?섏? ?딆븯?듬땲??' };
+    if (sheetId === 'NO_SHEET') return { success: false, error: '스프레드시트가 연동되지 않았습니다.' };
     if (isGlobalMockMode && !sheetId) return { success: true };
 
     try {
@@ -649,11 +649,30 @@ export async function updateDevice(deviceId: string, updates: Partial<Device>, o
 }
 
 export async function deleteDevice(deviceId: string) {
+    // 0. Check Firebase Mode
+    const appConfig = await _getAppConfig();
+    if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
+        return await fbActions.deleteDeviceFromDB(appConfig.firebase, deviceId);
+    }
+
     const sheetId = await getUserSheetId();
-    if (sheetId === 'NO_SHEET') return { success: false, error: '?ㅽ봽?덈뱶?쒗듃媛 ?곕룞?섏? ?딆븯?듬땲??' };
+    if (sheetId === 'NO_SHEET') return { success: false, error: '스프레드시트가 연동되지 않았습니다.' };
     if (isGlobalMockMode && !sheetId) return { success: true };
 
     try {
+        // 1. Delete related DeviceInstances
+        try {
+            const instRows = await getData('DeviceInstances!A2:F', sheetId);
+            if (instRows) {
+                const filtered = instRows.filter((r: any[]) => r[1] !== deviceId);
+                await clearData('DeviceInstances!A2:F', sheetId);
+                if (filtered.length > 0) {
+                    await updateData('DeviceInstances!A2', filtered, sheetId);
+                }
+            }
+        } catch (e) { /* DeviceInstances sheet may not exist */ }
+
+        // 2. Delete the device itself
         const rows = await getData('Devices!A2:R', sheetId);
         if (!rows) return { success: false, error: 'No devices found' };
 
@@ -691,11 +710,30 @@ export async function deleteAllDevices() {
 }
 
 export async function deleteBulkDevices(deviceIds: string[]) {
+    // 0. Check Firebase Mode
+    const appConfig = await _getAppConfig();
+    if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
+        return await fbActions.deleteBulkDevicesFromDB(appConfig.firebase, deviceIds);
+    }
+
     const sheetId = await getUserSheetId();
-    if (sheetId === 'NO_SHEET') return { success: false, error: '?ㅽ봽?덈뱶?쒗듃媛 ?곕룞?섏? ?딆븯?듬땲??' };
+    if (sheetId === 'NO_SHEET') return { success: false, error: '스프레드시트가 연동되지 않았습니다.' };
     if (isGlobalMockMode && !sheetId) return { success: true };
 
     try {
+        // 1. Delete related DeviceInstances
+        try {
+            const instRows = await getData('DeviceInstances!A2:F', sheetId);
+            if (instRows) {
+                const filtered = instRows.filter((r: any[]) => !deviceIds.includes(r[1]));
+                await clearData('DeviceInstances!A2:F', sheetId);
+                if (filtered.length > 0) {
+                    await updateData('DeviceInstances!A2', filtered, sheetId);
+                }
+            }
+        } catch (e) { /* DeviceInstances sheet may not exist */ }
+
+        // 2. Delete devices
         const rows = await getData('Devices!A2:R', sheetId);
         if (!rows) return { success: true };
 
@@ -1766,9 +1804,8 @@ export async function importAllData(backup: any) {
     try {
         // Firebase mode
         if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
-            // Clear existing data first
-            const session = await getServerSession(authOptions);
-            await fbActions.deleteEntireUserData(appConfig.firebase, session?.user?.email || '');
+            // Clear existing data only (preserve User account)
+            await fbActions.clearAllCollectionData(appConfig.firebase);
 
             // Import all data
             return await fbActions.importBulkData(appConfig.firebase, {

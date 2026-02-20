@@ -21,7 +21,7 @@ function getSheetsClient() {
         PRIVATE_KEY = PRIVATE_KEY.slice(1, -1);
     }
     PRIVATE_KEY = PRIVATE_KEY.replace(/\\n/g, '\n');
-    console.log('[GoogleSheets DEBUG] Key length:', PRIVATE_KEY.length, '| Starts:', PRIVATE_KEY.substring(0, 30));
+    console.log('[GoogleSheets] Client initialized.');
 
     try {
         const auth = new google.auth.GoogleAuth({

@@ -2,6 +2,12 @@
 
 import { collection, query, where, getDocs, getDoc, doc, setDoc, updateDoc, addDoc, deleteDoc, writeBatch } from "firebase/firestore/lite";
 import { getFirebaseStore } from "@/lib/firebase";
+import { createHash } from 'crypto';
+
+// Simple SHA-256 hash helper (no external deps needed)
+function hashPassword(password: string): string {
+    return createHash('sha256').update(password).digest('hex');
+}
 
 // --- Authentication ---
 export async function registerUser(config: any, userData: { email: string, password: string, name: string }, systemConfig?: { visionApiKey: string }) {
@@ -15,7 +21,7 @@ export async function registerUser(config: any, userData: { email: string, passw
 
         await setDoc(docRef, {
             email: userData.email,
-            password: userData.password, // Plain text for demo
+            password: hashPassword(userData.password),
             name: userData.name,
             role: 'admin',
             createdAt: new Date().toISOString()
@@ -42,7 +48,9 @@ export async function verifyUser(config: any, creds: { email: string, password: 
 
         if (snap.exists()) {
             const u = snap.data();
-            if (u.password === creds.password) {
+            // Support hashed password (new) and plaintext fallback (legacy)
+            const hashedInput = hashPassword(creds.password);
+            if (u.password === hashedInput || u.password === creds.password) {
                 return { id: u.email, name: u.name, email: u.email, role: u.role };
             }
         }
@@ -597,12 +605,48 @@ export async function returnLoanInDB(config: any, loanId: string, returnConditio
     } catch (e) { return { success: false, error: String(e) }; }
 }
 
-// --- Account Deletion (Full Wipe) ---
-export async function deleteEntireUserData(config: any, userEmail: string) {
+// --- Delete Single Device (with Instance cleanup) ---
+export async function deleteDeviceFromDB(config: any, deviceId: string) {
+    const db = getFirebaseStore(config);
+    try {
+        // 1. Delete related DeviceInstances
+        const instQ = query(collection(db, "DeviceInstances"), where("deviceId", "==", deviceId));
+        const instSnap = await getDocs(instQ);
+        const deletions = instSnap.docs.map(d => deleteDoc(d.ref));
+        await Promise.all(deletions);
+
+        // 2. Delete the device itself
+        await deleteDoc(doc(db, "Devices", deviceId));
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: String(e) };
+    }
+}
+
+// --- Delete Bulk Devices (with Instance cleanup) ---
+export async function deleteBulkDevicesFromDB(config: any, deviceIds: string[]) {
+    const db = getFirebaseStore(config);
+    try {
+        for (const deviceId of deviceIds) {
+            // Delete related instances
+            const instQ = query(collection(db, "DeviceInstances"), where("deviceId", "==", deviceId));
+            const instSnap = await getDocs(instQ);
+            const deletions = instSnap.docs.map(d => deleteDoc(d.ref));
+            await Promise.all(deletions);
+            // Delete device
+            await deleteDoc(doc(db, "Devices", deviceId));
+        }
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: String(e) };
+    }
+}
+
+// --- Clear All Data (for import/restore, keeps User record) ---
+export async function clearAllCollectionData(config: any) {
     const db = getFirebaseStore(config);
     try {
         const collectionsToDelete = ['Devices', 'DeviceInstances', 'Software', 'Accounts', 'Loans', 'Locations', 'SystemConfig'];
-
         for (const collName of collectionsToDelete) {
             const snap = await getDocs(collection(db, collName));
             const chunks = [];
@@ -615,6 +659,18 @@ export async function deleteEntireUserData(config: any, userEmail: string) {
                 await batch.commit();
             }
         }
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: String(e) };
+    }
+}
+
+// --- Account Deletion (Full Wipe including User record) ---
+export async function deleteEntireUserData(config: any, userEmail: string) {
+    const db = getFirebaseStore(config);
+    try {
+        // Clear all collection data first
+        await clearAllCollectionData(config);
 
         // Delete user record
         if (userEmail) {
