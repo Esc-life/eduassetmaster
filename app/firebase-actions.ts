@@ -168,13 +168,30 @@ export async function deleteDeviceInstance(config: any, instanceId: string) {
 export async function updateZoneName(config: any, zoneId: string, oldName: string, newName: string) {
     const db = getFirebaseStore(config);
     try {
+        // 1. Update Locations collection
         await updateDoc(doc(db, "Locations", zoneId), { name: newName });
 
+        // 2. Update DeviceInstances locationName
         const instQ = query(collection(db, "DeviceInstances"), where("locationId", "==", zoneId));
         const instSnap = await getDocs(instQ);
-
         const updates = instSnap.docs.map(d => updateDoc(doc(db, "DeviceInstances", d.id), { locationName: newName }));
         await Promise.all(updates);
+
+        // 3. Update MapZones JSON in SystemConfig
+        try {
+            const zoneDoc = await getDoc(doc(db, "SystemConfig", "MapZones"));
+            if (zoneDoc.exists() && zoneDoc.data().json) {
+                const zones = JSON.parse(zoneDoc.data().json);
+                const updatedZones = zones.map((z: any) => {
+                    if (z.id === zoneId) return { ...z, name: newName };
+                    return z;
+                });
+                await setDoc(doc(db, "SystemConfig", "MapZones"), {
+                    json: JSON.stringify(updatedZones),
+                    updatedAt: new Date().toISOString()
+                });
+            }
+        } catch (e) { console.log('MapZones JSON update skipped', e); }
 
         return { success: true };
     } catch (e) {
@@ -282,10 +299,28 @@ export async function fetchMapConfiguration(config: any) {
     const db = getFirebaseStore(config);
     try {
         const zoneDoc = await getDoc(doc(db, "SystemConfig", "MapZones"));
-        let zones = [];
+        let zones: any[] = [];
         if (zoneDoc.exists() && zoneDoc.data().json) {
             try { zones = JSON.parse(zoneDoc.data().json); } catch (e) { }
         }
+
+        // Merge with Locations collection (source of truth for names)
+        try {
+            const locSnap = await getDocs(collection(db, "Locations"));
+            if (!locSnap.empty) {
+                const nameMap = new Map<string, string>();
+                locSnap.docs.forEach(d => {
+                    const data = d.data();
+                    if (data.name) nameMap.set(d.id, data.name);
+                });
+                if (nameMap.size > 0) {
+                    zones = zones.map(z => ({
+                        ...z,
+                        name: nameMap.get(z.id) || z.name
+                    }));
+                }
+            }
+        } catch (e) { }
 
         const metaDoc = await getDoc(doc(db, "SystemConfig", "MapImageMeta"));
         let mapImage = null;

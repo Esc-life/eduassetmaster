@@ -1645,6 +1645,22 @@ export async function updateZoneName(zoneId: string, oldName: string, newName: s
             }
         } catch (e) { console.log('Device update skipped', e); }
 
+        // 4. Update MapZones JSON in Config Sheet
+        try {
+            const configRows = await getData('Config!A1:B2000', sheetId);
+            if (configRows) {
+                const zoneRowIdx = configRows.findIndex((r: any[]) => r[0] === 'MapZones');
+                if (zoneRowIdx !== -1 && configRows[zoneRowIdx][1]) {
+                    const zonesJson: any[] = JSON.parse(configRows[zoneRowIdx][1]);
+                    const updatedZones = zonesJson.map((z: any) => {
+                        if (z.id === zoneId) return { ...z, name: newName };
+                        return z;
+                    });
+                    await updateData(`Config!A${zoneRowIdx + 1}`, [['MapZones', JSON.stringify(updatedZones)]], sheetId);
+                }
+            }
+        } catch (e) { console.log('MapZones JSON update skipped', e); }
+
         return { success: true };
     } catch (e) {
         return { success: false, error: String(e) };
