@@ -274,7 +274,8 @@ export default function Home() {
   const handleBatchSave = async (newZones: Location[]) => {
     setIsLoadingMessage('구역 이름을 수정하는 중입니다...');
     const oldPins = pins;
-    savePins(newZones);
+    // Update local state immediately, but DON'T call savePins (which triggers saveMapConfiguration)
+    setPins(newZones);
 
     try {
       // 1. Find zones whose names changed and call updateZoneName for each
@@ -291,11 +292,15 @@ export default function Home() {
         await updateZoneName(change.zoneId, change.oldName, change.newName);
       }
 
-      // 3. Also sync the full zone list to Locations sheet/collection
+      // 3. Sync the full zone list to Locations sheet/collection
       const res = await syncZonesToSheet(newZones);
       if (!res.success) {
         console.warn('Locations sync warning:', res.error);
       }
+
+      // 4. Save MapZones JSON once at the end (single write instead of double)
+      const currentImage = mapImage;
+      await saveMapConfiguration(currentImage || null, newZones);
     } catch (e) {
       alert(`DB 동기화 오류: ${e}`);
     } finally {

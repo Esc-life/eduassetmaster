@@ -53,10 +53,15 @@ export async function fetchAssetData(overrideSheetId?: string) {
     const appConfig = await _getAppConfig();
     if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
         const fbData: any = await fbActions.fetchAssetData(appConfig.firebase);
+        // Also fetch software and credentials from Firebase
+        const [softwareList, credentialsList] = await Promise.all([
+            fbActions.fetchSoftwareList(appConfig.firebase),
+            fbActions.fetchAccountList(appConfig.firebase)
+        ]);
         return {
             devices: (fbData.devices || []) as Device[],
-            software: [] as Software[],
-            credentials: [] as Credential[],
+            software: (softwareList || []) as any[],
+            credentials: (credentialsList || []) as any[],
             deviceInstances: (fbData.instances || []) as DeviceInstance[]
         };
     }
@@ -541,7 +546,10 @@ export async function syncZonesToSheet(zones: Location[]) {
         ];
 
         zones.forEach((z: Location) => {
-            const customName = existingMap.get(z.id) || '';
+            // If there was a previous custom name and it differs from auto name, keep it.
+            // Otherwise, set custom name = current zone name for consistency.
+            const prevCustom = existingMap.get(z.id) || '';
+            const customName = prevCustom && prevCustom !== z.name ? prevCustom : z.name;
             values.push([z.id, z.name, customName]);
         });
 
@@ -1888,9 +1896,9 @@ export async function importAllData(backup: any) {
         // 7. Import Locations
         if (importData.locations?.length > 0) {
             try { await addSheet('Locations', sheetId); } catch (e) { }
-            try { await updateData('Locations!A1', [['ID', 'Name', 'Type']], sheetId); } catch (e) { }
+            try { await updateData('Locations!A1', [['Zone ID', 'Auto Name', 'Custom Name']], sheetId); } catch (e) { }
             const locRows = importData.locations.map((loc: any) => [
-                loc.id || '', loc.name || '', loc.type || 'Classroom'
+                loc.id || '', loc.name || '', loc.name || ''  // Use name for both Auto Name and Custom Name
             ]);
             await appendData('Locations!A2', locRows, sheetId);
         }
