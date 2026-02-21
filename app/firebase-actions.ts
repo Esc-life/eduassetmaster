@@ -542,7 +542,16 @@ export async function fetchLoans(config: any) {
     const db = getFirebaseStore(config);
     try {
         const snap = await getDocs(collection(db, "Loans"));
-        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const today = new Date().toISOString().split('T')[0];
+        return snap.docs.map(d => {
+            const data = d.data();
+            let status = data.status || 'Active';
+            // Auto-detect overdue loans
+            if (status === 'Active' && data.dueDate && data.dueDate < today) {
+                status = 'Overdue';
+            }
+            return { id: d.id, ...data, status };
+        });
     } catch (e) { return []; }
 }
 

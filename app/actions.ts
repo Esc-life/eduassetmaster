@@ -1,5 +1,27 @@
 ﻿'use server';
 
+/**
+ * Server Actions Module
+ * 
+ * This file contains all server-side actions for the application.
+ * It handles both Google Sheets and Firebase backends seamlessly.
+ * 
+ * Sections:
+ *   1. Configuration & Helpers (line ~30)
+ *   2. PDF & Asset Data (line ~70)
+ *   3. Map Configuration (line ~200)
+ *   4. Software & Accounts CRUD (line ~300)
+ *   5. Zone Management (line ~510)
+ *   6. Device CRUD & Distribution (line ~570)
+ *   7. DeviceInstance CRUD (line ~790)
+ *   8. System Config (line ~940)
+ *   9. OCR & Scan Processing (line ~990)
+ *  10. Loans Management (line ~1400)
+ *  11. Backup & Restore (line ~1800)
+ * 
+ * TODO: Split into separate modules (devices-actions.ts, loans-actions.ts, etc.)
+ */
+
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getData, updateData, appendData, addSheet, clearData } from '@/lib/google-sheets';
@@ -31,6 +53,20 @@ export async function parsePdfAction(formData: FormData): Promise<{ success: boo
 
 // Helper to check if we are in Mock Mode 
 const isGlobalMockMode = !process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+
+// #14: Structured error helper for consistent error responses
+function createActionError(code: string, message: string) {
+    return { success: false as const, error: message, errorCode: code };
+}
+
+// #23: Session verification helper for write operations
+async function requireSession() {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email) {
+        throw new Error('UNAUTHORIZED');
+    }
+    return session;
+}
 
 async function getUserSheetId() {
     try {
@@ -657,6 +693,9 @@ export async function updateDevice(deviceId: string, updates: Partial<Device>, o
 }
 
 export async function deleteDevice(deviceId: string) {
+    // Session verification for destructive operation
+    try { await requireSession(); } catch { return createActionError('AUTH_REQUIRED', '로그인이 필요합니다.'); }
+
     // 0. Check Firebase Mode
     const appConfig = await _getAppConfig();
     if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
@@ -698,6 +737,9 @@ export async function deleteDevice(deviceId: string) {
 }
 
 export async function deleteAllDevices() {
+    // Session verification for destructive operation
+    try { await requireSession(); } catch { return createActionError('AUTH_REQUIRED', '로그인이 필요합니다.'); }
+
     // 0. Check Firebase Mode
     const appConfig = await _getAppConfig();
     if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
@@ -718,6 +760,9 @@ export async function deleteAllDevices() {
 }
 
 export async function deleteBulkDevices(deviceIds: string[]) {
+    // Session verification for destructive operation
+    try { await requireSession(); } catch { return createActionError('AUTH_REQUIRED', '로그인이 필요합니다.'); }
+
     // 0. Check Firebase Mode
     const appConfig = await _getAppConfig();
     if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
@@ -1387,24 +1432,35 @@ export async function getLoans() {
         const rows = await getData('Loans!A2:J', sheetId);
         if (!rows) return [];
 
-        return rows.map((r: any[]) => ({
-            id: r[0],
-            deviceId: r[1],
-            deviceName: r[2],
-            userId: r[3],
-            userName: r[4],
-            loanDate: r[5],
-            dueDate: r[6],
-            returnDate: r[7] || undefined,
-            status: r[8] as any,
-            notes: r[9] || ''
-        }));
+        const today = new Date().toISOString().split('T')[0];
+        return rows.map((r: any[]) => {
+            let status = r[8] as string;
+            // #20: Auto-detect overdue loans
+            if (status === 'Active' && r[6] && r[6] < today) {
+                status = 'Overdue';
+            }
+            return {
+                id: r[0],
+                deviceId: r[1],
+                deviceName: r[2],
+                userId: r[3],
+                userName: r[4],
+                loanDate: r[5],
+                dueDate: r[6],
+                returnDate: r[7] || undefined,
+                status,
+                notes: r[9] || ''
+            };
+        });
     } catch (e) {
         return [];
     }
 }
 
 export async function createLoan(deviceId: string, userId: string, userName: string, dueDate: string, notes: string = '') {
+    // Session verification
+    try { await requireSession(); } catch { return createActionError('AUTH_REQUIRED', '로그인이 필요합니다.'); }
+
     const appConfig = await _getAppConfig();
     if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
         return await fbActions.createLoanToDB(appConfig.firebase, deviceId, userId, userName, dueDate, notes);
@@ -1631,12 +1687,13 @@ export async function updateZoneName(zoneId: string, oldName: string, newName: s
             await updateData('Locations!A1', [['Zone ID', 'Auto Name', 'Custom Name'], [zoneId, oldName, newName]], sheetId);
         }
 
-        // 2. Update DeviceInstances Sheet (Location Name)
+        // 2. Update DeviceInstances Sheet (Location Name) & collect data for Devices update
+        let cachedInstRows: any[][] | null = null;
         try {
-            const instRows = await getData('DeviceInstances!A2:F', sheetId);
-            if (instRows) {
+            cachedInstRows = await getData('DeviceInstances!A2:F', sheetId);
+            if (cachedInstRows) {
                 const updates: { range: string, values: any[][] }[] = [];
-                instRows.forEach((row: any[], idx: number) => {
+                cachedInstRows.forEach((row: any[], idx: number) => {
                     if (row[2] === zoneId || (oldName && row[3] === oldName)) {
                         const newRow = [...row];
                         newRow[3] = newName;
@@ -1649,18 +1706,17 @@ export async function updateZoneName(zoneId: string, oldName: string, newName: s
             }
         } catch (e) { console.log('Instance update skipped', e); }
 
-        // 3. Update Devices Sheet (Install Location) - Enhanced Logic
+        // 3. Update Devices Sheet (Install Location) - Reuses cachedInstRows (#17 optimization)
         try {
             const devRows = await getData('Devices!A2:R', sheetId);
-            const instRows = await getData('DeviceInstances!A2:F', sheetId); // Fetch instances for cross-check
 
             if (devRows) {
                 const devUpdates: { range: string, values: any[][] }[] = [];
 
                 // Find devices currently in this zone (via DeviceInstances)
                 const deviceIdsInZone = new Set<string>();
-                if (instRows) {
-                    instRows.forEach((r: any[]) => {
+                if (cachedInstRows) {
+                    cachedInstRows.forEach((r: any[]) => {
                         if (r[2] === zoneId) deviceIdsInZone.add(r[1]); // r[1] is DeviceID
                     });
                 }
@@ -1807,6 +1863,10 @@ export async function importAllData(backup: any) {
     }
 
     const appConfig = await _getAppConfig();
+
+    // Session verification for destructive import operation
+    try { await requireSession(); } catch { return createActionError('AUTH_REQUIRED', '로그인이 필요합니다.'); }
+
     const importData = backup.data;
 
     try {
@@ -1914,6 +1974,15 @@ export async function importAllData(backup: any) {
             }
             if (configRows.length > 0) {
                 await appendData('Config!A1', configRows, sheetId);
+            }
+        }
+
+        // 9. Import MapImage (#24)
+        if (importData.mapImage) {
+            try {
+                await saveMapConfiguration(importData.mapImage, importData.locations || []);
+            } catch (e) {
+                console.warn('MapImage import warning:', e);
             }
         }
 

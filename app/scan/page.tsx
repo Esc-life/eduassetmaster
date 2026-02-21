@@ -395,6 +395,18 @@ function ScanPageContent() {
                                                             </div>
                                                         </div>
                                                     )}
+                                                    {/* #21: Show OCR text and manual registration option on failure */}
+                                                    {!result.success && result.text && (
+                                                        <div className="mt-3 space-y-2">
+                                                            <details className="text-xs">
+                                                                <summary className="cursor-pointer text-gray-500 hover:text-gray-700">인식된 텍스트 보기</summary>
+                                                                <pre className="mt-1 p-2 bg-gray-100 dark:bg-gray-800 rounded text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-all max-h-32 overflow-y-auto">{result.text}</pre>
+                                                            </details>
+                                                            <Link href="/devices" className="block w-full py-2.5 bg-blue-600 text-white rounded-lg text-center text-sm font-bold hover:bg-blue-700 transition-colors">
+                                                                기기 목록에서 직접 등록 →
+                                                            </Link>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                             <button onClick={handleRetake} className="w-full mt-6 py-4 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors">

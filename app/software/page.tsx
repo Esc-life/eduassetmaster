@@ -6,6 +6,7 @@ import {
     getAccountList, saveAccount, deleteAccount
 } from '@/app/actions';
 import { Plus, Edit2, Trash2, Key, Globe, Shield, Search, Loader2 } from 'lucide-react';
+import PageLoading from '@/components/ui/PageLoading';
 
 export default function SoftwarePage() {
     const [activeTab, setActiveTab] = useState<'software' | 'accounts'>('software');
@@ -135,9 +136,7 @@ export default function SoftwarePage() {
             )}
 
             {isLoading ? (
-                <div className="flex justify-center py-20">
-                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                </div>
+                <PageLoading />
             ) : (
                 <div className="grid gap-4">
                     {activeTab === 'software' ? (

@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { getLoans, createLoan, returnLoan, fetchAssetData, LoanRecord } from '@/app/actions';
 import { Device } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Plus, Calendar, User, Monitor, CheckCircle, AlertCircle, RefreshCw, X, ArrowLeft } from 'lucide-react';
+import { Search, Plus, Calendar, User, Monitor, CheckCircle, AlertCircle, RefreshCw, X, ArrowLeft, Loader2 } from 'lucide-react';
+import PageLoading from '@/components/ui/PageLoading';
 import Link from 'next/link';
 
 export default function LoansPage() {
@@ -191,8 +192,9 @@ export default function LoansPage() {
                         <tbody>
                             {isLoading ? (
                                 <tr>
-                                    <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
-                                        로딩 중...
+                                    <td colSpan={7} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                                        <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-blue-500" />
+                                        데이터를 불러오는 중...
                                     </td>
                                 </tr>
                             ) : filteredLoans.length === 0 ? (
