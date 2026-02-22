@@ -4,7 +4,7 @@ import { getData, updateData, appendData, addSheet, initializeUserSheet } from "
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const { email, password, name, visionApiKey, serviceAccountJson } = body;
+        const { email, password, name, school, visionApiKey, serviceAccountJson } = body;
         const spreadsheetId = body.spreadsheetId?.trim();
 
         if (!email || !password || !name) {
@@ -16,17 +16,13 @@ export async function POST(req: Request) {
             console.log(`[Register] Initializing spreadsheet: ${spreadsheetId}`);
             try {
                 // Try to initialize (create tabs/headers)
-                // This will throw if we don't have edit access
                 const initResult = await initializeUserSheet(spreadsheetId);
                 if (!initResult) throw new Error('Initialization failed');
 
-                // Save Initial Config (Vision Key, Manager Name, Service Account) to SystemConfig sheet
-                // IMPORTANT: Must use SystemConfig (not Config) because:
-                //   - fetchSystemConfig reads from SystemConfig!A2:B
-                //   - saveMapConfiguration overwrites Config!A1 with map data
                 const configRows: string[][] = [];
                 if (visionApiKey) configRows.push(['GOOGLE_VISION_KEY', visionApiKey]);
                 if (name) configRows.push(['ManagerName', name]);
+                if (school) configRows.push(['SchoolName', school]);
                 if (serviceAccountJson) configRows.push(['SERVICE_ACCOUNT_JSON', serviceAccountJson]);
 
                 if (configRows.length > 0) {
@@ -53,12 +49,12 @@ export async function POST(req: Request) {
         if (rows === null) {
             console.log("[Register] Creating master Users sheet");
             await addSheet('Users');
-            await updateData('Users!A1', [['ID', 'Name', 'Email', 'Password', 'SpreadsheetID', 'CreatedAt']]);
+            await updateData('Users!A1', [['ID', 'Name', 'School', 'Email', 'Password', 'SpreadsheetID', 'CreatedAt']]);
             rows = [];
         }
 
         // 2. Check duplicate
-        if (rows && rows.some((r: any[]) => r[2] === email)) {
+        if (rows && rows.some((r: any[]) => r[3] === email)) {
             return NextResponse.json({ message: "이미 등록된 이메일입니다." }, { status: 409 });
         }
 
@@ -66,6 +62,7 @@ export async function POST(req: Request) {
         const newUser = [
             crypto.randomUUID(),
             name,
+            school || '',
             email,
             password,
             spreadsheetId || '',

@@ -98,6 +98,10 @@ export function AssetMapViewer({
                     className="w-full h-auto block select-none"
                     draggable={false}
                     onLoad={onImageLoad}
+                    onError={(e) => {
+                        console.error("AssetMapViewer: Failed to load map image. URL may be malformed or too long.", e);
+                        onImageLoad?.(); // Clear loading state even on failure
+                    }}
                 />
 
                 {/* Overlay for Zones */}

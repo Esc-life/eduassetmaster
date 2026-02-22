@@ -346,6 +346,10 @@ export async function saveMapConfiguration(mapImage: string | null, zones: Locat
             await addSheet('Config', sheetId);
         }
 
+        // IMPORTANT: Clear old data first to remove stale MapImage_N chunks
+        // Otherwise, if new image has fewer chunks, old chunks will remain at the end and corrupt base64
+        await clearData('Config!A1:B2000', sheetId);
+
         const values = [
             ['Key', 'Value'],
             ['MapZones', JSON.stringify(zones)],

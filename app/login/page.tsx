@@ -108,6 +108,12 @@ export default function LoginPage() {
                             {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : '로그인'}
                         </button>
                     </div>
+
+                    <div className="text-center pt-2">
+                        <Link href="/recover" className="text-xs text-gray-500 hover:text-blue-600 transition-colors">
+                            아이디 또는 비밀번호를 잊어버리셨나요?
+                        </Link>
+                    </div>
                 </form>
             </div>
         </div>
