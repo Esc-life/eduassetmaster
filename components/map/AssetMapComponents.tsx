@@ -77,7 +77,7 @@ export function AssetZone({ location, device, onClick, onDoubleClick, isSelected
         >
             {!isTempZone && (
                 <div className="p-2 flex flex-col items-center justify-center h-full bg-white/40 dark:bg-gray-900/40 rounded-md backdrop-blur-sm pointer-events-none">
-                    <span className="text-sm font-bold text-gray-900 dark:text-white text-center drop-shadow-md whitespace-nowrap">
+                    <span className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white text-center drop-shadow-md leading-tight">
                         {location.name}
                     </span>
                 </div>

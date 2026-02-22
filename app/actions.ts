@@ -749,6 +749,43 @@ export async function syncZonesToSheet(zones: Location[]) {
     }
 }
 
+export async function deleteZonesFromLocations(zoneIds: string[]) {
+    if (zoneIds.length === 0) return { success: true };
+
+    const appConfig = await _getAppConfig();
+    if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
+        return await fbActions.deleteZonesFromLocations(appConfig.firebase, zoneIds);
+    }
+
+    const sheetId = await getUserSheetId();
+    if (sheetId === 'NO_SHEET') return { success: false, error: '시트가 없습니다.' };
+
+    try {
+        // 1. Clear from Locations Sheet
+        const locRows = await getData('Locations!A:C', sheetId);
+        if (locRows && locRows.length > 1) {
+            const header = locRows[0];
+            const remaining = locRows.slice(1).filter(r => !zoneIds.includes(r[0]));
+            await clearData('Locations!A1:C5000', sheetId);
+            await updateData('Locations!A1', [header, ...remaining], sheetId);
+        }
+
+        // 2. Clear from DeviceInstances (Optional but recommended for consistency)
+        const instRows = await getData('DeviceInstances!A:F', sheetId);
+        if (instRows && instRows.length > 1) {
+            const header = instRows[0];
+            const remaining = instRows.slice(1).filter(r => !zoneIds.includes(r[2])); // Col C is LocationID
+            await clearData('DeviceInstances!A1:F5000', sheetId);
+            await updateData('DeviceInstances!A1', [header, ...remaining], sheetId);
+        }
+
+        return { success: true };
+    } catch (e) {
+        console.error('Failed to delete zones from locations:', e);
+        return { success: false, error: String(e) };
+    }
+}
+
 
 // Device Management Functions
 

@@ -11,7 +11,7 @@ import { DeleteConfirmModal } from '@/components/devices/DeleteConfirmModal';
 import Link from 'next/link';
 import { Image as ImageIcon, PlusCircle, Check, Trash2, MousePointer2, ScanSearch, Loader2, Save, Minus, RotateCcw, FileSpreadsheet, ScanLine, Edit3, Settings, MoreHorizontal, CheckSquare, Edit } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { fetchMapConfiguration, saveMapConfiguration, syncZonesToSheet, fetchAssetData, updateDevice, createDeviceInstance, deleteDeviceInstance, updateZoneName, batchUpdateZoneNames, fetchMapList, deleteMap } from '@/app/actions';
+import { fetchMapConfiguration, saveMapConfiguration, syncZonesToSheet, fetchAssetData, updateDevice, createDeviceInstance, deleteDeviceInstance, updateZoneName, batchUpdateZoneNames, deleteZonesFromLocations, fetchMapList, deleteMap } from '@/app/actions';
 import { DeviceEditModal } from '@/components/devices/DeviceEditModal';
 import { ZoneEditModal } from '@/components/map/ZoneEditModal';
 import { ZoneBatchEditModal } from '@/components/map/ZoneBatchEditModal';
@@ -218,9 +218,12 @@ export default function Home() {
     }
   };
 
-  const deleteSelectedZones = () => {
+  const deleteSelectedZones = async () => {
     if (selectedZoneIds.size === 0) return;
     if (confirm(`선택한 ${selectedZoneIds.size}개의 구역을 삭제하시겠습니까?`)) {
+      const zoneIdsToDelete = Array.from(selectedZoneIds);
+      await deleteZonesFromLocations(zoneIdsToDelete);
+
       const newPins = pins.filter(p => !selectedZoneIds.has(p.id));
       savePins(newPins);
       setSelectedZoneIds(new Set());
@@ -341,6 +344,13 @@ export default function Home() {
     if (currentMapId === 'default') {
       if (confirm("기본 배치도의 이미지와 구역 설정을 초기화하시겠습니까?")) {
         setIsLoadingMessage('초기화 중...');
+        // 1. Clear persistent names for these zones
+        const zoneIds = pins.map(p => p.id);
+        if (zoneIds.length > 0) {
+          await deleteZonesFromLocations(zoneIds);
+        }
+
+        // 2. Clear Map Config
         await saveMapConfiguration(null, [], 'default');
         setMapImage(undefined);
         setPins([]);
@@ -351,6 +361,14 @@ export default function Home() {
     }
     if (confirm(`'${currentMapId}' 배치도를 정말 삭제하시겠습니까?\n해당 층의 모든 구역 정보와 이미지가 삭제됩니다.`)) {
       setIsLoadingMessage('배치도 삭제 중...');
+
+      // 1. Clear persistent names for these zones
+      const zoneIds = pins.map(p => p.id);
+      if (zoneIds.length > 0) {
+        await deleteZonesFromLocations(zoneIds);
+      }
+
+      // 2. Delete floor entry
       const res = await deleteMap(currentMapId);
       if (res.success) {
         localStorage.removeItem(`map_cache_${currentMapId}`);

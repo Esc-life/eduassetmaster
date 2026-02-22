@@ -862,3 +862,31 @@ export async function batchUpdateZoneNames(config: any, changes: { zoneId: strin
     }
 }
 
+/**
+ * Delete zones from Locations and related DeviceInstances (Firebase)
+ */
+export async function deleteZonesFromLocations(config: any, zoneIds: string[]) {
+    const db = getFirebaseStore(config);
+    const batch = writeBatch(db);
+
+    try {
+        for (const zoneId of zoneIds) {
+            // 1. Delete from Locations
+            batch.delete(doc(db, "Locations", zoneId));
+
+            // 2. Delete related DeviceInstances
+            const instQ = query(collection(db, "DeviceInstances"), where("locationId", "==", zoneId));
+            const instSnap = await getDocs(instQ);
+            instSnap.docs.forEach(d => {
+                batch.delete(doc(db, "DeviceInstances", d.id));
+            });
+        }
+
+        await batch.commit();
+        return { success: true };
+    } catch (e) {
+        console.error('Firebase delete zones failed:', e);
+        return { success: false, error: String(e) };
+    }
+}
+
