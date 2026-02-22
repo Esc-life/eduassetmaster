@@ -7,8 +7,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Plus, Calendar, User, Monitor, CheckCircle, AlertCircle, RefreshCw, X, ArrowLeft, Loader2 } from 'lucide-react';
 import PageLoading from '@/components/ui/PageLoading';
 import Link from 'next/link';
+import { useMessage } from '@/components/Providers';
 
 export default function LoansPage() {
+    const { showAlert, showConfirmAsync } = useMessage();
     const [loans, setLoans] = useState<LoanRecord[]>([]);
     const [devices, setDevices] = useState<Device[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -35,7 +37,7 @@ export default function LoansPage() {
             if (devicesData) setDevices(devicesData);
         } catch (error) {
             console.error(error);
-            alert('데이터 로딩 중 오류가 발생했습니다.');
+            showAlert('데이터 로딩 중 오류가 발생했습니다.', 'error');
         } finally {
             setIsLoading(false);
         }
@@ -46,29 +48,29 @@ export default function LoansPage() {
     }, []);
 
     const handleReturn = async (loanId: string) => {
-        if (!confirm('반납 처리하시겠습니까?')) return;
+        if (!await showConfirmAsync('반납 처리하시겠습니까?')) return;
 
         try {
             const result = await returnLoan(loanId);
             if (result.success) {
-                alert('반납 처리되었습니다.');
+                showAlert('반납 처리되었습니다.', 'success');
                 loadData();
             } else {
-                alert('반납 실패: ' + result.error);
+                showAlert('반납 실패: ' + result.error, 'error');
             }
         } catch (error) {
-            alert('반납 처리 중 오류 발생');
+            showAlert('반납 처리 중 오류 발생', 'error');
         }
     };
 
     const handleSubmitLoan = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedDevice) {
-            alert('기기를 선택해주세요.');
+            showAlert('기기를 선택해주세요.', 'alert');
             return;
         }
         if (!userName || !dueDate) {
-            alert('필수 정보를 입력해주세요.');
+            showAlert('필수 정보를 입력해주세요.', 'alert');
             return;
         }
 
@@ -76,7 +78,7 @@ export default function LoansPage() {
         try {
             const result = await createLoan(selectedDevice.id, userId || userName, userName, dueDate, notes);
             if (result.success) {
-                alert('대여가 등록되었습니다.');
+                showAlert('대여가 등록되었습니다.', 'success');
                 setShowModal(false);
                 // Reset Form
                 setSelectedDevice(null);
@@ -86,10 +88,10 @@ export default function LoansPage() {
                 setNotes('');
                 loadData();
             } else {
-                alert('대여 등록 실패: ' + result.error);
+                showAlert('대여 등록 실패: ' + result.error, 'error');
             }
         } catch (error) {
-            alert('대여 등록 중 오류 발생');
+            showAlert('대여 등록 중 오류 발생', 'error');
         } finally {
             setIsSubmitting(false);
         }

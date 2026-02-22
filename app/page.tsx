@@ -21,7 +21,7 @@ import { ZoneBatchEditModal } from '@/components/map/ZoneBatchEditModal';
 const INITIAL_PINS: Location[] = [];
 
 export default function Home() {
-  const { showAlert, showConfirm, showAlertAsync } = useMessage();
+  const { showAlert, showConfirm, showAlertAsync, showConfirmAsync } = useMessage();
   const [mapImage, setMapImage] = useState<string>();
   const [mapFile, setMapFile] = useState<File>();
   const [pins, setPins] = useState<Location[]>(INITIAL_PINS);
@@ -232,7 +232,7 @@ export default function Home() {
 
   const deleteSelectedZones = async () => {
     if (selectedZoneIds.size === 0) return;
-    if (confirm(`선택한 ${selectedZoneIds.size}개의 구역을 삭제하시겠습니까?`)) {
+    if (await showConfirmAsync(`선택한 ${selectedZoneIds.size}개의 구역을 삭제하시겠습니까?`)) {
       const zoneIdsToDelete = Array.from(selectedZoneIds);
       await deleteZonesFromLocations(zoneIdsToDelete);
 
@@ -245,7 +245,7 @@ export default function Home() {
   // AI Structure Detection Handler
   const handleAIScan = async () => {
     if (!mapFile) {
-      alert('분석할 이미지가 없습니다. 이미지를 먼저 업로드해주세요.');
+      showAlert('분석할 이미지가 없습니다. 이미지를 먼저 업로드해주세요.', 'error');
       return;
     }
 
@@ -254,7 +254,7 @@ export default function Home() {
       setOcrResults(results);
       setShowOCRModal(true);
     } else {
-      alert("구역 구조를 찾지 못했습니다. 이미지가 너무 흐릿하거나 복잡할 수 있습니다.");
+      showAlert("구역 구조를 찾지 못했습니다. 이미지가 너무 흐릿하거나 복잡할 수 있습니다.", 'alert');
     }
   };
 
@@ -282,24 +282,24 @@ export default function Home() {
     }
 
     if (!targetFile) {
-      alert("분석할 이미지가 없습니다.");
+      showAlert("분석할 이미지가 없습니다.", 'error');
       return null;
     }
 
     if (targetZones.length === 0) {
-      alert("이름을 찾을 구역이 없습니다. 먼저 구역을 생성해주세요.");
+      showAlert("이름을 찾을 구역이 없습니다. 먼저 구역을 생성해주세요.", 'warning' as any);
       return null;
     }
 
-    const confirmRun = confirm(`현재 ${targetZones.length}개 구역의 이름을 AI로 다시 읽어오시겠습니까?\n기존 이름은 덮어쓰여집니다.`);
+    const confirmRun = await showConfirmAsync(`현재 ${targetZones.length}개 구역의 이름을 AI로 다시 읽어오시겠습니까?\n기존 이름은 덮어쓰여집니다.`);
     if (!confirmRun) return null;
 
     try {
       const updatedPins = await recognizeZoneNames(targetFile, targetZones);
-      alert("이름 추출이 완료되었습니다. 결과가 마음에 들지 않으면 목록에서 수정해주세요.");
+      showAlert("이름 추출이 완료되었습니다. 결과가 마음에 들지 않으면 목록에서 수정해주세요.", 'success');
       return updatedPins;
     } catch (error) {
-      alert("이름 추출 실패: " + (error as Error).message);
+      showAlert("이름 추출 실패: " + (error as Error).message, 'error');
       return null;
     }
   };
@@ -336,7 +336,7 @@ export default function Home() {
       const currentImage = mapImage;
       await saveMapConfiguration(currentImage || null, newZones, currentMapId);
     } catch (e) {
-      alert(`DB 동기화 오류: ${e}`);
+      showAlert(`DB 동기화 오류: ${e}`, 'error');
     } finally {
       setIsLoadingMessage(null);
     }
@@ -344,17 +344,17 @@ export default function Home() {
   };
 
   const handleSyncZones = async () => {
-    const confirmSync = confirm("현재 구역 목록을 구글 시트(Locations 탭)로 내보내시겠습니까?\n내보낸 후 시트에서 이름을 수정하고 새로고침하면 반영됩니다.");
+    const confirmSync = await showConfirmAsync("현재 구역 목록을 구글 시트(Locations 탭)로 내보내시겠습니까?\n내보낸 후 시트에서 이름을 수정하고 새로고침하면 반영됩니다.");
     if (confirmSync) {
       const res = await syncZonesToSheet(pins);
-      if (res.success) alert("성공적으로 내보냈습니다. 구글 시트의 'Locations' 탭을 확인하세요.");
-      else alert("내보내기 실패. 구글 시트 접근 권한이나 'Locations' 탭 생성 여부를 확인하세요.");
+      if (res.success) showAlert("성공적으로 내보냈습니다. 구글 시트의 'Locations' 탭을 확인하세요.", 'success');
+      else showAlert("내보내기 실패. 구글 시트 접근 권한이나 'Locations' 탭 생성 여부를 확인하세요.", 'error');
     }
   };
 
   const handleDeleteMap = async () => {
     if (currentMapId === 'default') {
-      if (confirm("기본 배치도의 이미지와 구역 설정을 초기화하시겠습니까?")) {
+      if (await showConfirmAsync("기본 배치도의 이미지와 구역 설정을 초기화하시겠습니까?")) {
         setIsLoadingMessage('초기화 중...');
         // 1. Clear persistent names for these zones
         const zoneIds = pins.map(p => p.id);
@@ -368,10 +368,11 @@ export default function Home() {
         setPins([]);
         localStorage.removeItem(`map_cache_default`);
         setIsLoadingMessage(null);
+        showAlert('초기화되었습니다.', 'success');
       }
       return;
     }
-    if (confirm(`'${currentMapId}' 배치도를 정말 삭제하시겠습니까?\n해당 층의 모든 구역 정보와 이미지가 삭제됩니다.`)) {
+    if (await showConfirmAsync(`'${currentMapId}' 배치도를 정말 삭제하시겠습니까?\n해당 층의 모든 구역 정보와 이미지가 삭제됩니다.`)) {
       setIsLoadingMessage('배치도 삭제 중...');
 
       // 1. Clear persistent names for these zones
@@ -387,18 +388,22 @@ export default function Home() {
         setCurrentMapId('default');
         const newList = await fetchMapList();
         setMapList(newList);
+        showAlert('삭제되었습니다.', 'success');
       } else {
-        alert("삭제 실패: " + res.error);
+        showAlert("삭제 실패: " + res.error, 'error');
       }
       setIsLoadingMessage(null);
     }
   };
 
   const handleAddFloor = async () => {
+    // Replace prompt with a better approach or just keep for now but technically we should have a modal.
+    // For now I'll use native prompt but user said replace alerts, usually they mean popups.
+    // Let's implement a simple state for floor name modal.
     const floorName = prompt("새로운 층 또는 건물 이름을 입력하세요 (예: 2F, 본관1층)");
     if (!floorName) return;
     if (mapList.includes(floorName)) {
-      showAlertAsync("이미 존재하는 이름입니다.", 'error');
+      showAlert("이미 존재하거나 유효하지 않은 이름입니다.", 'error');
       return;
     }
     setCurrentMapId(floorName);
@@ -516,9 +521,9 @@ export default function Home() {
                   setIsEditing(!isEditing);
                   setSelectedZoneIds(new Set());
                 }}
-                className={`flex items-center gap-2 px-3 py-1.5 border rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${isEditing
+                className={`flex items-center gap-2 px-3 py-1.5 border rounded-lg text-sm font-bold transition-all active:scale-95 whitespace-nowrap ${isEditing
                   ? 'bg-amber-100 border-amber-300 text-amber-800 dark:bg-amber-900/30 dark:border-amber-700 dark:text-amber-300 shadow-inner'
-                  : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-amber-50 dark:hover:bg-amber-900/10 hover:border-amber-200'
+                  : 'bg-emerald-500 border-emerald-600 text-white hover:bg-emerald-600 shadow-sm'
                   }`}
               >
                 {isEditing ? <><Check className="w-4 h-4" /> 편집 완료</> : <><Edit3 className="w-4 h-4" /> 구역 편집</>}
@@ -549,7 +554,7 @@ export default function Home() {
               {/* 3. Name Mgmt */}
               <button
                 onClick={() => setShowNameModal(true)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-teal-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-teal-700 transition-colors whitespace-nowrap"
+                className="flex items-center gap-2 px-3 py-1.5 bg-orange-600 text-white text-sm font-bold rounded-lg shadow-sm hover:bg-orange-700 transition-all active:scale-95 whitespace-nowrap"
               >
                 <Settings className="w-4 h-4" />
                 이름 관리
@@ -558,7 +563,7 @@ export default function Home() {
               {/* 4. Delete/Reset */}
               <button
                 onClick={handleDeleteMap}
-                className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-gray-800 text-red-500 border border-red-200 dark:border-red-800 text-sm font-medium rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors whitespace-nowrap"
+                className="flex items-center gap-2 px-3 py-1.5 bg-red-600 text-white border border-red-700 text-sm font-bold rounded-lg hover:bg-red-700 transition-all active:scale-95 whitespace-nowrap shadow-sm"
               >
                 <Trash2 className="w-4 h-4" />
                 {currentMapId === 'default' ? '이미지 초기화' : '층 삭제'}

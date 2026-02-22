@@ -30,7 +30,8 @@ import {
     appendData as baseAppendData,
     addSheet as baseAddSheet,
     clearData as baseClearData,
-    batchUpdateData as baseBatchUpdateData
+    batchUpdateData as baseBatchUpdateData,
+    deleteRowByIndex as baseDeleteRowByIndex
 } from '@/lib/google-sheets';
 import { MOCK_DEVICES, MOCK_SOFTWARE, MOCK_CREDENTIALS } from '@/lib/mock-data';
 import { Device, Software, Credential, Location, DeviceInstance } from '@/types';
@@ -258,7 +259,7 @@ export async function fetchAssetData(overrideSheetId?: string) {
 
         } catch (error) {
             console.error('[fetchAssetData] Error:', error);
-            return { devices: [], software: [], credentials: [], deviceInstances: [] };
+            return { devices: [], software: [], credentials: [], deviceInstances: [], zones: [] };
         }
     } catch (outerError) {
         console.error('[fetchAssetData] Critical error:', outerError);
@@ -340,6 +341,75 @@ export async function fetchMapConfiguration(mapId: string = 'default', overrideS
     }
 }
 
+/**
+ * Fetch all zones across all maps for a given spreadsheet
+ */
+export async function fetchAllZones(overrideSheetId?: string) {
+    try {
+        const list = await fetchMapList(overrideSheetId);
+        let all: Location[] = [];
+
+        // 1. Try fetching from each map configuration
+        for (const mapId of list) {
+            try {
+                const config = await fetchMapConfiguration(mapId, overrideSheetId);
+                if (config.zones && config.zones.length > 0) {
+                    all = [...all, ...config.zones];
+                }
+            } catch (e) {
+                console.warn(`[fetchAllZones] Failed to fetch config for ${mapId}:`, e);
+            }
+        }
+
+        // 2. Supplement with Locations sheet (Global/Unpinned zones)
+        try {
+            const locZones = await fetchZonesOnly(overrideSheetId);
+            if (locZones.length > 0) {
+                all = [...all, ...locZones];
+            }
+        } catch (e) {
+            console.warn('[fetchAllZones] Failed to fetch Locations sheet:', e);
+        }
+
+        if (all.length === 0) return [];
+
+        // De-duplicate by ID (priority to map-pinned versions if they have specific Metadata)
+        const uniqueMap = new Map<string, Location>();
+        all.forEach(z => {
+            if (z.id && !uniqueMap.has(z.id)) {
+                uniqueMap.set(z.id, z);
+            }
+        });
+
+        return Array.from(uniqueMap.values());
+    } catch (e: any) {
+        console.error('[fetchAllZones] Error:', e);
+        if (e.message === 'PERMISSION_DENIED') throw e;
+        return [];
+    }
+}
+
+/**
+ * Lightweight zone fetcher
+ */
+export async function fetchZonesOnly(overrideSheetId?: string) {
+    const sheetId = overrideSheetId || await getUserSheetId();
+    if (!sheetId || sheetId === 'NO_SHEET') return [];
+
+    try {
+        const rows = await getData('Locations!A2:C', sheetId);
+        return (rows || []).map((row: any[]) => ({
+            id: row[0],
+            name: row[2] || row[1],
+            type: 'Classroom' as const,
+            pinX: 0,
+            pinY: 0
+        })).filter(z => z.id);
+    } catch (e) {
+        return [];
+    }
+}
+
 export async function saveMapConfiguration(mapImage: string | null, zones: Location[], mapId: string = 'default') {
     const appConfig = await _getAppConfig();
 
@@ -404,14 +474,14 @@ export async function saveMapConfiguration(mapImage: string | null, zones: Locat
     }
 }
 
-export async function fetchMapList() {
+export async function fetchMapList(overrideSheetId?: string) {
     const appConfig = await _getAppConfig();
+    const sheetId = overrideSheetId || await getUserSheetId();
+    if (!sheetId || sheetId === 'NO_SHEET') return ['default'];
+
     if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
         return fbActions.fetchMapList(appConfig.firebase);
     }
-
-    const sheetId = await getUserSheetId();
-    if (!sheetId || sheetId === 'NO_SHEET') return ['default'];
 
     try {
         const rows = await getData('Config!A1:B100', sheetId);
@@ -1940,49 +2010,32 @@ export async function changePassword(current: string, newPass: string) {
     if (!session || !session.user?.email) return { success: false, error: '로그인이 필요합니다.' };
 
     const email = session.user.email;
-    const sheetId = await getUserSheetId();
-    if (sheetId === 'NO_SHEET') return { success: false, error: '연결된 시트가 없습니다.' };
 
     try {
-        let rows = await getData('Users!A:E', sheetId);
+        // Use Master Sheet (no sheetId passed)
+        const rows = await baseGetData('Users!A:G');
 
-        // If Users sheet doesn't exist, create it
-        if (!rows) {
-            await addSheet('Users', sheetId);
-            await updateData('Users!A1', [['ID', 'Name', 'Email', 'Password', 'Role']], sheetId);
-            rows = [];
-        }
+        if (!rows) return { success: false, error: '사용자 데이터베이스를 불러올 수 없습니다.' };
 
-        const userIndex = rows.findIndex((r: any[]) => r[2] === email);
+        // Index 3 is Email in Master Sheet
+        const userIndex = rows.findIndex((r: any[]) => r[3] === email);
 
         if (userIndex === -1) {
-            // User not found. If current password matches '1234' (Default Admin), create user.
-            if (current === '1234') {
-                const newUser = [
-                    'User-' + Date.now(),
-                    'Admin User',
-                    email,
-                    newPass,
-                    'admin'
-                ];
-                await appendData('Users!A1', [newUser], sheetId);
-                return { success: true };
-            }
             return { success: false, error: '사용자를 찾을 수 없습니다.' };
         }
 
         const userRow = rows[userIndex];
 
-        // Check current password (Index 3)
-        if (userRow[3] !== current) {
+        // Check current password (Index 4 in Master Sheet)
+        if (String(userRow[4] || '').trim() !== String(current).trim()) {
             return { success: false, error: '현재 비밀번호가 일치하지 않습니다.' };
         }
 
         const updatedRow = [...userRow];
-        updatedRow[3] = newPass;
+        updatedRow[4] = newPass;
 
         // Row number is index + 1
-        await updateData(`Users!A${userIndex + 1}`, [updatedRow], sheetId);
+        await baseUpdateData(`Users!A${userIndex + 1}`, [updatedRow]);
 
         return { success: true };
     } catch (e) {
@@ -2161,18 +2214,17 @@ export async function deleteMyAccount() {
         if (sheetId && sheetId !== 'NO_SHEET') {
             const sheetsToClean = ['Devices', 'DeviceInstances', 'Software', 'Accounts', 'Config', 'Locations', 'Credentials', 'Loans', 'SystemConfig'];
             for (const sheet of sheetsToClean) {
-                try { await clearData(`${sheet}!A2:Z`, sheetId); } catch (e) { /* sheet may not exist */ }
+                try { await baseClearData(`${sheet}!A2:Z`, sheetId); } catch (e) { /* sheet may not exist */ }
             }
         }
 
         // 2. Remove user from master Users sheet
-        const masterRows = await getData('Users!A:F');
+        const masterRows = await baseGetData('Users!A:G');
         if (masterRows) {
-            const idx = masterRows.findIndex((r: any[]) => r[2] === email);
+            const idx = masterRows.findIndex((r: any[]) => r[3] === email);
             if (idx >= 0) {
-                // Clear the user row in master sheet
-                const emptyRow = masterRows[idx].map(() => '');
-                await updateData(`Users!A${idx + 1}`, [emptyRow]);
+                // Permanently delete the user row from master sheet
+                await baseDeleteRowByIndex('Users', idx + 1);
             }
         }
 

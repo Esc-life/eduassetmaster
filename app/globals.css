@@ -1,9 +1,11 @@
 @import "tailwindcss";
+/* @theme */
 
 :root {
   --background: #ffffff;
   --foreground: #171717;
-  --primary: #1E3A8A; /* Deep Blue */
+  --primary: #1E3A8A;
+  /* Deep Blue */
   --sidebar-bg: #1E3A8A;
   --sidebar-fg: #ffffff;
 }

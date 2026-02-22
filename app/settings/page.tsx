@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { RefreshCw, Key, User, Copy, Check, Link as LinkIcon, HelpCircle, X, ExternalLink, Trash2, AlertTriangle, Shield, Loader2, Download, Upload, FolderArchive } from 'lucide-react';
 import { fetchSystemConfig, saveSystemConfig, getMySheetId, changePassword, getServerType, deleteMyAccount, exportAllData, importAllData } from '@/app/actions';
 import { signOut } from 'next-auth/react';
+import { useMessage } from '@/components/Providers';
 
 // --- Guide Modal ---
 function GuideModal({ onClose }: { onClose: () => void }) {
@@ -141,6 +142,7 @@ function DeleteAccountModal({ onClose, onConfirm, isDeleting }: { onClose: () =>
 
 // --- Main Settings Page ---
 export default function SettingsPage() {
+    const { showAlert, showConfirmAsync } = useMessage();
     const [activeTab, setActiveTab] = useState<'account' | 'system'>('account');
 
     // Config States
@@ -182,15 +184,17 @@ export default function SettingsPage() {
             try {
                 const configStr = decodeURIComponent(escape(atob(magic)));
                 JSON.parse(configStr);
-                if (confirm('설정 동기화 링크가 감지되었습니다.\n현재 기기에 설정을 적용하시겠습니까?')) {
-                    const encoded = encodeURIComponent(configStr);
-                    document.cookie = `edu-asset-config=${encoded}; path=/; max-age=31536000; SameSite=Lax`;
-                    alert('설정이 성공적으로 적용되었습니다!');
-                    window.location.href = '/settings';
-                }
+                showConfirmAsync('설정 동기화 링크가 감지되었습니다.\n현재 기기에 설정을 적용하시겠습니까?').then(confirmed => {
+                    if (confirmed) {
+                        const encoded = encodeURIComponent(configStr);
+                        document.cookie = `edu-asset-config=${encoded}; path=/; max-age=31536000; SameSite=Lax`;
+                        showAlert('설정이 성공적으로 적용되었습니다!', 'success');
+                        window.location.href = '/settings';
+                    }
+                });
             } catch (e) {
                 console.error(e);
-                alert('유효하지 않은 설정 링크입니다.');
+                showAlert('유효하지 않은 설정 링크입니다.', 'error');
             }
         }
     }, []);
@@ -231,30 +235,30 @@ export default function SettingsPage() {
                 'ManagerName': managerName,
                 'GOOGLE_VISION_KEY': visionKey
             });
-            alert('설정이 저장되었습니다.');
+            showAlert('설정이 저장되었습니다.', 'success');
         } catch (e) {
-            alert('저장 실패');
+            showAlert('저장 실패', 'error');
         } finally {
             setIsSaving(false);
         }
     };
 
     const handleChangePassword = async () => {
-        if (!curPass || !newPass || !cfmPass) return alert('모든 항목을 입력해주세요.');
-        if (newPass !== cfmPass) return alert('새 비밀번호가 일치하지 않습니다.');
-        if (newPass.length < 4) return alert('비밀번호는 4자 이상이어야 합니다.');
+        if (!curPass || !newPass || !cfmPass) return showAlert('모든 항목을 입력해주세요.', 'alert');
+        if (newPass !== cfmPass) return showAlert('새 비밀번호가 일치하지 않습니다.', 'error');
+        if (newPass.length < 4) return showAlert('비밀번호는 4자 이상이어야 합니다.', 'alert');
 
         setIsPwChanging(true);
         const result = await changePassword(curPass, newPass);
         setIsPwChanging(false);
 
         if (result.success) {
-            alert('비밀번호가 변경되었습니다.');
+            showAlert('비밀번호가 변경되었습니다.', 'success');
             setCurPass('');
             setNewPass('');
             setCfmPass('');
         } else {
-            alert('변경 실패: ' + result.error);
+            showAlert('변경 실패: ' + result.error, 'error');
         }
     };
 
@@ -265,13 +269,13 @@ export default function SettingsPage() {
             if (result.success) {
                 // Clear local config cookie
                 document.cookie = 'edu-asset-config=; path=/; max-age=0';
-                alert('계정이 성공적으로 삭제되었습니다.');
+                await showAlert('계정이 성공적으로 삭제되었습니다.', 'success');
                 await signOut({ callbackUrl: '/login' });
             } else {
-                alert('삭제 실패: ' + (result.error || '알 수 없는 오류'));
+                showAlert('삭제 실패: ' + (result.error || '알 수 없는 오류'), 'error');
             }
         } catch (e) {
-            alert('삭제 중 오류가 발생했습니다.');
+            showAlert('삭제 중 오류가 발생했습니다.', 'error');
         } finally {
             setIsDeleting(false);
             setShowDeleteModal(false);
@@ -298,12 +302,12 @@ export default function SettingsPage() {
                 a.download = `EduAssetMaster_Backup_${date}.json`;
                 a.click();
                 URL.revokeObjectURL(url);
-                alert('백업 파일이 다운로드되었습니다.');
+                showAlert('백업 파일이 다운로드되었습니다.', 'success');
             } else {
-                alert('백업 실패: ' + (result.error || ''));
+                showAlert('백업 실패: ' + (result.error || ''), 'error');
             }
         } catch (e) {
-            alert('백업 중 오류 발생');
+            showAlert('백업 중 오류 발생', 'error');
         } finally {
             setIsExporting(false);
         }
@@ -339,19 +343,19 @@ export default function SettingsPage() {
                 `이 데이터를 현재 계정(${targetLabel})에 가져오시겠습니까?\n` +
                 `⚠️ 기존 데이터는 모두 덮어쓰여집니다.`;
 
-            if (!confirm(msg)) return;
+            if (await showConfirmAsync(msg)) {
+                setIsImporting(true);
+                const result = await importAllData(backup);
 
-            setIsImporting(true);
-            const result = await importAllData(backup);
-
-            if (result.success) {
-                alert('데이터를 성공적으로 가져왔습니다!\n페이지를 새로고침합니다.');
-                window.location.reload();
-            } else {
-                alert('가져오기 실패: ' + (result.error || ''));
+                if (result.success) {
+                    await showAlert('데이터를 성공적으로 가져왔습니다!\n페이지를 새로고침합니다.', 'success');
+                    window.location.reload();
+                } else {
+                    showAlert('가져오기 실패: ' + (result.error || ''), 'error');
+                }
             }
         } catch (e) {
-            alert('파일을 읽을 수 없습니다. JSON 형식인지 확인해주세요.');
+            showAlert('파일을 읽을 수 없습니다. JSON 형식인지 확인해주세요.', 'error');
         } finally {
             setIsImporting(false);
         }
@@ -539,18 +543,6 @@ export default function SettingsPage() {
                                     </button>
                                 </div>
                             </div>
-                        </div>
-                    </Section>
-
-                    {/* Data Reset */}
-                    <Section title="데이터 초기화" icon={<RefreshCw className="w-5 h-5 text-orange-500" />} color="bg-orange-50 dark:bg-orange-900/20">
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 break-keep">
-                            시스템 오류 발생 시 특정 데이터를 강제로 초기화할 수 있습니다.<br />
-                            <span className="text-xs text-orange-500 font-medium">⚠️ 초기화된 데이터는 복구할 수 없습니다.</span>
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                            <button onClick={() => alert('준비 중')} className="btn-danger-outline">Devices 초기화</button>
-                            <button onClick={() => alert('준비 중')} className="btn-danger-outline">Software 초기화</button>
                         </div>
                     </Section>
 

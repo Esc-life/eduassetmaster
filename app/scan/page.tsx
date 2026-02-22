@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, ChangeEvent, Suspense } from 'react';
 import { Camera, Upload, Check, AlertCircle, ArrowLeft, Loader2, ScanLine, MapPin, User, ImageIcon, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { fetchMapConfiguration, processScannedImage } from '@/app/actions';
+import { fetchAllZones, processScannedImage } from '@/app/actions';
 import { Location, Device } from '@/types';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -65,18 +65,23 @@ function ScanPageContent() {
 
         setIsZoneLoading(true);
         try {
-            const config = await fetchMapConfiguration(targetId);
+            const allZones = await fetchAllZones(targetId);
 
-            if (config && (config.zones || config.zones === undefined)) {
-                const sorted = config.zones ? [...config.zones].sort((a, b) => a.name.localeCompare(b.name, 'ko')) : [];
+            if (allZones && allZones.length > 0) {
+                const sorted = [...allZones].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
                 setZones(sorted);
                 setIsIdConfirmed(true);
                 if (!overrideId) localStorage.setItem('edu_asset_manager_id', targetId);
             } else {
-                alert('연결 실패: 유효하지 않은 ID이거나 접근 권한이 없습니다.');
+                alert('연결 실패: 구역 정보를 불러올 수 없거나 유효하지 않은 ID입니다.');
             }
-        } catch (error) {
-            console.error('Config fetch error:', error);
+        } catch (error: any) {
+            console.error('Zone fetch error:', error);
+            if (error.message === 'PERMISSION_DENIED') {
+                alert('연결 실패: 해당 스프레드시트가 시스템 계정(EduAssetMaster 서비스 계정)에 공유되지 않았습니다. 시트 설정에서 편집 권한을 추가해 주세요.');
+            } else {
+                alert('데이터를 불러오는 중 오류가 발생했습니다.');
+            }
         } finally {
             setIsZoneLoading(false);
         }

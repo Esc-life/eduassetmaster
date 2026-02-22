@@ -7,8 +7,10 @@ import {
 } from '@/app/actions';
 import { Plus, Edit2, Trash2, Key, Globe, Shield, Search, Loader2 } from 'lucide-react';
 import PageLoading from '@/components/ui/PageLoading';
+import { useMessage } from '@/components/Providers';
 
 export default function SoftwarePage() {
+    const { showConfirmAsync } = useMessage();
     const [activeTab, setActiveTab] = useState<'software' | 'accounts'>('software');
     const [softwareList, setSoftwareList] = useState<any[]>([]);
     const [accountList, setAccountList] = useState<any[]>([]);
@@ -65,7 +67,7 @@ export default function SoftwarePage() {
     };
 
     const confirmDelete = async (id: string) => {
-        if (!confirm("삭제하시겠습니까?")) return;
+        if (!await showConfirmAsync("삭제하시겠습니까?")) return;
 
         setIsLoading(true);
         if (activeTab === 'software') {

@@ -242,3 +242,48 @@ export async function initializeUserSheet(spreadsheetId: string, credentials?: a
     }
     return true;
 }
+
+/**
+ * Delete a specific row by index (1-indexed).
+ */
+export async function deleteRowByIndex(sheetTitle: string, rowIndex: number, spreadsheetId?: string, credentials?: any) {
+    try {
+        const sheets = getSheetsClient(credentials);
+        if (!sheets) throw new Error('Google Sheets Client initialization failed');
+
+        const targetSheetId = spreadsheetId || process.env.GOOGLE_SPREADSHEET_ID;
+        if (!targetSheetId) throw new Error('Spreadsheet ID is missing');
+
+        // First, get the sheet ID (gid) for the given title
+        const spreadsheet = await sheets.spreadsheets.get({
+            spreadsheetId: targetSheetId,
+        });
+
+        const sheet = spreadsheet.data.sheets?.find(s => s.properties?.title === sheetTitle);
+        if (!sheet || sheet.properties?.sheetId === undefined) {
+            throw new Error(`Sheet with title "${sheetTitle}" not found`);
+        }
+
+        const gid = sheet.properties.sheetId;
+
+        await sheets.spreadsheets.batchUpdate({
+            spreadsheetId: targetSheetId,
+            requestBody: {
+                requests: [{
+                    deleteDimension: {
+                        range: {
+                            sheetId: gid,
+                            dimension: 'ROWS',
+                            startIndex: rowIndex - 1, // 0-indexed
+                            endIndex: rowIndex
+                        }
+                    }
+                }]
+            }
+        });
+        return { success: true };
+    } catch (error: any) {
+        console.error('Error deleting row:', error.message);
+        throw error;
+    }
+}
