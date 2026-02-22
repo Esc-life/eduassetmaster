@@ -65,7 +65,7 @@ export async function POST(req: Request) {
         if (rows === null) {
             console.log("[Register] Creating master Users sheet");
             await addSheet('Users');
-            await updateData('Users!A1', [['ID', 'Name', 'School', 'Email', 'Password', 'SpreadsheetID', 'CreatedAt']]);
+            await updateData('Users!A1', [['ID', 'Name', 'School', 'Email', 'Password', 'SpreadsheetID', 'CreatedAt', 'ServiceAccountJSON']]);
             rows = [];
         }
 
@@ -82,7 +82,8 @@ export async function POST(req: Request) {
             email,
             password,
             spreadsheetId || '',
-            new Date().toISOString()
+            new Date().toISOString(),
+            serviceAccountJson || ''
         ];
 
         // 4. Save to Admin Master Spreadsheet

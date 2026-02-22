@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, ChangeEvent, Suspense } from 'react';
 import { Camera, Upload, Check, AlertCircle, ArrowLeft, Loader2, ScanLine, MapPin, User, ImageIcon, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { fetchAllZones, processScannedImage } from '@/app/actions';
+import { fetchAllZones, processScannedImage, getSystemEmail } from '@/app/actions';
 import { Location, Device } from '@/types';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -32,7 +32,12 @@ function ScanPageContent() {
     const [isCameraActive, setIsCameraActive] = useState(false);
     const [cameraError, setCameraError] = useState('');
 
+    const [systemEmail, setSystemEmail] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        getSystemEmail().then(res => setSystemEmail(res.email));
+    }, []);
 
     useEffect(() => {
         const urlId = searchParams.get('id');
@@ -74,7 +79,7 @@ function ScanPageContent() {
                 if (!overrideId) localStorage.setItem('edu_asset_manager_id', targetId);
             } else if (!res.success) {
                 if (res.error === 'PERMISSION_DENIED') {
-                    alert(`연결 실패: 해당 스프레드시트(${targetId})가 시스템 계정에 공유되지 않았습니다. 시트 설정에서 편집 권한을 추가해 주세요.`);
+                    alert(`[권한 부족] 해당 스프레드시트(${targetId})가 시스템 계정에 공유되지 않았습니다.\n\n해결 방법:\n1. 구글 시트 우측 상단 '공유' 클릭\n2. 아래 이메일을 '편집자'로 추가\n👉 ${systemEmail || '시스템 서비스 계정'}`);
                 } else {
                     alert(`에러 발생: ${res.error || '데이터를 불러오는 중 오류가 발생했습니다.'}\n(ID: ${targetId})`);
                 }

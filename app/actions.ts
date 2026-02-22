@@ -57,13 +57,26 @@ async function _getAppConfig() {
 async function _getSheetsCredentials(sheetId?: string) {
     const config = await _getAppConfig();
 
-    // 1. Try Cookie
     const jsonFromCookie = config?.sheet?.serviceAccountJson;
     if (jsonFromCookie) {
         try { return JSON.parse(jsonFromCookie); } catch (e) { }
     }
 
-    // 2. Try Spreadsheet (via Master Service Account)
+    // 2. Try Master Users Table
+    // This solves the chicken-and-egg problem for guests visiting scan links!
+    if (sheetId && sheetId !== 'NO_SHEET') {
+        try {
+            const users = await baseGetData('Users!A:H');
+            if (users) {
+                const userRow = users.find((u: any[]) => u[5] === sheetId);
+                if (userRow && userRow[7]) { // Column H is the ServiceAccountJSON
+                    return JSON.parse(userRow[7]);
+                }
+            }
+        } catch (e) { }
+    }
+
+    // 3. Try Spreadsheet (via Master Service Account fallback)
     if (sheetId && sheetId !== 'NO_SHEET') {
         try {
             // We use baseGetData here to avoid recursion
@@ -2218,7 +2231,7 @@ export async function deleteMyAccount() {
         if (sheetId && sheetId !== 'NO_SHEET') {
             const sheetsToClean = ['Devices', 'DeviceInstances', 'Software', 'Accounts', 'Config', 'Locations', 'Credentials', 'Loans', 'SystemConfig'];
             for (const sheet of sheetsToClean) {
-                try { await baseClearData(`${sheet}!A2:Z`, sheetId); } catch (e) { /* sheet may not exist */ }
+                try { await clearData(`${sheet}!A2:Z`, sheetId); } catch (e) { /* sheet may not exist */ }
             }
         }
 
