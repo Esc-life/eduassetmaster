@@ -11,8 +11,8 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-    // Hide layout on login, register, AND scan pages
-    const isStandalonePage = pathname === '/login' || pathname === '/register' || pathname === '/scan';
+    // Hide layout on login, register, recover, AND scan pages
+    const isStandalonePage = pathname === '/login' || pathname === '/register' || pathname === '/recover' || pathname === '/scan';
 
     if (isStandalonePage) {
         return <>{children}</>;

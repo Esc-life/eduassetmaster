@@ -154,12 +154,21 @@ export const useOCR = (): UseOCRResult => {
             setProgress(90);
 
             if (result.success && result.zones) {
-                setStatusText(`${result.zones.filter((z: any, i: number) => z.name !== zones[i]?.name).length}개 구역 이름 인식 완료`);
-                return result.zones as Location[];
+                // Merge names back into original zones to preserve all properties (type, color, etc.)
+                const mergedZones = zones.map(original => {
+                    const updated = (result.zones as any[]).find(uz => uz.id === original.id);
+                    if (updated && updated.name && updated.name.trim()) {
+                        return { ...original, name: updated.name.trim() };
+                    }
+                    return original;
+                });
+
+                setStatusText(`${mergedZones.filter((z, i) => z.name !== zones[i]?.name).length}개 구역 이름 인식 완료`);
+                return mergedZones;
             } else {
                 console.warn('Gemini zone recognition failed:', result.error);
                 setStatusText('인식 실패: ' + (result.error || ''));
-                return zones; // Return original zones unchanged
+                return zones;
             }
 
         } catch (error) {

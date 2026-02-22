@@ -11,10 +11,11 @@ import { DeleteConfirmModal } from '@/components/devices/DeleteConfirmModal';
 import Link from 'next/link';
 import { Image as ImageIcon, PlusCircle, Check, Trash2, MousePointer2, ScanSearch, Loader2, Save, Minus, RotateCcw, FileSpreadsheet, ScanLine, Edit3, Settings, MoreHorizontal, CheckSquare, Edit } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { fetchMapConfiguration, saveMapConfiguration, syncZonesToSheet, fetchAssetData, updateDevice, createDeviceInstance, deleteDeviceInstance, updateZoneName } from '@/app/actions';
+import { fetchMapConfiguration, saveMapConfiguration, syncZonesToSheet, fetchAssetData, updateDevice, createDeviceInstance, deleteDeviceInstance, updateZoneName, fetchMapList, deleteMap } from '@/app/actions';
 import { DeviceEditModal } from '@/components/devices/DeviceEditModal';
 import { ZoneEditModal } from '@/components/map/ZoneEditModal';
 import { ZoneBatchEditModal } from '@/components/map/ZoneBatchEditModal';
+import { Layers, ChevronDown } from 'lucide-react';
 
 // Mock pin locations linked to mock devices (Initial State) by default empty
 const INITIAL_PINS: Location[] = [];
@@ -33,6 +34,9 @@ export default function Home() {
   const [isMapLoading, setIsMapLoading] = useState(false); // Image Rendering
   const [isLoadingMessage, setIsLoadingMessage] = useState<string | null>(null);
   const [showDeleteMapModal, setShowDeleteMapModal] = useState(false);
+  const [mapList, setMapList] = useState<string[]>(['default']);
+  const [currentMapId, setCurrentMapId] = useState<string>('default');
+  const [showMapSwitcher, setShowMapSwitcher] = useState(false);
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const uploaderRef = useRef<ImageUploaderHandle>(null);
@@ -76,8 +80,11 @@ export default function Home() {
     const loadMapData = async () => {
       setIsLoadingMap(true);
       try {
-        const { mapImage: serverImage, zones: serverZones } = await fetchMapConfiguration();
+        const { mapImage: serverImage, zones: serverZones } = await fetchMapConfiguration(currentMapId);
         const { devices: serverDevices, deviceInstances: serverInstances } = await fetchAssetData();
+        const serverMapList = await fetchMapList();
+
+        setMapList(serverMapList);
 
         // localStorage logic removed to prevent data leak between accounts
         const imageToLoad = serverImage;
@@ -103,12 +110,12 @@ export default function Home() {
         else setDeviceInstances([]);
 
       } catch (error) {
-        console.error('Error loading map data:', error);
+        console.error('Failed to load map data:', error);
         setIsLoadingMap(false);
       }
     };
     loadMapData();
-  }, []);
+  }, [currentMapId]);
 
   const handleImageUpload = (file: File, url: string) => {
     setMapFile(file); // Save file instance for OCR
@@ -120,29 +127,17 @@ export default function Home() {
       // Ensure we have the map image
       const currentImage = base64String;
       console.log(`[Client] Saving Image...`);
-      saveMapConfiguration(currentImage, pins)
+      saveMapConfiguration(currentImage, pins, currentMapId)
         .then(res => console.log('[Client] Server Save Result:', res));
     };
     reader.readAsDataURL(file);
   };
 
-  const savePins = (newPins: Location[]) => {
+  const savePins = async (newPins: Location[]) => {
     setPins(newPins);
-    // localStorage removed
-
-    // Ensure we have the map image
-    const currentImage = mapImage;
-    console.log(`[Client] Saving Pins: ${newPins.length} zones.`);
-
-    // Sync to Server
-    saveMapConfiguration(currentImage || null, newPins)
-      .then(res => {
-        console.log('[Client] Server Save Result:', res);
-        if (!res.success) {
-          alert(`[저장 실패] 서버에 데이터가 저장되지 않았습니다.\n원인: ${res.error}\n\n잠시 후 다시 시도하거나 네트워크를 확인해주세요.`);
-        }
-      })
-      .catch(e => alert(`[통신 오류] 서버와 연결할 수 없습니다: ${e}`));
+    // Don't auto-save to server during rapid edits, but we do here for simplicity
+    // or we could add a "Save Changes" button. Let's sync with server.
+    await saveMapConfiguration(mapImage || null, newPins, currentMapId);
   };
 
   const toggleZoneSelection = (id: string, e: React.MouseEvent) => {
@@ -301,7 +296,7 @@ export default function Home() {
 
       // 4. Save MapZones JSON once at the end (single write instead of double)
       const currentImage = mapImage;
-      await saveMapConfiguration(currentImage || null, newZones);
+      await saveMapConfiguration(currentImage || null, newZones, currentMapId);
     } catch (e) {
       alert(`DB 동기화 오류: ${e}`);
     } finally {
@@ -320,18 +315,35 @@ export default function Home() {
   };
 
   const handleDeleteMap = async () => {
-    try {
-      await saveMapConfiguration(null, []);
-      setMapImage(undefined);
-      setPins([]);
-      setIsEditing(false);
-      setIsMapLoading(false);
-      alert("배치도가 삭제되었습니다.");
-    } catch (e) {
-      console.error(e);
-      alert("삭제 중 오류 발생: " + e);
-      throw e;
+    if (currentMapId === 'default') {
+      alert("기본 배치도는 삭제할 수 없습니다. 이미지를 변경하거나 구역을 수정해주세요.");
+      return;
     }
+    if (confirm(`'${currentMapId}' 배치도를 정말 삭제하시겠습니까?\n해당 층의 모든 구역 정보와 이미지가 삭제됩니다.`)) {
+      setIsLoadingMessage('배치도 삭제 중...');
+      const res = await deleteMap(currentMapId);
+      if (res.success) {
+        setCurrentMapId('default');
+        const newList = await fetchMapList();
+        setMapList(newList);
+      } else {
+        alert("삭제 실패: " + res.error);
+      }
+      setIsLoadingMessage(null);
+    }
+  };
+
+  const handleAddFloor = async () => {
+    const floorName = prompt("새로운 층 또는 건물 이름을 입력하세요 (예: 2F, 본관1층)");
+    if (!floorName) return;
+    if (mapList.includes(floorName)) {
+      alert("이미 존재하는 이름입니다.");
+      return;
+    }
+    setCurrentMapId(floorName);
+    setMapList(prev => [...prev, floorName]);
+    setMapImage(undefined);
+    setPins([]);
   };
 
   const confirmStructureUpdate = () => {
@@ -435,6 +447,41 @@ export default function Home() {
                 3. 이름 관리
               </button>
 
+              {/* 4. Floor Management & Selector */}
+              <div className="relative shrink-0">
+                <button
+                  onClick={() => setShowMapSwitcher(!showMapSwitcher)}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800 rounded-lg hover:bg-blue-100 transition-colors shadow-sm"
+                >
+                  <Layers className="w-4 h-4" />
+                  <span className="font-bold text-sm">{currentMapId === 'default' ? '기본 배치도' : currentMapId}</span>
+                  <ChevronDown className={`w-3 h-3 transition-transform ${showMapSwitcher ? 'rotate-180' : ''}`} />
+                </button>
+
+                {showMapSwitcher && (
+                  <div className="absolute top-full left-0 mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl shadow-2xl z-[70] py-2 overflow-hidden shadow-blue-500/10">
+                    {mapList.map(m => (
+                      <button
+                        key={m}
+                        onClick={() => { setCurrentMapId(m); setShowMapSwitcher(false); }}
+                        className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center justify-between group ${currentMapId === m ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 font-bold' : 'text-gray-700 dark:text-gray-300'}`}
+                      >
+                        {m === 'default' ? '기본 배치도' : m}
+                        {currentMapId === m && <Check className="w-4 h-4" />}
+                      </button>
+                    ))}
+                    <div className="border-t border-gray-100 dark:border-gray-700 my-1" />
+                    <button
+                      onClick={() => { handleAddFloor(); setShowMapSwitcher(false); }}
+                      className="w-full px-4 py-2.5 text-left text-sm text-blue-600 font-bold hover:bg-blue-50 dark:hover:bg-blue-900/20 flex items-center gap-2"
+                    >
+                      <PlusCircle className="w-4 h-4" />
+                      새 배치도 추가
+                    </button>
+                  </div>
+                )}
+              </div>
+
               {/* Selection Actions (Only in Edit Mode) */}
               {isEditing && selectedZoneIds.size > 0 && (
                 <button
@@ -456,14 +503,16 @@ export default function Home() {
                 </button>
               )}
 
-              {/* 4. Delete Map */}
-              <button
-                onClick={() => setShowDeleteMapModal(true)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-gray-800 text-red-500 border border-red-200 dark:border-red-800 text-sm font-medium rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors whitespace-nowrap"
-              >
-                <Trash2 className="w-4 h-4" />
-                4. 배치도 삭제
-              </button>
+              {/* 5. Delete Current Floor Map */}
+              {currentMapId !== 'default' && (
+                <button
+                  onClick={handleDeleteMap}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-gray-800 text-red-500 border border-red-200 dark:border-red-800 text-sm font-medium rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors whitespace-nowrap"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  층 삭제
+                </button>
+              )}
             </div>
           ) : (
             <div className="ml-auto">

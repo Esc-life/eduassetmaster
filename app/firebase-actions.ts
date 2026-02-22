@@ -309,13 +309,13 @@ export async function updateDeviceWithDistribution(config: any, deviceId: string
 }
 
 // --- Map Config & Sync ---
-export async function saveMapConfiguration(config: any, mapImage: string | null, zones: any[]) {
+export async function saveMapConfiguration(config: any, mapImage: string | null, zones: any[], mapId: string = 'default') {
     const db = getFirebaseStore(config);
     try {
         const batch = writeBatch(db);
 
-        // 1. Save Zones JSON (Frontend State)
-        const zoneRef = doc(db, "SystemConfig", "MapZones");
+        // 1. Save Zones JSON
+        const zoneRef = doc(db, "SystemConfig", mapId === 'default' ? "MapZones" : `MapZones_${mapId}`);
         batch.set(zoneRef, {
             json: JSON.stringify(zones),
             updatedAt: new Date().toISOString()
@@ -326,13 +326,26 @@ export async function saveMapConfiguration(config: any, mapImage: string | null,
             const CHUNK_SIZE = 800000; // 800KB
             const totalChunks = Math.ceil(mapImage.length / CHUNK_SIZE);
 
-            const metaRef = doc(db, "SystemConfig", "MapImageMeta");
+            const metaRef = doc(db, "SystemConfig", mapId === 'default' ? "MapImageMeta" : `MapImageMeta_${mapId}`);
             batch.set(metaRef, { totalChunks, updatedAt: new Date().toISOString() });
 
             for (let i = 0; i < totalChunks; i++) {
                 const chunk = mapImage.substring(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
-                batch.set(doc(db, "SystemConfig", `MapImage_${i}`), { data: chunk });
+                const chunkKey = mapId === 'default' ? `MapImage_${i}` : `MapImage_${mapId}_${i}`;
+                batch.set(doc(db, "SystemConfig", chunkKey), { data: chunk });
             }
+        }
+
+        // 3. Update Map List
+        const listRef = doc(db, "SystemConfig", "MapList");
+        const listSnap = await getDoc(listRef);
+        let maps = ['default'];
+        if (listSnap.exists()) {
+            maps = listSnap.data().value || ['default'];
+        }
+        if (!maps.includes(mapId)) {
+            maps.push(mapId);
+            batch.set(listRef, { value: maps });
         }
 
         await batch.commit();
@@ -342,16 +355,17 @@ export async function saveMapConfiguration(config: any, mapImage: string | null,
     }
 }
 
-export async function fetchMapConfiguration(config: any) {
+export async function fetchMapConfiguration(config: any, mapId: string = 'default') {
     const db = getFirebaseStore(config);
     try {
-        const zoneDoc = await getDoc(doc(db, "SystemConfig", "MapZones"));
+        const zoneKey = mapId === 'default' ? "MapZones" : `MapZones_${mapId}`;
+        const zoneDoc = await getDoc(doc(db, "SystemConfig", zoneKey));
         let zones: any[] = [];
         if (zoneDoc.exists() && zoneDoc.data().json) {
             try { zones = JSON.parse(zoneDoc.data().json); } catch (e) { }
         }
 
-        // Merge with Locations collection (source of truth for names)
+        // Merge with Locations collection
         try {
             const locSnap = await getDocs(collection(db, "Locations"));
             if (!locSnap.empty) {
@@ -369,7 +383,8 @@ export async function fetchMapConfiguration(config: any) {
             }
         } catch (e) { }
 
-        const metaDoc = await getDoc(doc(db, "SystemConfig", "MapImageMeta"));
+        const metaKey = mapId === 'default' ? "MapImageMeta" : `MapImageMeta_${mapId}`;
+        const metaDoc = await getDoc(doc(db, "SystemConfig", metaKey));
         let mapImage = null;
 
         if (metaDoc.exists()) {
@@ -377,7 +392,8 @@ export async function fetchMapConfiguration(config: any) {
             if (total > 0) {
                 const promises = [];
                 for (let i = 0; i < total; i++) {
-                    promises.push(getDoc(doc(db, "SystemConfig", `MapImage_${i}`)));
+                    const chunkKey = mapId === 'default' ? `MapImage_${i}` : `MapImage_${mapId}_${i}`;
+                    promises.push(getDoc(doc(db, "SystemConfig", chunkKey)));
                 }
                 const chunks = await Promise.all(promises);
                 mapImage = chunks.map(c => c.exists() ? c.data().data : '').join('');
@@ -388,6 +404,53 @@ export async function fetchMapConfiguration(config: any) {
     } catch (e) {
         console.error("Firebase Map Config Error", e);
         return { mapImage: null, zones: [] };
+    }
+}
+
+export async function fetchMapList(config: any) {
+    const db = getFirebaseStore(config);
+    try {
+        const docSnap = await getDoc(doc(db, "SystemConfig", "MapList"));
+        if (docSnap.exists()) {
+            return docSnap.data().value || ['default'];
+        }
+    } catch (e) { }
+    return ['default'];
+}
+
+export async function deleteMap(config: any, mapId: string) {
+    const db = getFirebaseStore(config);
+    try {
+        const batch = writeBatch(db);
+
+        // 1. Delete Zones
+        const zoneKey = mapId === 'default' ? "MapZones" : `MapZones_${mapId}`;
+        batch.delete(doc(db, "SystemConfig", zoneKey));
+
+        // 2. Delete Meta & Chunks
+        const metaKey = mapId === 'default' ? "MapImageMeta" : `MapImageMeta_${mapId}`;
+        const metaDoc = await getDoc(doc(db, "SystemConfig", metaKey));
+        if (metaDoc.exists()) {
+            const total = metaDoc.data().totalChunks || 0;
+            batch.delete(metaDoc.ref);
+            for (let i = 0; i < total; i++) {
+                const chunkKey = mapId === 'default' ? `MapImage_${i}` : `MapImage_${mapId}_${i}`;
+                batch.delete(doc(db, "SystemConfig", chunkKey));
+            }
+        }
+
+        // 3. Update List
+        const listRef = doc(db, "SystemConfig", "MapList");
+        const listSnap = await getDoc(listRef);
+        if (listSnap.exists()) {
+            const maps = (listSnap.data().value || []).filter((id: string) => id !== mapId);
+            batch.set(listRef, { value: maps });
+        }
+
+        await batch.commit();
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: String(e) };
     }
 }
 

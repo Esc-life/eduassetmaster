@@ -259,12 +259,12 @@ export async function fetchAssetData(overrideSheetId?: string) {
     }
 }
 
-export async function fetchMapConfiguration(overrideSheetId?: string) {
+export async function fetchMapConfiguration(mapId: string = 'default', overrideSheetId?: string) {
     const appConfig = await _getAppConfig();
 
     // Firebase Branch
     if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
-        return fbActions.fetchMapConfiguration(appConfig.firebase);
+        return fbActions.fetchMapConfiguration(appConfig.firebase, mapId);
     }
 
     const sheetId = overrideSheetId || appConfig?.sheet?.spreadsheetId || await getUserSheetId();
@@ -277,33 +277,38 @@ export async function fetchMapConfiguration(overrideSheetId?: string) {
         if (!rows || rows.length === 0) return { mapImage: null, zones: [] };
 
         const configMap = new Map<string, string>();
-
         rows.forEach((row: any[]) => {
             if (row[0]) configMap.set(row[0], row[1]);
         });
 
+        // Key naming: Map_Zones_{mapId}, Map_Image_{mapId}_{chunk}
+        const zonesKey = mapId === 'default' ? 'MapZones' : `Map_Zones_${mapId}`;
+        const imagePrefix = mapId === 'default' ? 'MapImage_' : `Map_Image_${mapId}_`;
+
         // Reconstruct MapImage
         let mapImage = '';
-        const chunkKeys = Array.from(configMap.keys()).filter(k => k.startsWith('MapImage_'));
+        const chunkKeys = Array.from(configMap.keys()).filter(k => k.startsWith(imagePrefix));
 
         if (chunkKeys.length > 0) {
             chunkKeys.sort((a, b) => {
-                const idxA = parseInt(a.replace('MapImage_', '') || '0', 10);
-                const idxB = parseInt(b.replace('MapImage_', '') || '0', 10);
+                const idxA = parseInt(a.replace(imagePrefix, '') || '0', 10);
+                const idxB = parseInt(b.replace(imagePrefix, '') || '0', 10);
                 return idxA - idxB;
             });
             for (const key of chunkKeys) {
                 mapImage += configMap.get(key) || '';
             }
         }
-        if (!mapImage && configMap.has('MapImage')) {
+
+        // Legacy fallback
+        if (!mapImage && mapId === 'default' && configMap.has('MapImage')) {
             mapImage = configMap.get('MapImage') || '';
         }
 
-        const zonesJson = configMap.get('MapZones');
+        const zonesJson = configMap.get(zonesKey);
         let zones: Location[] = zonesJson ? JSON.parse(zonesJson) : [];
 
-        // Merge with Locations sheet
+        // Merge with Locations sheet (Global names)
         try {
             const locRows = await getData('Locations!A:C', sheetId);
             if (locRows && locRows.length > 0) {
@@ -323,17 +328,16 @@ export async function fetchMapConfiguration(overrideSheetId?: string) {
 
         return { mapImage: mapImage || null, zones };
     } catch (error) {
-        // If sheet doesn't exist (Config tab missing), return empty
         return { mapImage: null, zones: [] };
     }
 }
 
-export async function saveMapConfiguration(mapImage: string | null, zones: Location[]) {
+export async function saveMapConfiguration(mapImage: string | null, zones: Location[], mapId: string = 'default') {
     const appConfig = await _getAppConfig();
 
     // Firebase Branch
     if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
-        return fbActions.saveMapConfiguration(appConfig.firebase, mapImage, zones);
+        return fbActions.saveMapConfiguration(appConfig.firebase, mapImage, zones, mapId);
     }
 
     const sheetId = await getUserSheetId();
@@ -346,33 +350,104 @@ export async function saveMapConfiguration(mapImage: string | null, zones: Locat
             await addSheet('Config', sheetId);
         }
 
-        // IMPORTANT: Clear old data first to remove stale MapImage_N chunks
-        // Otherwise, if new image has fewer chunks, old chunks will remain at the end and corrupt base64
-        await clearData('Config!A1:B2000', sheetId);
+        const zonesKey = mapId === 'default' ? 'MapZones' : `Map_Zones_${mapId}`;
+        const imagePrefix = mapId === 'default' ? 'MapImage_' : `Map_Image_${mapId}_`;
 
-        const values = [
-            ['Key', 'Value'],
-            ['MapZones', JSON.stringify(zones)],
-            ['LastUpdated', new Date().toISOString()]
-        ];
+        // 1. Fetch current config to merge or selectively clear
+        const existingRows = await getData('Config!A1:B2000', sheetId) || [];
+        const configMap = new Map<string, string>();
+        existingRows.forEach(r => { if (r[0]) configMap.set(r[0], r[1]); });
+
+        // 2. Remove chunks for THIS mapId only
+        const keysToDelete = Array.from(configMap.keys()).filter(k => k.startsWith(imagePrefix) || k === zonesKey || k === 'MapImage');
+        keysToDelete.forEach(k => configMap.delete(k));
+
+        // 3. Add new data
+        configMap.set(zonesKey, JSON.stringify(zones));
+        configMap.set('LastUpdated', new Date().toISOString());
+
+        // Update Floor List
+        const floorListStr = configMap.get('Map_List') || 'default';
+        const floors = new Set(floorListStr.split(','));
+        floors.add(mapId);
+        configMap.set('Map_List', Array.from(floors).join(','));
 
         if (mapImage) {
             const CHUNK_SIZE = 40000;
             const totalChunks = Math.ceil(mapImage.length / CHUNK_SIZE);
             for (let i = 0; i < totalChunks; i++) {
                 const chunk = mapImage.substring(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
-                values.push([`MapImage_${i}`, chunk]);
+                configMap.set(`${imagePrefix}${i}`, chunk);
             }
-        } else {
-            values.push(['MapImage_0', '']);
         }
 
+        const values = Array.from(configMap.entries());
+        values.unshift(['Key', 'Value']);
+
+        // Clear and Overwrite Config sheet
+        await clearData('Config!A1:B2000', sheetId);
         await updateData('Config!A1', values, sheetId);
+
         return { success: true };
     } catch (error: any) {
         console.error('Failed to save map config:', error);
         const errorMessage = error?.result?.error?.message || error?.message || String(error);
         return { success: false, error: errorMessage };
+    }
+}
+
+export async function fetchMapList() {
+    const appConfig = await _getAppConfig();
+    if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
+        return fbActions.fetchMapList(appConfig.firebase);
+    }
+
+    const sheetId = await getUserSheetId();
+    if (!sheetId || sheetId === 'NO_SHEET') return ['default'];
+
+    try {
+        const rows = await getData('Config!A1:B100', sheetId);
+        const listRow = rows?.find((r: any[]) => r[0] === 'Map_List');
+        if (listRow && listRow[1]) {
+            return listRow[1].split(',');
+        }
+    } catch (e) { }
+    return ['default'];
+}
+
+export async function deleteMap(mapId: string) {
+    if (mapId === 'default') return { success: false, error: '기본 배치도는 삭제할 수 없습니다.' };
+
+    const appConfig = await _getAppConfig();
+    if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
+        return fbActions.deleteMap(appConfig.firebase, mapId);
+    }
+
+    const sheetId = await getUserSheetId();
+    try {
+        const rows = await getData('Config!A1:B2000', sheetId) || [];
+        const configMap = new Map<string, string>();
+        rows.forEach(r => { if (r[0]) configMap.set(r[0], r[1]); });
+
+        const zonesKey = `Map_Zones_${mapId}`;
+        const imagePrefix = `Map_Image_${mapId}_`;
+
+        const keysToDelete = Array.from(configMap.keys()).filter(k => k.startsWith(imagePrefix) || k === zonesKey);
+        keysToDelete.forEach(k => configMap.delete(k));
+
+        const floorListStr = configMap.get('Map_List') || 'default';
+        const floors = new Set(floorListStr.split(','));
+        floors.delete(mapId);
+        configMap.set('Map_List', Array.from(floors).join(','));
+
+        const values = Array.from(configMap.entries());
+        values.unshift(['Key', 'Value']);
+
+        await clearData('Config!A1:B2000', sheetId);
+        await updateData('Config!A1', values, sheetId);
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: String(e) };
     }
 }
 
