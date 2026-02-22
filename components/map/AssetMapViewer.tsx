@@ -37,7 +37,15 @@ export function AssetMapViewer({
 }: AssetMapViewerProps) {
     const mapWrapperRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<HTMLDivElement>(null);
+    const imgRef = useRef<HTMLImageElement>(null);
     const [currentDrag, setCurrentDrag] = useState<{ startX: number, startY: number, curX: number, curY: number } | null>(null);
+
+    // Robust Image Loading Check (handles cached cases)
+    useEffect(() => {
+        if (imgRef.current?.complete) {
+            onImageLoad?.();
+        }
+    }, [imageSrc, onImageLoad]);
 
     // Handle zone creation drag
     const handleMouseDown = (e: React.MouseEvent) => {
@@ -93,6 +101,7 @@ export function AssetMapViewer({
                 }}
             >
                 <img
+                    ref={imgRef}
                     src={imageSrc}
                     alt="Map"
                     className="w-full h-auto block select-none"

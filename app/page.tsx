@@ -105,8 +105,12 @@ export default function Home() {
         if (serverImage) {
           // Update cache if server image is present
           localStorage.setItem(cacheKey, JSON.stringify({ image: serverImage, updatedAt: serverUpdatedAt }));
-          setMapImage(serverImage);
-          setIsMapLoading(true);
+
+          // Only trigger loading overlay if image is different from what we already have
+          if (serverImage !== mapImage) {
+            setMapImage(serverImage);
+            setIsMapLoading(true);
+          }
         } else {
           // If server says no image, clear cache
           localStorage.removeItem(cacheKey);
