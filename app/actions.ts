@@ -1278,13 +1278,14 @@ export async function processScannedImage(imageBase64: string, locationName: str
     }
 }
 
-// --- Gemini Vision: Floor Plan Zone Name Recognition ---
-export async function recognizeZoneNamesWithAI(imageBase64: string, zones: { id: string, pinX: number, pinY: number, width?: number, height?: number, name: string }[]) {
+export async function recognizeZoneNamesWithAI(imageBase64: string, zones: any[], imageWidth?: number, imageHeight?: number) {
+    console.log('[AI] Starting Zone Name Recognition...');
     const config = await fetchSystemConfig();
-    const apiKey = config['GOOGLE_VISION_KEY'] || process.env.GOOGLE_VISION_KEY;
+    const apiKey = config['GEMINI_API_KEY'] || process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
-        return { success: false, error: 'API Key가 설정되지 않았습니다.', zones };
+        console.warn('Gemini API Key missing, falling back to OCR...');
+        return await recognizeZoneNamesWithOCR(imageBase64, zones, 'API Key 누락', imageWidth, imageHeight);
     }
 
     try {
@@ -1337,7 +1338,7 @@ ${zoneDescriptions}
         if (!response.ok) {
             const err = await response.json();
             console.warn('Gemini blocked or failed, trying OCR fallback:', err.error?.message);
-            return await recognizeZoneNamesWithOCR(imageBase64, zones);
+            return await recognizeZoneNamesWithOCR(imageBase64, zones, err.error?.message, imageWidth, imageHeight);
         }
 
         const data = await response.json();
@@ -1346,8 +1347,8 @@ ${zoneDescriptions}
         // Parse JSON from response (Gemini may wrap in ```json ... ```)
         const jsonMatch = rawText.match(/\[[\s\S]*\]/);
         if (!jsonMatch) {
-            console.warn('Gemini zone name response not parseable, trying OCR fallback:', rawText);
-            return await recognizeZoneNamesWithOCR(imageBase64, zones);
+            console.warn('Gemini response not parseable, trying OCR fallback:', rawText);
+            return await recognizeZoneNamesWithOCR(imageBase64, zones, 'JSON 파싱 실패', imageWidth, imageHeight);
         }
 
         const parsed: { index: number, name: string }[] = JSON.parse(jsonMatch[0]);
@@ -1363,19 +1364,19 @@ ${zoneDescriptions}
 
         if (!changed) {
             console.warn('Gemini returned results but no names were changed, trying OCR fallback...');
-            return await recognizeZoneNamesWithOCR(imageBase64, zones, 'Gemini가 새로운 이름을 감지하지 못했습니다.');
+            return await recognizeZoneNamesWithOCR(imageBase64, zones, 'Gemini가 새로운 이름을 감지하지 못했습니다.', imageWidth, imageHeight);
         }
 
         return { success: true, zones: updatedZones, message: 'AI(Gemini)로 구역 식별 완료' };
     } catch (e) {
         const geminiError = String(e).includes('blocked') ? 'Gemini API 차단됨' : String(e);
         console.error('Gemini error, trying OCR fallback:', e);
-        return await recognizeZoneNamesWithOCR(imageBase64, zones, geminiError);
+        return await recognizeZoneNamesWithOCR(imageBase64, zones, geminiError, imageWidth, imageHeight);
     }
 }
 
 // Fallback: Use basic Google Vision OCR to find text near zones
-async function recognizeZoneNamesWithOCR(imageBase64: string, zones: any[], previousError?: string) {
+async function recognizeZoneNamesWithOCR(imageBase64: string, zones: any[], previousError?: string, imageWidth?: number, imageHeight?: number) {
     console.log('[AI Fallback] Attempting Legacy OCR recognition...');
     const config = await fetchSystemConfig();
     const apiKey = config['GOOGLE_VISION_KEY'] || process.env.GOOGLE_VISION_KEY;
@@ -1408,71 +1409,74 @@ async function recognizeZoneNamesWithOCR(imageBase64: string, zones: any[], prev
             return { success: false, error: '이미지에서 텍스트를 찾을 수 없습니다.', zones };
         }
 
-        // 1. Determine Image Dimensions from the first (full) annotation
-        const fullPoly = annotations[0].boundingPoly?.vertices;
-        let imgW = 0, imgH = 0;
-        if (fullPoly) {
-            fullPoly.forEach((v: any) => {
-                if (v.x > imgW) imgW = v.x;
-                if (v.y > imgH) imgH = v.y;
-            });
+        // 1. Determine Image Dimensions
+        let imgW = imageWidth || 0;
+        let imgH = imageHeight || 0;
+
+        // Fallback: Infer from full annotation bounding poly if client didn't provide
+        if (!imgW || !imgH) {
+            const fullPoly = annotations[0].boundingPoly?.vertices;
+            if (fullPoly) {
+                fullPoly.forEach((v: any) => {
+                    if (v.x > imgW) imgW = v.x;
+                    if (v.y > imgH) imgH = v.y;
+                });
+            }
         }
 
-        // If we can't get dimensions, fallback to a guess or just return error
         if (imgW === 0 || imgH === 0) {
-            console.warn('[OCR] Could not determine image dimensions from Vision API');
             return { success: false, error: '이미지 크기를 분석할 수 없어 위치 매칭에 실패했습니다.', zones };
         }
 
-        // 2. Proximity Matching: Map text blocks to zones
-        const textBlocks = annotations.slice(1); // Skip the first full-text summary
-        const zoneMatches = new Map<string, string[]>(); // zoneId -> string[] of names
+        console.log(`[OCR Logic] Matching against image size: ${imgW}x${imgH}`);
+
+        // 2. Proximity Matching: Match text blocks that are INSIDE the zone rectangles
+        const textBlocks = annotations.slice(1);
+        const zoneMatches = new Map<string, { text: string, x: number, y: number }[]>();
 
         textBlocks.forEach((block: any) => {
             const text = block.description?.trim();
             if (!text || text.length < 1) return;
 
             const vertices = block.boundingPoly.vertices;
+            // Center of text block in percentage relative to imgW/imgH
             const avgX = (vertices.reduce((sum: number, v: any) => sum + (v.x || 0), 0) / 4 / imgW) * 100;
             const avgY = (vertices.reduce((sum: number, v: any) => sum + (v.y || 0), 0) / 4 / imgH) * 100;
 
-            // Find best zone for this text block
-            let bestZoneId = null;
-            let minDistance = 10; // 10% tolerance
-
             zones.forEach(zone => {
-                // Check if text center is inside zone (with a bit of padding)
-                const isInsideX = avgX >= zone.pinX - 2 && avgX <= zone.pinX + (zone.width || 5) + 2;
-                const isInsideY = avgY >= zone.pinY - 2 && avgY <= zone.pinY + (zone.height || 5) + 2;
+                const zW = zone.width || 5;
+                const zH = zone.height || 5;
+
+                // PRIORITY: Text must be inside the box (with 1.5% padding)
+                const isInsideX = avgX >= zone.pinX - 1.5 && avgX <= zone.pinX + zW + 1.5;
+                const isInsideY = avgY >= zone.pinY - 1.5 && avgY <= zone.pinY + zH + 1.5;
 
                 if (isInsideX && isInsideY) {
-                    const dist = Math.sqrt(Math.pow(avgX - (zone.pinX + (zone.width || 5) / 2), 2) + Math.pow(avgY - (zone.pinY + (zone.height || 5) / 2), 2));
-                    if (dist < minDistance) {
-                        minDistance = dist;
-                        bestZoneId = zone.id;
-                    }
+                    const list = zoneMatches.get(zone.id) || [];
+                    list.push({ text, x: avgX, y: avgY });
+                    zoneMatches.set(zone.id, list);
                 }
             });
-
-            if (bestZoneId) {
-                const existing = zoneMatches.get(bestZoneId) || [];
-                // Only add if not already present to avoid "1-1 1-1"
-                if (!existing.includes(text)) {
-                    existing.push(text);
-                    zoneMatches.set(bestZoneId, existing);
-                }
-            }
         });
 
-        // 3. Update zones with found names
+        // 3. Update zones with names found inside them
         const updatedZones = zones.map(zone => {
-            const names = zoneMatches.get(zone.id);
-            if (names && names.length > 0) {
-                // Join multiple words (e.g., "1", "-", "1" -> "1-1")
-                const combinedName = names.join('').replace(/\s+/g, '');
-                // Filter out obviously wrong names
-                if (combinedName.length >= 1) {
-                    return { ...zone, name: combinedName };
+            const matches = zoneMatches.get(zone.id);
+            if (matches && matches.length > 0) {
+                // Sort by Y then X to handle multi-line names ("1" \n "학년" \n "1반")
+                matches.sort((a, b) => (a.y - b.y) || (a.x - b.x));
+                const combined = matches.map(m => m.text).join(' ');
+
+                // For Korean, join words without spaces (e.g., "과학 실" -> "과학실")
+                let cleaned = combined;
+                if (/^[가-힣\s]+$/.test(combined)) {
+                    cleaned = combined.replace(/\s+/g, '');
+                } else {
+                    cleaned = combined.replace(/\s+/g, ' ').trim();
+                }
+
+                if (cleaned.length >= 1) {
+                    return { ...zone, name: cleaned };
                 }
             }
             return zone;
@@ -1480,11 +1484,11 @@ async function recognizeZoneNamesWithOCR(imageBase64: string, zones: any[], prev
 
         const changeCount = updatedZones.filter((z, i) => z.name !== zones[i].name).length;
         if (changeCount === 0) {
-            const errorMsg = previousError ? `인식 실패 (${previousError} & OCR 결과 없음)` : '구역 내에서 텍스트를 찾을 수 없습니다. (Legacy OCR)';
+            const errorMsg = previousError ? `인식 실패 (${previousError} & OCR 결과 없음)` : '구역 내에서 공간 이름을 찾지 못했습니다.';
             return { success: false, error: errorMsg, zones };
         }
 
-        return { success: true, zones: updatedZones, message: `Legacy OCR로 ${changeCount}개 구역 식별 완료` };
+        return { success: true, zones: updatedZones, message: `Legacy OCR: ${changeCount}개 구역 식별됨` };
 
     } catch (e) {
         console.error('OCR Fallback Logic Error:', e);

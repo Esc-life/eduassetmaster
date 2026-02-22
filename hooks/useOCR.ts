@@ -138,6 +138,13 @@ export const useOCR = (): UseOCRResult => {
                 reader.readAsDataURL(imageFile);
             });
 
+            // Get Image Dimensions for precise matching
+            const { width, height } = await new Promise<{ width: number, height: number }>((resolve) => {
+                const img = new Image();
+                img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+                img.src = URL.createObjectURL(imageFile);
+            });
+
             setProgress(30);
             setStatusText('서버에 이미지 전송 중...');
 
@@ -149,7 +156,7 @@ export const useOCR = (): UseOCRResult => {
                 width: z.width,
                 height: z.height,
                 name: z.name
-            })));
+            })), width, height);
 
             setProgress(90);
 
