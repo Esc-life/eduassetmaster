@@ -1351,24 +1351,31 @@ ${zoneDescriptions}
         }
 
         const parsed: { index: number, name: string }[] = JSON.parse(jsonMatch[0]);
+        let changed = false;
         const updatedZones = zones.map((z, i) => {
             const match = parsed.find(p => p.index === i);
-            if (match && match.name && match.name.trim() && match.name !== "분석 불가") {
+            if (match && match.name && match.name.trim() && match.name !== "분석 불가" && match.name !== z.name) {
+                changed = true;
                 return { ...z, name: match.name.trim() };
             }
             return z;
         });
 
+        if (!changed) {
+            console.warn('Gemini returned results but no names were changed, trying OCR fallback...');
+            return await recognizeZoneNamesWithOCR(imageBase64, zones, 'Gemini가 새로운 이름을 감지하지 못했습니다.');
+        }
+
         return { success: true, zones: updatedZones, message: 'AI(Gemini)로 구역 식별 완료' };
     } catch (e) {
-        console.error('Gemini Zone Recognition Error, trying OCR fallback:', e);
-        return await recognizeZoneNamesWithOCR(imageBase64, zones);
+        const geminiError = String(e).includes('blocked') ? 'Gemini API 차단됨' : String(e);
+        console.error('Gemini error, trying OCR fallback:', e);
+        return await recognizeZoneNamesWithOCR(imageBase64, zones, geminiError);
     }
 }
 
 // Fallback: Use basic Google Vision OCR to find text near zones
-// Fallback: Use basic Google Vision OCR to find text near zones
-async function recognizeZoneNamesWithOCR(imageBase64: string, zones: any[]) {
+async function recognizeZoneNamesWithOCR(imageBase64: string, zones: any[], previousError?: string) {
     console.log('[AI Fallback] Attempting Legacy OCR recognition...');
     const config = await fetchSystemConfig();
     const apiKey = config['GOOGLE_VISION_KEY'] || process.env.GOOGLE_VISION_KEY;
@@ -1473,14 +1480,16 @@ async function recognizeZoneNamesWithOCR(imageBase64: string, zones: any[]) {
 
         const changeCount = updatedZones.filter((z, i) => z.name !== zones[i].name).length;
         if (changeCount === 0) {
-            return { success: false, error: '구역 내에서 텍스트를 찾을 수 없습니다. (Legacy OCR)', zones };
+            const errorMsg = previousError ? `인식 실패 (${previousError} & OCR 결과 없음)` : '구역 내에서 텍스트를 찾을 수 없습니다. (Legacy OCR)';
+            return { success: false, error: errorMsg, zones };
         }
 
         return { success: true, zones: updatedZones, message: `Legacy OCR로 ${changeCount}개 구역 식별 완료` };
 
     } catch (e) {
         console.error('OCR Fallback Logic Error:', e);
-        return { success: false, error: 'Legacy OCR 처리 중 시스템 오류가 발생했습니다.', zones };
+        const errorMsg = previousError ? `시스템 오류 (${previousError} & OCR 에러)` : 'Legacy OCR 처리 중 오류가 발생했습니다.';
+        return { success: false, error: errorMsg, zones };
     }
 }
 
