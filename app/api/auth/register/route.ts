@@ -14,9 +14,24 @@ export async function POST(req: Request) {
         // 0. Verify Spreadsheet Access (if provided)
         if (spreadsheetId) {
             console.log(`[Register] Initializing spreadsheet: ${spreadsheetId}`);
+
+            // Extract credentials if user provided their own JSON
+            let userCredentials = undefined;
+            if (serviceAccountJson) {
+                try {
+                    const parsed = JSON.parse(serviceAccountJson);
+                    userCredentials = {
+                        client_email: parsed.client_email,
+                        private_key: parsed.private_key
+                    };
+                } catch (e) {
+                    console.error("[Register] Invalid user service account JSON");
+                }
+            }
+
             try {
-                // Try to initialize (create tabs/headers)
-                const initResult = await initializeUserSheet(spreadsheetId);
+                // Try to initialize (create tabs/headers) using user's own credentials if available
+                const initResult = await initializeUserSheet(spreadsheetId, userCredentials);
                 if (!initResult) throw new Error('Initialization failed');
 
                 const configRows: string[][] = [];
@@ -27,14 +42,15 @@ export async function POST(req: Request) {
 
                 if (configRows.length > 0) {
                     console.log(`[Register] Writing config to SystemConfig!A2 on ${spreadsheetId}`);
-                    const updateRes = await updateData('SystemConfig!A2', configRows, spreadsheetId);
+                    // Use user's own credentials to write the config
+                    const updateRes = await updateData('SystemConfig!A2', configRows, spreadsheetId, userCredentials);
                     console.log(`[Register] Update result:`, !!updateRes);
                 }
             } catch (initError: any) {
                 console.error("[Register] Sheet Init Error detail:", initError);
                 if (initError.message === 'PERMISSION_DENIED' || initError.code === 403) {
                     return NextResponse.json({
-                        message: "스프레드시트 접근 권한이 없습니다.\n관리자 서비스 계정 이메일을 '편집자'로 초대했는지 확인해주세요."
+                        message: "스프레드시트 접근 권한이 없습니다. 업로드한 서비스 계정 이메일이 시트에 '편집자'로 초대되어 있는지 확인해주세요."
                     }, { status: 403 });
                 }
                 return NextResponse.json({
