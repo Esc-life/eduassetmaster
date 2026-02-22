@@ -1290,6 +1290,33 @@ export async function saveSystemConfig(config: Record<string, string>) {
 
 // --- OCR & Auto Assign ---
 
+async function getBestGeminiModel(apiKey: string): Promise<string> {
+    try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+        if (!res.ok) return 'gemini-1.5-flash';
+
+        const data = await res.json();
+        const models = data.models || [];
+
+        const validModels = models
+            .filter((m: any) => m.supportedGenerationMethods?.includes('generateContent'))
+            .map((m: any) => m.name.replace('models/', ''));
+
+        const preferences = ['gemini-3.0-flash', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+        for (const pref of preferences) {
+            const match = validModels.find((m: string) => m.includes(pref));
+            if (match) return match; // e.g. gemini-1.5-flash-latest or gemini-2.0-flash
+        }
+
+        const fallback = validModels.find((m: string) => m.includes('flash') || m.includes('pro'));
+        return fallback || validModels[0] || 'gemini-1.5-flash';
+    } catch (e) {
+        console.warn('Failed to fetch Gemini models list, using fallback.', e);
+        return 'gemini-1.5-flash';
+    }
+}
+
+
 export async function processScannedImage(imageBase64: string, locationName: string, overrideSheetId?: string) {
     // 1. Get Configuration (API Key)
     const config = await fetchSystemConfig(overrideSheetId);
@@ -1301,9 +1328,11 @@ export async function processScannedImage(imageBase64: string, locationName: str
     }
 
     try {
+        const modelName = await getBestGeminiModel(apiKey);
+
         // 1. Gemini Vision API Call (Text Extraction)
         const geminiResponse = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1447,8 +1476,9 @@ ${zoneDescriptions}
 - 박스 내부에 텍스트가 없으면 "분석 불가"라고 적으세요.
 - 학교 특성상 "Wee 클래스", "방과후실", "돌봄교실" 등이 많으므로 오타에 주의하세요.`;
 
+        const modelName = await getBestGeminiModel(apiKey);
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
