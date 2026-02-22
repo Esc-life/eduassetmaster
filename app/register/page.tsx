@@ -6,6 +6,7 @@ import { UserPlus, Mail, Lock, Database, FileSpreadsheet, Server, Cloud, Eye, Ke
 import Link from 'next/link';
 import { getSystemEmail, verifySpreadsheetAccess } from '@/app/actions';
 import { useEffect } from 'react';
+import { useMessage } from '@/components/Providers';
 
 type DBType = 'sheet' | 'firebase';
 
@@ -36,6 +37,7 @@ interface RegisterForm {
 
 export default function RegisterPage() {
     const router = useRouter();
+    const { showAlert } = useMessage();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -68,7 +70,7 @@ export default function RegisterPage() {
 
     const handleVerifySheet = async () => {
         if (!form.spreadsheetId) {
-            alert('스프레드시트 ID를 먼저 입력해주세요.');
+            showAlert('스프레드시트 ID를 먼저 입력해주세요.', 'error');
             return;
         }
         setIsSheetLoading(true);
@@ -77,7 +79,7 @@ export default function RegisterPage() {
             const res = await verifySpreadsheetAccess(form.spreadsheetId, form.serviceAccountJson);
             if (res.success) {
                 setIsSheetVerified(true);
-                alert('연결 성공! 구글 시트 초기화(탭 생성)가 완료되었습니다.');
+                showAlert('연결 성공! 구글 시트 초기화(탭 생성)가 완료되었습니다.', 'success');
             } else {
                 if (res.error === 'PERMISSION_DENIED') {
                     setSheetVerifyError(`권한이 없습니다. 아래의 서비스 계정 이메일을 복사하여 구글 시트에 '편집자'로 추가해 주세요.\n\n${res.systemEmail}`);
@@ -110,7 +112,7 @@ export default function RegisterPage() {
                 }
                 setForm(prev => ({ ...prev, serviceAccountJson: content }));
             } catch (err) {
-                alert('올바른 JSON 파일이 아닙니다.');
+                showAlert('올바른 JSON 파일이 아닙니다.', 'error');
             }
         };
         reader.readAsText(file);
@@ -241,7 +243,7 @@ export default function RegisterPage() {
             const cookieValue = encodeURIComponent(JSON.stringify(configToSave));
             document.cookie = `edu-asset-config=${cookieValue}; path=/; max-age=31536000; SameSite=Lax`;
 
-            alert('회원가입 및 설정이 완료되었습니다. 로그인해주세요.');
+            showAlert('회원가입 및 설정이 완료되었습니다. 로그인해주세요.', 'success');
             router.push('/login');
         } catch (err: any) {
             setError(err.message);
@@ -381,19 +383,23 @@ export default function RegisterPage() {
                                     <div className="flex items-center gap-2">
                                         <input
                                             readOnly
-                                            value={extractedEmail || systemEmail || '파일을 먼저 업로드해주세요'}
-                                            className="flex-1 text-[11px] bg-white dark:bg-gray-800 border border-blue-200 dark:border-gray-700 rounded px-3 py-2 font-mono text-blue-900 dark:text-blue-100"
+                                            value={extractedEmail}
+                                            placeholder="JSON 파일을 업로드하면 이메일이 자동 추출됩니다"
+                                            className="flex-1 text-[11px] bg-white dark:bg-gray-800 border border-blue-200 dark:border-gray-700 rounded px-3 py-2 font-mono text-blue-900 dark:text-blue-100 italic"
                                         />
                                         <button
                                             type="button"
                                             onClick={() => {
-                                                const email = extractedEmail || systemEmail;
+                                                const email = extractedEmail;
                                                 if (email) {
                                                     navigator.clipboard.writeText(email);
-                                                    alert('이메일이 복사되었습니다.');
+                                                    showAlert('이메일이 복사되었습니다.', 'success');
+                                                } else {
+                                                    showAlert('먼저 1단계에서 파일을 업로드해주세요.', 'error');
                                                 }
                                             }}
-                                            className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-bold transition-colors"
+                                            className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-bold transition-colors disabled:opacity-50"
+                                            disabled={!extractedEmail}
                                         >
                                             복사
                                         </button>

@@ -41,13 +41,13 @@ export async function POST(req: Request) {
                 if (serviceAccountJson) configRows.push(['SERVICE_ACCOUNT_JSON', serviceAccountJson]);
 
                 if (configRows.length > 0) {
-                    console.log(`[Register] Writing config to SystemConfig!A2 on ${spreadsheetId}`);
+                    console.log(`[Register] Writing config rows to ${spreadsheetId}:`, configRows.map(r => r[0]));
                     // Use user's own credentials to write the config
                     const updateRes = await updateData('SystemConfig!A2', configRows, spreadsheetId, userCredentials);
-                    console.log(`[Register] Update result:`, !!updateRes);
+                    console.log(`[Register] Config Update Success: ${!!updateRes}`);
                 }
             } catch (initError: any) {
-                console.error("[Register] Sheet Init Error detail:", initError);
+                console.error("[Register] Sheet Init/Config Error detail:", initError);
                 if (initError.message === 'PERMISSION_DENIED' || initError.code === 403) {
                     return NextResponse.json({
                         message: "스프레드시트 접근 권한이 없습니다. 업로드한 서비스 계정 이메일이 시트에 '편집자'로 초대되어 있는지 확인해주세요."

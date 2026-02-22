@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { Image as ImageIcon, PlusCircle, Check, Trash2, MousePointer2, ScanSearch, Loader2, Save, Minus, RotateCcw, FileSpreadsheet, ScanLine, Edit3, Settings, MoreHorizontal, CheckSquare, Edit } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { fetchMapConfiguration, saveMapConfiguration, syncZonesToSheet, fetchAssetData, updateDevice, createDeviceInstance, deleteDeviceInstance, updateZoneName, batchUpdateZoneNames, deleteZonesFromLocations, fetchMapList, deleteMap } from '@/app/actions';
+import { useMessage } from '@/components/Providers';
 import { DeviceEditModal } from '@/components/devices/DeviceEditModal';
 import { ZoneEditModal } from '@/components/map/ZoneEditModal';
 import { ZoneBatchEditModal } from '@/components/map/ZoneBatchEditModal';
@@ -21,6 +22,7 @@ import { Layers, ChevronDown } from 'lucide-react';
 const INITIAL_PINS: Location[] = [];
 
 export default function Home() {
+  const { showAlert, showConfirm } = useMessage();
   const [mapImage, setMapImage] = useState<string>();
   const [mapFile, setMapFile] = useState<File>();
   const [pins, setPins] = useState<Location[]>(INITIAL_PINS);

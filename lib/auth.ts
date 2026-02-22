@@ -39,12 +39,12 @@ export const authOptions: NextAuthOptions = {
 
                 try {
                     // Fetch users from Sheet (Master Sheet)
-                    // Expected: [ID, Name, Email, Password, SpreadsheetID, CreatedAt]
-                    const rows = await getData('Users!A:E');
+                    // Structure: [ID(0), Name(1), School(2), Email(3), Password(4), SpreadsheetID(5), CreatedAt(6)]
+                    const rows = await getData('Users!A:G');
                     console.log(`[Auth] Fetched User Rows: ${rows ? rows.length : 'null'}`);
 
                     if (!rows) {
-                        // Fallback Admin: Use environment variables instead of hardcoded credentials
+                        // Fallback Admin
                         const adminEmail = process.env.ADMIN_EMAIL || 'admin@test.com';
                         const adminPass = process.env.ADMIN_PASSWORD;
                         if (adminPass && credentials.email === adminEmail && credentials.password === adminPass) {
@@ -58,27 +58,25 @@ export const authOptions: NextAuthOptions = {
                         return null;
                     }
 
-                    // Find user (Column Index 2 is Email)
-                    const userRow = rows.find((r: any[]) => r[2] === credentials.email);
+                    // Find user (Column Index 3 is Email)
+                    const userRow = rows.find((r: any[]) => r[3] === credentials.email);
 
                     if (userRow) {
-                        console.log(`[Auth] ✅ User found: ${userRow[2]} | SheetID: ${userRow[4]}`);
+                        console.log(`[Auth] ✅ User found: ${userRow[3]} | SheetID: ${userRow[5]}`);
 
                         // Check password
-                        // Check password (Trim check)
-                        const storedPass = String(userRow[3] || '').trim();
+                        const storedPass = String(userRow[4] || '').trim();
                         const inputPass = String(credentials.password || '').trim();
 
-                        // Also check for raw match just in case
-                        if (storedPass === inputPass || userRow[3] === credentials.password) {
+                        if (storedPass === inputPass) {
                             return {
                                 id: userRow[0],
                                 name: userRow[1],
-                                email: userRow[2],
-                                spreadsheetId: userRow[4] // Important: Index 4
+                                email: userRow[3],
+                                spreadsheetId: userRow[5]
                             } as any;
                         } else {
-                            console.log(`[Auth] ❌ Password mismatch for ${userRow[2]} (InputLen: ${inputPass.length}, StoredLen: ${storedPass.length})`);
+                            console.log(`[Auth] ❌ Password mismatch for ${userRow[3]}`);
                         }
                     } else {
                         console.log(`[Auth] ❌ User not found in sheet: ${credentials.email}`);
