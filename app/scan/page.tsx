@@ -35,7 +35,9 @@ function ScanPageContent() {
     const [systemEmail, setSystemEmail] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // We will fetch this when confirming an ID so it's scoped properly
     useEffect(() => {
+        // Just preload without ID (will fallback to master or authenticated cookie)
         getSystemEmail().then(res => setSystemEmail(res.email));
     }, []);
 
@@ -70,6 +72,10 @@ function ScanPageContent() {
 
         setIsZoneLoading(true);
         try {
+            // Fetch dynamically scoped email specifically for this sheet ID
+            const emailRes = await getSystemEmail(targetId);
+            setSystemEmail(emailRes.email);
+
             const res = await fetchAllZones(targetId);
 
             if (res.success && res.zones && res.zones.length > 0) {

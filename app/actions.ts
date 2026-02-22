@@ -1303,7 +1303,7 @@ export async function processScannedImage(imageBase64: string, locationName: str
     try {
         // 1. Gemini Vision API Call (Text Extraction)
         const geminiResponse = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1448,7 +1448,7 @@ ${zoneDescriptions}
 - 학교 특성상 "Wee 클래스", "방과후실", "돌봄교실" 등이 많으므로 오타에 주의하세요.`;
 
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -2515,7 +2515,14 @@ export async function batchUpdateZoneNames(changes: { zoneId: string, oldName: s
  * Registration Helpers (Unauthenticated)
  */
 
-export async function getSystemEmail() {
+export async function getSystemEmail(sheetId?: string) {
+    try {
+        const creds = await _getSheetsCredentials(sheetId);
+        if (creds && creds.client_email) {
+            return { email: creds.client_email };
+        }
+    } catch (e) { }
+
     return {
         email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || '설정되지 않음'
     };
