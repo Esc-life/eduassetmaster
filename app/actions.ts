@@ -1336,7 +1336,8 @@ ${zoneDescriptions}
 
         if (!response.ok) {
             const err = await response.json();
-            return { success: false, error: err.error?.message || 'Gemini API call failed', zones };
+            console.warn('Gemini blocked or failed, trying OCR fallback:', err.error?.message);
+            return await recognizeZoneNamesWithOCR(imageBase64, zones);
         }
 
         const data = await response.json();
@@ -1358,7 +1359,7 @@ ${zoneDescriptions}
             return z;
         });
 
-        return { success: true, zones: updatedZones };
+        return { success: true, zones: updatedZones, message: 'AI(Gemini)로 구역 식별 완료' };
     } catch (e) {
         console.error('Gemini Zone Recognition Error, trying OCR fallback:', e);
         return await recognizeZoneNamesWithOCR(imageBase64, zones);
@@ -1366,10 +1367,12 @@ ${zoneDescriptions}
 }
 
 // Fallback: Use basic Google Vision OCR to find text near zones
+// Fallback: Use basic Google Vision OCR to find text near zones
 async function recognizeZoneNamesWithOCR(imageBase64: string, zones: any[]) {
+    console.log('[AI Fallback] Attempting Legacy OCR recognition...');
     const config = await fetchSystemConfig();
     const apiKey = config['GOOGLE_VISION_KEY'] || process.env.GOOGLE_VISION_KEY;
-    if (!apiKey) return { success: false, error: 'OCR Fallback: No API Key', zones };
+    if (!apiKey) return { success: false, error: 'OCR Fallback: API Key가 없습니다.', zones };
 
     try {
         const response = await fetch(
@@ -1386,48 +1389,98 @@ async function recognizeZoneNamesWithOCR(imageBase64: string, zones: any[]) {
             }
         );
 
-        if (!response.ok) return { success: false, error: 'Vision API failed', zones };
+        if (!response.ok) {
+            const err = await response.json();
+            return { success: false, error: `Vision API 오류: ${err.error?.message || response.statusText}`, zones };
+        }
+
         const data = await response.json();
         const annotations = data.responses[0]?.textAnnotations;
 
-        if (!annotations || annotations.length <= 1) return { success: false, error: 'No text found', zones };
+        if (!annotations || annotations.length === 0) {
+            return { success: false, error: '이미지에서 텍스트를 찾을 수 없습니다.', zones };
+        }
 
-        // The first annotation is the full text. Others are individual words/lines.
-        const textBlocks = annotations.slice(1);
+        // 1. Determine Image Dimensions from the first (full) annotation
+        const fullPoly = annotations[0].boundingPoly?.vertices;
+        let imgW = 0, imgH = 0;
+        if (fullPoly) {
+            fullPoly.forEach((v: any) => {
+                if (v.x > imgW) imgW = v.x;
+                if (v.y > imgH) imgH = v.y;
+            });
+        }
 
-        const updatedZones = zones.map(zone => {
-            // Find text block closest to zone center
-            const zCX = zone.pinX;
-            const zCY = zone.pinY;
+        // If we can't get dimensions, fallback to a guess or just return error
+        if (imgW === 0 || imgH === 0) {
+            console.warn('[OCR] Could not determine image dimensions from Vision API');
+            return { success: false, error: '이미지 크기를 분석할 수 없어 위치 매칭에 실패했습니다.', zones };
+        }
 
-            let bestMatch = null;
-            let minDist = 15; // Max 15% distance
+        // 2. Proximity Matching: Map text blocks to zones
+        const textBlocks = annotations.slice(1); // Skip the first full-text summary
+        const zoneMatches = new Map<string, string[]>(); // zoneId -> string[] of names
 
-            textBlocks.forEach((block: any) => {
-                const vertices = block.boundingPoly.vertices;
-                // Average vertices to get center
-                const avgX = vertices.reduce((sum: number, v: any) => sum + (v.x || 0), 0) / 4;
-                const avgY = vertices.reduce((sum: number, v: any) => sum + (v.y || 0), 0) / 4;
+        textBlocks.forEach((block: any) => {
+            const text = block.description?.trim();
+            if (!text || text.length < 1) return;
 
-                // We need to normalize block coordinates to percentages.
-                // But we don't know the exact image size here easily without extra work.
-                // However, Vision API returns pixel coordinates. 
-                // Let's assume the user's zones are using the same aspect ratio.
-                // Wait, if we don't have dimensions, proximity matching is hard.
-                // But most floor plans have text INSIDE the zone.
+            const vertices = block.boundingPoly.vertices;
+            const avgX = (vertices.reduce((sum: number, v: any) => sum + (v.x || 0), 0) / 4 / imgW) * 100;
+            const avgY = (vertices.reduce((sum: number, v: any) => sum + (v.y || 0), 0) / 4 / imgH) * 100;
+
+            // Find best zone for this text block
+            let bestZoneId = null;
+            let minDistance = 10; // 10% tolerance
+
+            zones.forEach(zone => {
+                // Check if text center is inside zone (with a bit of padding)
+                const isInsideX = avgX >= zone.pinX - 2 && avgX <= zone.pinX + (zone.width || 5) + 2;
+                const isInsideY = avgY >= zone.pinY - 2 && avgY <= zone.pinY + (zone.height || 5) + 2;
+
+                if (isInsideX && isInsideY) {
+                    const dist = Math.sqrt(Math.pow(avgX - (zone.pinX + (zone.width || 5) / 2), 2) + Math.pow(avgY - (zone.pinY + (zone.height || 5) / 2), 2));
+                    if (dist < minDistance) {
+                        minDistance = dist;
+                        bestZoneId = zone.id;
+                    }
+                }
             });
 
-            // If proximity fails, return original
+            if (bestZoneId) {
+                const existing = zoneMatches.get(bestZoneId) || [];
+                // Only add if not already present to avoid "1-1 1-1"
+                if (!existing.includes(text)) {
+                    existing.push(text);
+                    zoneMatches.set(bestZoneId, existing);
+                }
+            }
+        });
+
+        // 3. Update zones with found names
+        const updatedZones = zones.map(zone => {
+            const names = zoneMatches.get(zone.id);
+            if (names && names.length > 0) {
+                // Join multiple words (e.g., "1", "-", "1" -> "1-1")
+                const combinedName = names.join('').replace(/\s+/g, '');
+                // Filter out obviously wrong names
+                if (combinedName.length >= 1) {
+                    return { ...zone, name: combinedName };
+                }
+            }
             return zone;
         });
 
-        // Actually, Vision API returns full text. If proximity is hard, maybe just return success:false with helpful error.
-        // Let's try to get image size from the first annotation's bounding poly if possible? 
-        // No, it's not always there.
+        const changeCount = updatedZones.filter((z, i) => z.name !== zones[i].name).length;
+        if (changeCount === 0) {
+            return { success: false, error: '구역 내에서 텍스트를 찾을 수 없습니다. (Legacy OCR)', zones };
+        }
 
-        return { success: false, error: 'Gemini가 차단되었습니다. Google Cloud Console에서 Generative Language API 권한을 확인해주세요.', zones };
+        return { success: true, zones: updatedZones, message: `Legacy OCR로 ${changeCount}개 구역 식별 완료` };
+
     } catch (e) {
-        return { success: false, error: 'OCR Fallback Error: ' + String(e), zones };
+        console.error('OCR Fallback Logic Error:', e);
+        return { success: false, error: 'Legacy OCR 처리 중 시스템 오류가 발생했습니다.', zones };
     }
 }
 

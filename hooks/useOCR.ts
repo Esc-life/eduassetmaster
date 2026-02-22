@@ -163,11 +163,13 @@ export const useOCR = (): UseOCRResult => {
                     return original;
                 });
 
-                setStatusText(`${mergedZones.filter((z, i) => z.name !== zones[i]?.name).length}개 구역 이름 인식 완료`);
+                const res = result as any;
+                setStatusText(res.message || `${mergedZones.filter((z, i) => z.name !== zones[i]?.name).length}개 구역 이름 인식 완료`);
                 return mergedZones;
             } else {
-                console.warn('Gemini zone recognition failed:', result.error);
-                setStatusText('인식 실패: ' + (result.error || ''));
+                const res = result as any;
+                console.warn('Gemini zone recognition failed:', res.error);
+                setStatusText('인식 실패: ' + (res.error || ''));
                 return zones;
             }
 
