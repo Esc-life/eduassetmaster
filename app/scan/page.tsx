@@ -65,23 +65,25 @@ function ScanPageContent() {
 
         setIsZoneLoading(true);
         try {
-            const allZones = await fetchAllZones(targetId);
+            const res = await fetchAllZones(targetId);
 
-            if (allZones && allZones.length > 0) {
-                const sorted = [...allZones].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+            if (res.success && res.zones && res.zones.length > 0) {
+                const sorted = [...res.zones].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
                 setZones(sorted);
                 setIsIdConfirmed(true);
                 if (!overrideId) localStorage.setItem('edu_asset_manager_id', targetId);
+            } else if (!res.success) {
+                if (res.error === 'PERMISSION_DENIED') {
+                    alert(`연결 실패: 해당 스프레드시트(${targetId})가 시스템 계정에 공유되지 않았습니다. 시트 설정에서 편집 권한을 추가해 주세요.`);
+                } else {
+                    alert(`에러 발생: ${res.error || '데이터를 불러오는 중 오류가 발생했습니다.'}\n(ID: ${targetId})`);
+                }
             } else {
-                alert('연결 실패: 구역 정보를 불러올 수 없거나 유효하지 않은 ID입니다.');
+                alert(`연결 실패: 구역 정보가 없습니다.\n(ID: ${targetId})\n\n시트 내 'Locations' 시트나 'Config' 시트에 구역 데이터가 등록되어 있는지 확인해 주세요.`);
             }
         } catch (error: any) {
             console.error('Zone fetch error:', error);
-            if (error.message === 'PERMISSION_DENIED') {
-                alert('연결 실패: 해당 스프레드시트가 시스템 계정(EduAssetMaster 서비스 계정)에 공유되지 않았습니다. 시트 설정에서 편집 권한을 추가해 주세요.');
-            } else {
-                alert('데이터를 불러오는 중 오류가 발생했습니다.');
-            }
+            alert(`데이터 요청 중 기술적인 오류가 발생했습니다: ${error.message || 'Unknown error'}`);
         } finally {
             setIsZoneLoading(false);
         }

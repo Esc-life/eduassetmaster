@@ -344,8 +344,9 @@ export async function fetchMapConfiguration(mapId: string = 'default', overrideS
 
 /**
  * Fetch all zones across all maps for a given spreadsheet
+ * Returns a result object to avoid 500 errors in production Server Actions
  */
-export async function fetchAllZones(overrideSheetId?: string) {
+export async function fetchAllZones(overrideSheetId?: string): Promise<{ success: boolean; zones?: Location[]; error?: string }> {
     try {
         const list = await fetchMapList(overrideSheetId);
         let all: Location[] = [];
@@ -372,7 +373,7 @@ export async function fetchAllZones(overrideSheetId?: string) {
             console.warn('[fetchAllZones] Failed to fetch Locations sheet:', e);
         }
 
-        if (all.length === 0) return [];
+        if (all.length === 0) return { success: true, zones: [] };
 
         // De-duplicate by ID (priority to map-pinned versions if they have specific Metadata)
         const uniqueMap = new Map<string, Location>();
@@ -382,11 +383,10 @@ export async function fetchAllZones(overrideSheetId?: string) {
             }
         });
 
-        return Array.from(uniqueMap.values());
+        return { success: true, zones: Array.from(uniqueMap.values()) };
     } catch (e: any) {
         console.error('[fetchAllZones] Error:', e);
-        if (e.message === 'PERMISSION_DENIED') throw e;
-        return [];
+        return { success: false, error: e.message === 'PERMISSION_DENIED' ? 'PERMISSION_DENIED' : (e.message || '알 수 없는 오류') };
     }
 }
 
