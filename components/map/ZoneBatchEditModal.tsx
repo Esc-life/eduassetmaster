@@ -10,7 +10,7 @@ interface ZoneBatchEditModalProps {
     zones: Location[];
     onClose: () => void;
     onSave: (newZones: Location[]) => void;
-    onAutoDetect: () => void;
+    onAutoDetect: (currentZones: Location[]) => Promise<Location[] | null>;
     isScanning?: boolean;
 }
 
@@ -45,6 +45,13 @@ export function ZoneBatchEditModal({ isOpen, zones, onClose, onSave, onAutoDetec
         onClose();
     };
 
+    const handleAutoDetect = async () => {
+        const results = await onAutoDetect(editedZones);
+        if (results) {
+            setEditedZones(results);
+        }
+    };
+
     // Use editedZones directly for rendering to prevent re-sorting during typing
     const displayedZones = editedZones;
 
@@ -76,7 +83,7 @@ export function ZoneBatchEditModal({ isOpen, zones, onClose, onSave, onAutoDetec
                 {/* Toolbar */}
                 <div className="px-6 py-3 bg-blue-50/50 dark:bg-blue-900/10 border-b border-blue-100 dark:border-blue-800 flex flex-wrap gap-3 shrink-0 items-center">
                     <button
-                        onClick={onAutoDetect}
+                        onClick={handleAutoDetect}
                         disabled={isScanning}
                         className="flex items-center gap-2 px-3 py-1.5 bg-white border border-blue-200 shadow-sm text-blue-700 text-sm font-medium rounded-lg hover:bg-blue-50 transition-colors disabled:opacity-75 disabled:cursor-wait"
                     >

@@ -233,8 +233,9 @@ export default function Home() {
   };
 
   // AI Name Recognition Handler
-  const handleAutoNameZones = async (shouldClose = true) => {
+  const handleAutoNameZones = async (currentZones?: Location[]): Promise<Location[] | null> => {
     let targetFile = mapFile;
+    const targetZones = currentZones || pins;
 
     // Make sure we have a file, even if retrieved from server/localstorage as base64
     if (!targetFile && mapImage) {
@@ -243,30 +244,30 @@ export default function Home() {
       } catch (e) {
         console.error("Failed to convert base64 to file", e);
         alert("이미지 복원 중 오류가 발생했습니다. 이미지를 다시 업로드해주세요.");
-        return;
+        return null;
       }
     }
 
     if (!targetFile) {
       alert("분석할 이미지가 없습니다.");
-      return;
+      return null;
     }
 
-    if (pins.length === 0) {
+    if (targetZones.length === 0) {
       alert("이름을 찾을 구역이 없습니다. 먼저 구역을 생성해주세요.");
-      return;
+      return null;
     }
 
-    const confirmRun = confirm(`현재 ${pins.length}개 구역의 이름을 AI로 다시 읽어오시겠습니까?\n기존 이름은 덮어쓰여집니다.`);
-    if (!confirmRun) return;
+    const confirmRun = confirm(`현재 ${targetZones.length}개 구역의 이름을 AI로 다시 읽어오시겠습니까?\n기존 이름은 덮어쓰여집니다.`);
+    if (!confirmRun) return null;
 
     try {
-      const updatedPins = await recognizeZoneNames(targetFile, pins);
-      // Use handleBatchSave to sync names to all DB locations
-      await handleBatchSave(updatedPins);
+      const updatedPins = await recognizeZoneNames(targetFile, targetZones);
       alert("이름 추출이 완료되었습니다. 결과가 마음에 들지 않으면 목록에서 수정해주세요.");
+      return updatedPins;
     } catch (error) {
       alert("이름 추출 실패: " + (error as Error).message);
+      return null;
     }
   };
 
@@ -691,7 +692,7 @@ export default function Home() {
             zones={pins}
             onClose={() => setShowNameModal(false)}
             onSave={handleBatchSave}
-            onAutoDetect={() => handleAutoNameZones(false)}
+            onAutoDetect={handleAutoNameZones}
             isScanning={isScanning}
           />
           <DeleteConfirmModal
