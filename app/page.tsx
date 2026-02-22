@@ -78,37 +78,49 @@ export default function Home() {
     }
 
     const loadMapData = async () => {
-      setIsLoadingMap(true);
+      const cacheKey = `map_cache_${currentMapId}`;
+      const cachedStr = typeof window !== 'undefined' ? localStorage.getItem(cacheKey) : null;
+
+      // 1. Try Cache First for Speed
+      if (cachedStr) {
+        try {
+          const cached = JSON.parse(cachedStr);
+          if (cached.image) {
+            setMapImage(cached.image);
+            setIsMapLoading(true);
+            setIsLoadingMap(false); // Immediate render
+          }
+        } catch (e) { }
+      } else {
+        setIsLoadingMap(true);
+      }
+
       try {
-        const { mapImage: serverImage, zones: serverZones } = await fetchMapConfiguration(currentMapId);
+        const { mapImage: serverImage, zones: serverZones, updatedAt: serverUpdatedAt } = await fetchMapConfiguration(currentMapId);
         const { devices: serverDevices, deviceInstances: serverInstances } = await fetchAssetData();
         const serverMapList = await fetchMapList();
 
         setMapList(serverMapList);
 
-        // localStorage logic removed to prevent data leak between accounts
-        const imageToLoad = serverImage;
-
-        // If there's an image, wait for it to load before hiding spinner
-        if (imageToLoad) {
-          setMapImage(imageToLoad);
-          setIsMapLoading(true); // Trigger visual loading (waits for AssetMapViewer onLoad)
+        if (serverImage) {
+          // Update cache if server image is present
+          localStorage.setItem(cacheKey, JSON.stringify({ image: serverImage, updatedAt: serverUpdatedAt }));
+          setMapImage(serverImage);
+          setIsMapLoading(true);
         } else {
+          // If server says no image, clear cache
+          localStorage.removeItem(cacheKey);
           setMapImage(undefined);
           setIsMapLoading(false);
         }
 
-        setIsLoadingMap(false); // Data fetch done, allow rendering
-
+        setIsLoadingMap(false);
         if (serverZones) setPins(serverZones);
         else setPins([]);
-
         if (serverDevices) setDevices(serverDevices);
         else setDevices([]);
-
         if (serverInstances) setDeviceInstances(serverInstances);
         else setDeviceInstances([]);
-
       } catch (error) {
         console.error('Failed to load map data:', error);
         setIsLoadingMap(false);
@@ -122,12 +134,14 @@ export default function Home() {
     const reader = new FileReader();
     reader.onloadend = () => {
       const base64String = reader.result as string;
-      // localStorage removed
       setMapImage(base64String);
-      // Ensure we have the map image
-      const currentImage = base64String;
+
+      // Update cache immediately
+      const cacheKey = `map_cache_${currentMapId}`;
+      localStorage.setItem(cacheKey, JSON.stringify({ image: base64String, updatedAt: new Date().toISOString() }));
+
       console.log(`[Client] Saving Image...`);
-      saveMapConfiguration(currentImage, pins, currentMapId)
+      saveMapConfiguration(base64String, pins, currentMapId)
         .then(res => console.log('[Client] Server Save Result:', res));
     };
     reader.readAsDataURL(file);
@@ -135,8 +149,17 @@ export default function Home() {
 
   const savePins = async (newPins: Location[]) => {
     setPins(newPins);
-    // Don't auto-save to server during rapid edits, but we do here for simplicity
-    // or we could add a "Save Changes" button. Let's sync with server.
+    // Sync to cache to keep UI consistent during fast navigation
+    if (mapImage) {
+      const cacheKey = `map_cache_${currentMapId}`;
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        try {
+          const data = JSON.parse(cached);
+          localStorage.setItem(cacheKey, JSON.stringify({ ...data, updatedAt: new Date().toISOString() }));
+        } catch (e) { }
+      }
+    }
     await saveMapConfiguration(mapImage || null, newPins, currentMapId);
   };
 
@@ -316,13 +339,21 @@ export default function Home() {
 
   const handleDeleteMap = async () => {
     if (currentMapId === 'default') {
-      alert("기본 배치도는 삭제할 수 없습니다. 이미지를 변경하거나 구역을 수정해주세요.");
+      if (confirm("기본 배치도의 이미지와 구역 설정을 초기화하시겠습니까?")) {
+        setIsLoadingMessage('초기화 중...');
+        await saveMapConfiguration(null, [], 'default');
+        setMapImage(undefined);
+        setPins([]);
+        localStorage.removeItem(`map_cache_default`);
+        setIsLoadingMessage(null);
+      }
       return;
     }
     if (confirm(`'${currentMapId}' 배치도를 정말 삭제하시겠습니까?\n해당 층의 모든 구역 정보와 이미지가 삭제됩니다.`)) {
       setIsLoadingMessage('배치도 삭제 중...');
       const res = await deleteMap(currentMapId);
       if (res.success) {
+        localStorage.removeItem(`map_cache_${currentMapId}`);
         setCurrentMapId('default');
         const newList = await fetchMapList();
         setMapList(newList);
@@ -398,23 +429,58 @@ export default function Home() {
           학교 배치도 (Main Campus)
         </h1>
         <div className="flex flex-wrap items-center w-full gap-2">
+          {/* Always Visible: Floor Selector */}
+          <div className="relative shrink-0">
+            <button
+              onClick={() => setShowMapSwitcher(!showMapSwitcher)}
+              className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-md transition-all active:scale-95"
+            >
+              <Layers className="w-4 h-4" />
+              <span className="font-bold text-sm">{currentMapId === 'default' ? '기본 배치도' : currentMapId}</span>
+              <ChevronDown className={`w-3 h-3 transition-transform ${showMapSwitcher ? 'rotate-180' : ''}`} />
+            </button>
+
+            {showMapSwitcher && (
+              <div className="absolute top-full left-0 mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl shadow-2xl z-[70] py-2 overflow-hidden shadow-blue-500/10">
+                {mapList.map(m => (
+                  <button
+                    key={m}
+                    onClick={() => { setCurrentMapId(m); setShowMapSwitcher(false); }}
+                    className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center justify-between group ${currentMapId === m ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 font-bold' : 'text-gray-700 dark:text-gray-300'}`}
+                  >
+                    {m === 'default' ? '기본 배치도' : m}
+                    {currentMapId === m && <Check className="w-4 h-4" />}
+                  </button>
+                ))}
+                <div className="border-t border-gray-100 dark:border-gray-700 my-1" />
+                <button
+                  onClick={() => { handleAddFloor(); setShowMapSwitcher(false); }}
+                  className="w-full px-4 py-2.5 text-left text-sm text-blue-600 font-bold hover:bg-blue-50 dark:hover:bg-blue-900/20 flex items-center gap-2"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  새 배치도 추가
+                </button>
+              </div>
+            )}
+          </div>
+
           {isScanning ? (
-            <div className="flex items-center gap-2 px-4 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium animate-pulse">
+            <div className="flex items-center gap-2 px-4 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium animate-pulse ml-2">
               <Loader2 className="w-4 h-4 animate-spin" />
               {statusText}
             </div>
           ) : mapImage ? (
-            <div className="flex flex-wrap items-center justify-end w-full gap-2">
-              {/* 1. AI Structure Detection */}
+            <div className="flex flex-wrap items-center justify-end flex-1 gap-2">
+              {/* 1. AI Recognition */}
               <button
                 onClick={handleAIScan}
                 className="flex items-center gap-2 px-3 py-1.5 bg-violet-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-violet-700 transition-colors whitespace-nowrap"
               >
                 <ScanSearch className="w-4 h-4" />
-                1. AI 구역 인식
+                AI 구역 인식
               </button>
 
-              {/* 2. Edit Mode Toggle */}
+              {/* 2. Edit Mode */}
               <button
                 onClick={() => {
                   setIsEditing(!isEditing);
@@ -425,101 +491,34 @@ export default function Home() {
                   : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-amber-50 dark:hover:bg-amber-900/10 hover:border-amber-200'
                   }`}
               >
-                {isEditing ? (
-                  <>
-                    <Check className="w-4 h-4" />
-                    2. 편집 완료
-                  </>
-                ) : (
-                  <>
-                    <Edit3 className="w-4 h-4" />
-                    2. 구역 편집
-                  </>
-                )}
+                {isEditing ? <><Check className="w-4 h-4" /> 편집 완료</> : <><Edit3 className="w-4 h-4" /> 구역 편집</>}
               </button>
 
-              {/* 3. Name Management */}
+              {/* 3. Name Mgmt */}
               <button
                 onClick={() => setShowNameModal(true)}
                 className="flex items-center gap-2 px-3 py-1.5 bg-teal-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-teal-700 transition-colors whitespace-nowrap"
               >
                 <Settings className="w-4 h-4" />
-                3. 이름 관리
+                이름 관리
               </button>
 
-              {/* 4. Floor Management & Selector */}
-              <div className="relative shrink-0">
-                <button
-                  onClick={() => setShowMapSwitcher(!showMapSwitcher)}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800 rounded-lg hover:bg-blue-100 transition-colors shadow-sm"
-                >
-                  <Layers className="w-4 h-4" />
-                  <span className="font-bold text-sm">{currentMapId === 'default' ? '기본 배치도' : currentMapId}</span>
-                  <ChevronDown className={`w-3 h-3 transition-transform ${showMapSwitcher ? 'rotate-180' : ''}`} />
-                </button>
-
-                {showMapSwitcher && (
-                  <div className="absolute top-full left-0 mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl shadow-2xl z-[70] py-2 overflow-hidden shadow-blue-500/10">
-                    {mapList.map(m => (
-                      <button
-                        key={m}
-                        onClick={() => { setCurrentMapId(m); setShowMapSwitcher(false); }}
-                        className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center justify-between group ${currentMapId === m ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 font-bold' : 'text-gray-700 dark:text-gray-300'}`}
-                      >
-                        {m === 'default' ? '기본 배치도' : m}
-                        {currentMapId === m && <Check className="w-4 h-4" />}
-                      </button>
-                    ))}
-                    <div className="border-t border-gray-100 dark:border-gray-700 my-1" />
-                    <button
-                      onClick={() => { handleAddFloor(); setShowMapSwitcher(false); }}
-                      className="w-full px-4 py-2.5 text-left text-sm text-blue-600 font-bold hover:bg-blue-50 dark:hover:bg-blue-900/20 flex items-center gap-2"
-                    >
-                      <PlusCircle className="w-4 h-4" />
-                      새 배치도 추가
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Selection Actions (Only in Edit Mode) */}
-              {isEditing && selectedZoneIds.size > 0 && (
-                <button
-                  onClick={deleteSelectedZones}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-red-100 text-red-600 text-sm font-medium rounded-lg hover:bg-red-200 transition-colors animate-in fade-in whitespace-nowrap border border-red-200"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  선택 삭제 ({selectedZoneIds.size})
-                </button>
-              )}
-
-              {isEditing && (
-                <button
-                  onClick={handleSelectAll}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 text-sm font-medium rounded-lg hover:bg-blue-100 transition-colors whitespace-nowrap border border-blue-200"
-                >
-                  <CheckSquare className="w-4 h-4" />
-                  전체 선택
-                </button>
-              )}
-
-              {/* 5. Delete Current Floor Map */}
-              {currentMapId !== 'default' && (
-                <button
-                  onClick={handleDeleteMap}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-gray-800 text-red-500 border border-red-200 dark:border-red-800 text-sm font-medium rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors whitespace-nowrap"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  층 삭제
-                </button>
-              )}
+              {/* 4. Delete/Reset */}
+              <button
+                onClick={handleDeleteMap}
+                className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-gray-800 text-red-500 border border-red-200 dark:border-red-800 text-sm font-medium rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors whitespace-nowrap"
+              >
+                <Trash2 className="w-4 h-4" />
+                {currentMapId === 'default' ? '이미지 초기화' : '층 삭제'}
+              </button>
             </div>
           ) : (
-            <div className="ml-auto">
+            <div className="flex items-center gap-2 ml-auto">
               <button
                 onClick={() => uploaderRef.current?.open()}
-                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors shadow-sm text-sm font-medium"
+                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm text-sm font-bold flex items-center gap-2"
               >
+                <ImageIcon className="w-4 h-4" />
                 배치도 업로드
               </button>
             </div>

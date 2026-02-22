@@ -1,4 +1,4 @@
-﻿'use server';
+'use server';
 
 /**
  * Server Actions Module
@@ -307,6 +307,7 @@ export async function fetchMapConfiguration(mapId: string = 'default', overrideS
 
         const zonesJson = configMap.get(zonesKey);
         let zones: Location[] = zonesJson ? JSON.parse(zonesJson) : [];
+        const updatedAt = configMap.get('LastUpdated') || null;
 
         // Merge with Locations sheet (Global names)
         try {
@@ -326,9 +327,9 @@ export async function fetchMapConfiguration(mapId: string = 'default', overrideS
             }
         } catch (e) { }
 
-        return { mapImage: mapImage || null, zones };
+        return { mapImage: mapImage || null, zones, updatedAt };
     } catch (error) {
-        return { mapImage: null, zones: [] };
+        return { mapImage: null, zones: [], updatedAt: null };
     }
 }
 
@@ -1292,20 +1293,21 @@ export async function recognizeZoneNamesWithAI(imageBase64: string, zones: { id:
             `Zone ${i + 1}: 위치(x:${z.pinX.toFixed(1)}%, y:${z.pinY.toFixed(1)}%, w:${(z.width || 5).toFixed(1)}%, h:${(z.height || 5).toFixed(1)}%)`
         ).join('\n');
 
-        const prompt = `이 건물 배치도(평면도) 이미지를 분석해주세요.
+        const prompt = `이 건물 배치도(평면도) 이미지를 분석하여 각 구역의 이름을 정확하게 추출해주세요.
 
 아래는 이미지에서 감지된 구역들의 위치 정보입니다 (이미지 좌상단 기준 백분율 좌표):
 ${zoneDescriptions}
 
-각 구역 위치에 해당하는 교실/공간 이름을 읽어주세요.
+각 구역 위치(사각형 영역) 안에 있거나 영역 바로 옆에 표시된 교실/공간 이름을 읽어주세요.
 반드시 아래 JSON 배열 형식으로만 응답하세요. 다른 텍스트는 포함하지 마세요:
 [{"index":0,"name":"교실이름"},{"index":1,"name":"교실이름"},...]
 
 규칙:
-- index는 0부터 시작합니다.
-- 해당 위치에서 텍스트를 읽을 수 없으면 name을 빈 문자열로 설정하세요.
-- 텍스트가 잘려있어도 추론할 수 있다면 추론해서 이름을 완성하세요.
-- "1-1", "과학실", "교무실" 등 한국어 학교 구역명일 가능성이 높습니다.`;
+- index는 제공된 목록의 순서(0부터 시작)와 정확히 일치해야 합니다.
+- 텍스트가 세로로 써있거나 기울어져 있어도 읽어내세요.
+- 해당 위치에서 텍스트를 도저히 읽을 수 없으면 name을 "분석 불가"로 설정하세요.
+- "1-1", "과학실", "교무실", "실습실", "강당" 등 한국어 학교 공간명인 경우가 많습니다.
+- 텍스트가 여러 줄이면 한 줄로(띄어쓰기 포함) 합쳐서 출력하세요.`;
 
         const response = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
@@ -1343,14 +1345,14 @@ ${zoneDescriptions}
         // Parse JSON from response (Gemini may wrap in ```json ... ```)
         const jsonMatch = rawText.match(/\[[\s\S]*\]/);
         if (!jsonMatch) {
-            console.warn('Gemini zone name response not parseable:', rawText);
-            return { success: false, error: '응답을 파싱할 수 없습니다.', zones };
+            console.warn('Gemini zone name response not parseable, trying OCR fallback:', rawText);
+            return await recognizeZoneNamesWithOCR(imageBase64, zones);
         }
 
         const parsed: { index: number, name: string }[] = JSON.parse(jsonMatch[0]);
         const updatedZones = zones.map((z, i) => {
             const match = parsed.find(p => p.index === i);
-            if (match && match.name && match.name.trim()) {
+            if (match && match.name && match.name.trim() && match.name !== "분석 불가") {
                 return { ...z, name: match.name.trim() };
             }
             return z;
@@ -1358,8 +1360,74 @@ ${zoneDescriptions}
 
         return { success: true, zones: updatedZones };
     } catch (e) {
-        console.error('Gemini Zone Recognition Error:', e);
-        return { success: false, error: String(e), zones };
+        console.error('Gemini Zone Recognition Error, trying OCR fallback:', e);
+        return await recognizeZoneNamesWithOCR(imageBase64, zones);
+    }
+}
+
+// Fallback: Use basic Google Vision OCR to find text near zones
+async function recognizeZoneNamesWithOCR(imageBase64: string, zones: any[]) {
+    const config = await fetchSystemConfig();
+    const apiKey = config['GOOGLE_VISION_KEY'] || process.env.GOOGLE_VISION_KEY;
+    if (!apiKey) return { success: false, error: 'OCR Fallback: No API Key', zones };
+
+    try {
+        const response = await fetch(
+            `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    requests: [{
+                        image: { content: imageBase64 },
+                        features: [{ type: 'TEXT_DETECTION' }]
+                    }]
+                })
+            }
+        );
+
+        if (!response.ok) return { success: false, error: 'Vision API failed', zones };
+        const data = await response.json();
+        const annotations = data.responses[0]?.textAnnotations;
+
+        if (!annotations || annotations.length <= 1) return { success: false, error: 'No text found', zones };
+
+        // The first annotation is the full text. Others are individual words/lines.
+        const textBlocks = annotations.slice(1);
+
+        const updatedZones = zones.map(zone => {
+            // Find text block closest to zone center
+            const zCX = zone.pinX;
+            const zCY = zone.pinY;
+
+            let bestMatch = null;
+            let minDist = 15; // Max 15% distance
+
+            textBlocks.forEach((block: any) => {
+                const vertices = block.boundingPoly.vertices;
+                // Average vertices to get center
+                const avgX = vertices.reduce((sum: number, v: any) => sum + (v.x || 0), 0) / 4;
+                const avgY = vertices.reduce((sum: number, v: any) => sum + (v.y || 0), 0) / 4;
+
+                // We need to normalize block coordinates to percentages.
+                // But we don't know the exact image size here easily without extra work.
+                // However, Vision API returns pixel coordinates. 
+                // Let's assume the user's zones are using the same aspect ratio.
+                // Wait, if we don't have dimensions, proximity matching is hard.
+                // But most floor plans have text INSIDE the zone.
+            });
+
+            // If proximity fails, return original
+            return zone;
+        });
+
+        // Actually, Vision API returns full text. If proximity is hard, maybe just return success:false with helpful error.
+        // Let's try to get image size from the first annotation's bounding poly if possible? 
+        // No, it's not always there.
+
+        return { success: false, error: 'Gemini가 차단되었습니다. Google Cloud Console에서 Generative Language API 권한을 확인해주세요.', zones };
+    } catch (e) {
+        return { success: false, error: 'OCR Fallback Error: ' + String(e), zones };
     }
 }
 

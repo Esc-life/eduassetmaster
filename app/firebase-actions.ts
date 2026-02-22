@@ -361,8 +361,13 @@ export async function fetchMapConfiguration(config: any, mapId: string = 'defaul
         const zoneKey = mapId === 'default' ? "MapZones" : `MapZones_${mapId}`;
         const zoneDoc = await getDoc(doc(db, "SystemConfig", zoneKey));
         let zones: any[] = [];
-        if (zoneDoc.exists() && zoneDoc.data().json) {
-            try { zones = JSON.parse(zoneDoc.data().json); } catch (e) { }
+        let updatedAt = null;
+        if (zoneDoc.exists()) {
+            const data = zoneDoc.data();
+            if (data.json) {
+                try { zones = JSON.parse(data.json); } catch (e) { }
+            }
+            updatedAt = data.updatedAt || null;
         }
 
         // Merge with Locations collection
@@ -400,10 +405,10 @@ export async function fetchMapConfiguration(config: any, mapId: string = 'defaul
             }
         }
 
-        return { mapImage, zones };
+        return { mapImage, zones, updatedAt };
     } catch (e) {
         console.error("Firebase Map Config Error", e);
-        return { mapImage: null, zones: [] };
+        return { mapImage: null, zones: [], updatedAt: null };
     }
 }
 
