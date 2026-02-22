@@ -32,6 +32,7 @@ export default function Home() {
   const [editDevice, setEditDevice] = useState<Device | null>(null); // For editing
   const [isLoadingMap, setIsLoadingMap] = useState(true); // Server Data Fetching
   const [isMapLoading, setIsMapLoading] = useState(false); // Image Rendering
+  const [isSyncingZones, setIsSyncingZones] = useState(false); // Zone Data Syncing
   const [isLoadingMessage, setIsLoadingMessage] = useState<string | null>(null);
   const [showDeleteMapModal, setShowDeleteMapModal] = useState(false);
   const [mapList, setMapList] = useState<string[]>(['default']);
@@ -95,6 +96,8 @@ export default function Home() {
         setIsLoadingMap(true);
       }
 
+      setIsSyncingZones(true);
+
       try {
         const { mapImage: serverImage, zones: serverZones, updatedAt: serverUpdatedAt } = await fetchMapConfiguration(currentMapId);
         const { devices: serverDevices, deviceInstances: serverInstances } = await fetchAssetData();
@@ -128,6 +131,8 @@ export default function Home() {
       } catch (error) {
         console.error('Failed to load map data:', error);
         setIsLoadingMap(false);
+      } finally {
+        setIsSyncingZones(false);
       }
     };
     loadMapData();
@@ -607,6 +612,16 @@ export default function Home() {
                   {isLoadingMessage || (isLoadingMap ? '배치도 데이터를 불러오는 중...' : '이미지 렌더링 중...')}
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">잠시만 기다려주세요</p>
+              </div>
+            </div>
+          )}
+
+          {/* Subtle Zone Loading Overlay (Semi-transparent black filter) */}
+          {!isLoadingMap && !isMapLoading && !isLoadingMessage && isSyncingZones && (
+            <div className="absolute inset-0 bg-black/10 dark:bg-black/30 z-40 flex items-center justify-center animate-in fade-in duration-300">
+              <div className="bg-white/90 dark:bg-gray-800/90 px-5 py-2.5 rounded-full shadow-lg flex items-center gap-3 border border-gray-100 dark:border-gray-700">
+                <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+                <span className="text-sm font-semibold text-gray-800 dark:text-gray-100 italic">구역 데이터를 불러오는 중입니다...</span>
               </div>
             </div>
           )}
