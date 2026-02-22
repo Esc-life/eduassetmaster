@@ -1340,7 +1340,7 @@ export async function processScannedImage(imageBase64: string, locationName: str
                     contents: [{
                         parts: [
                             {
-                                text: '이 이미지에서 보이는 모든 텍스트를 정확하게 추출해주세요. 모델명, 관리번호, 일련번호 등이 포함될 수 있습니다. 텍스트만 줄바꿈으로 구분하여 출력해주세요. 추가 설명이나 마크다운 형식은 사용하지 마세요.'
+                                text: '이 이미지에서 보이는 모든 텍스트를 정확하게 추출해주세요. 물품목록번호(ID), 모델명, 취득일(YYYY-MM-DD), 단가, 취득금액 등이 포함될 수 있습니다. 텍스트만 줄바꿈으로 구분하여 출력해주세요. 추가 설명이나 마크다운 형식은 사용하지 마세요.'
                             },
                             {
                                 inlineData: {
@@ -1381,11 +1381,12 @@ export async function processScannedImage(imageBase64: string, locationName: str
             return { success: false, error: '매칭할 기기 데이터가 없습니다. 엑셀 데이터를 먼저 확인해주세요.', text: fullText };
         }
 
-        // 3. Smart Matching Logic
+        // 3. Smart Matching Logic (Scoring based)
         // Clean text: Remove ALL non-alphanumeric chars (including hyphens, underscores) to handle OCR errors better
         const normalize = (s: string) => s.replace(/[^a-zA-Z0-9가-힣]/g, '').toUpperCase();
         const cleanText = normalize(fullText);
-        let matchedDevice: Device | null = null;
+
+        let candidates: { device: Device, score: number }[] = [];
 
         for (const device of devices) {
             if (!device) continue;
@@ -1399,32 +1400,100 @@ export async function processScannedImage(imageBase64: string, locationName: str
                 targets.push(device.name);
             }
 
+            let isPrimaryMatch = false;
             for (const target of targets) {
                 if (!target || target.length < 5) continue;
-
                 const cleanTarget = normalize(target);
                 // Ensure target is robust enough after normalization
                 if (cleanTarget.length >= 5 && cleanText.includes(cleanTarget)) {
-                    matchedDevice = device;
+                    isPrimaryMatch = true;
                     break;
                 }
             }
 
-            if (matchedDevice) break;
+            if (isPrimaryMatch) {
+                // If we found a base match, give it 100 points
+                let score = 100;
+
+                // Add points for secondary metadata found in the image text
+                if (device.purchaseDate && device.purchaseDate.length >= 4) {
+                    const cleanDate = normalize(device.purchaseDate);
+                    if (cleanText.includes(cleanDate)) score += 20;
+                }
+
+                if (device.unitPrice && String(device.unitPrice).length >= 3) {
+                    const cleanPrice = normalize(String(device.unitPrice));
+                    if (cleanText.includes(cleanPrice)) score += 10;
+                }
+
+                if (device.totalAmount && String(device.totalAmount).length >= 3) {
+                    const cleanTotal = normalize(String(device.totalAmount));
+                    if (cleanText.includes(cleanTotal)) score += 10;
+                }
+
+                candidates.push({ device, score });
+            }
         }
 
+        // Sort candidates by highest score descending
+        candidates.sort((a, b) => b.score - a.score);
+        const matchedDevice = candidates.length > 0 ? candidates[0].device : null;
+
         if (matchedDevice) {
-            // 4. Update Location
-            if (matchedDevice.installLocation === locationName) {
-                return { success: true, message: '이미 해당 장소에 등록된 기기입니다.', device: matchedDevice, text: fullText };
+            // 4. Distribute Location (Only 1 item moved to the scanned location)
+            const totalQty = matchedDevice.quantity ? Number(matchedDevice.quantity) : 1;
+            const currentInstances = await getDeviceInstances(matchedDevice.id, overrideSheetId);
+
+            let found = false;
+            let sumQty = 0;
+            const newDistributions: { locationName: string, quantity: number }[] = [];
+
+            for (const inst of currentInstances) {
+                let qty = inst.quantity;
+                if (inst.locationName === locationName) {
+                    qty += 1;
+                    found = true;
+                }
+                newDistributions.push({ locationName: inst.locationName, quantity: qty });
+                sumQty += qty;
             }
 
-            // We use updateDevice which handles DeviceInstance sync internally now!
-            await updateDevice(matchedDevice.id, { installLocation: locationName }, overrideSheetId);
+            if (!found) {
+                newDistributions.push({ locationName, quantity: 1 });
+                sumQty += 1;
+            }
+
+            const oldLocation = matchedDevice.installLocation;
+            if (currentInstances.length === 0 && oldLocation && oldLocation !== locationName) {
+                // Device was never distributed, all items were at the old location
+                const remainQty = totalQty - 1;
+                if (remainQty > 0) {
+                    newDistributions.unshift({ locationName: oldLocation, quantity: remainQty });
+                    sumQty += remainQty;
+                }
+            } else if (currentInstances.length > 0 && sumQty > totalQty) {
+                // If adding 1 exceeds the master quantity, subtract 1 from the largest other location
+                const others = newDistributions.filter(d => d.locationName !== locationName);
+                others.sort((a, b) => b.quantity - a.quantity);
+                if (others.length > 0 && others[0].quantity > 0) {
+                    others[0].quantity -= 1;
+                    sumQty -= 1;
+                }
+            }
+
+            const finalDistributions = newDistributions.filter(d => d.quantity > 0);
+            const newTotalQty = Math.max(totalQty, sumQty);
+
+            await updateDeviceWithDistribution(
+                matchedDevice.id,
+                { quantity: newTotalQty },
+                finalDistributions,
+                overrideSheetId
+            );
 
             return {
                 success: true,
-                message: '기기 위치가 업데이트되었습니다.',
+                message: '기기(1개)가 스캔된 장소에 추가로 배치되었습니다.',
                 device: matchedDevice,
                 text: fullText
             };
@@ -1767,14 +1836,14 @@ export async function syncDeviceLocationString(deviceId: string, sheetId: string
     }
 }
 
-export async function getDeviceInstances(deviceId: string) {
+export async function getDeviceInstances(deviceId: string, overrideSheetId?: string): Promise<any[]> {
     // 0. Check Firebase Mode
     const appConfig = await _getAppConfig();
     if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
         return await fbActions.getDeviceInstances(appConfig.firebase, deviceId);
     }
 
-    const sheetId = await getUserSheetId();
+    const sheetId = overrideSheetId || await getUserSheetId();
     if (sheetId === 'NO_SHEET') return [];
 
     try {
@@ -1799,7 +1868,8 @@ export async function getDeviceInstances(deviceId: string) {
 export async function updateDeviceWithDistribution(
     deviceId: string,
     deviceUpdates: Partial<Device>,
-    distributions: { locationId?: string, locationName: string, quantity: number }[]
+    distributions: { locationId?: string, locationName: string, quantity: number }[],
+    overrideSheetId?: string
 ) {
     // 0. Check Firebase Mode
     const appConfig = await _getAppConfig();
@@ -1807,7 +1877,7 @@ export async function updateDeviceWithDistribution(
         return await fbActions.updateDeviceWithDistribution(appConfig.firebase, deviceId, deviceUpdates, distributions);
     }
 
-    const sheetId = await getUserSheetId();
+    const sheetId = overrideSheetId || await getUserSheetId();
     if (sheetId === 'NO_SHEET') return { success: false, error: 'No Sheet' };
 
     try {
