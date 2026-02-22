@@ -2428,3 +2428,28 @@ export async function batchUpdateZoneNames(changes: { zoneId: string, oldName: s
     }
 }
 
+/**
+ * Registration Helpers (Unauthenticated)
+ */
+
+export async function getSystemEmail() {
+    return {
+        email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || '설정되지 않음'
+    };
+}
+
+export async function verifySpreadsheetAccess(spreadsheetId: string) {
+    if (!spreadsheetId) return { success: false, error: '시트 ID가 없습니다.' };
+
+    const { initializeUserSheet } = await import('@/lib/google-sheets');
+    try {
+        await initializeUserSheet(spreadsheetId);
+        return { success: true };
+    } catch (e: any) {
+        if (e.message === 'PERMISSION_DENIED') {
+            return { success: false, error: 'PERMISSION_DENIED', systemEmail: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL };
+        }
+        return { success: false, error: String(e) };
+    }
+}
+
