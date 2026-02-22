@@ -391,6 +391,9 @@ export default function RegisterPage() {
                             <p className="mt-1 text-xs text-gray-500">
                                 경로: <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">Google Cloud Console</a> &gt; 사용자 인증 정보 &gt; API 키 만들기
                             </p>
+                            <div className="mt-2 bg-blue-50 dark:bg-blue-900/20 p-2 rounded border border-blue-200 dark:border-blue-800 text-[10px] text-blue-800 dark:text-blue-200">
+                                <strong>💡 필수 설정:</strong> API 키 생성 후, <a href="https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com" target="_blank" rel="noreferrer" className="underline font-bold">Generative Language API</a>를 반드시 '사용 설정' 해야 AI 기능이 작동합니다.
+                            </div>
                         </div>
                     </div>
 

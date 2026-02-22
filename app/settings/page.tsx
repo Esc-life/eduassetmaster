@@ -48,8 +48,13 @@ function GuideModal({ onClose }: { onClose: () => void }) {
                         <li>이곳 설정 페이지 입력창에 붙여넣기</li>
                     </ol>
 
-                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 text-xs text-gray-500">
-                        * <strong>Cloud Vision API</strong>가 '사용 설정' 되어 있어야 합니다. (라이브러리 메뉴에서 검색)
+                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 text-xs text-gray-500 space-y-2">
+                        <p>
+                            * <strong>Generative Language API</strong>(Gemini)가 반드시 &apos;사용 설정&apos; 되어 있어야 합니다.
+                        </p>
+                        <a href="https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com" target="_blank" className="text-purple-600 hover:underline flex items-center gap-1 font-bold">
+                            API 활성화 페이지 바로가기 <ExternalLink className="w-3 h-3" />
+                        </a>
                     </div>
                 </div>
 
