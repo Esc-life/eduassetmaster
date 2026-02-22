@@ -269,12 +269,12 @@ export async function fetchMapConfiguration(mapId: string = 'default', overrideS
 
     const sheetId = overrideSheetId || appConfig?.sheet?.spreadsheetId || await getUserSheetId();
 
-    if (sheetId === 'NO_SHEET') return { mapImage: null, zones: [] };
-    if (isGlobalMockMode && !sheetId) return { mapImage: null, zones: [] };
+    if (sheetId === 'NO_SHEET') return { mapImage: null, zones: [], updatedAt: null };
+    if (isGlobalMockMode && !sheetId) return { mapImage: null, zones: [], updatedAt: null };
 
     try {
         const rows = await getData('Config!A1:B2000', sheetId);
-        if (!rows || rows.length === 0) return { mapImage: null, zones: [] };
+        if (!rows || rows.length === 0) return { mapImage: null, zones: [], updatedAt: null };
 
         const configMap = new Map<string, string>();
         rows.forEach((row: any[]) => {
