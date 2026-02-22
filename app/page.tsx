@@ -494,6 +494,28 @@ export default function Home() {
                 {isEditing ? <><Check className="w-4 h-4" /> 편집 완료</> : <><Edit3 className="w-4 h-4" /> 구역 편집</>}
               </button>
 
+              {/* Selection Actions (Only in Edit Mode) */}
+              {isEditing && (
+                <>
+                  <button
+                    onClick={handleSelectAll}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 text-sm font-medium rounded-lg hover:bg-blue-100 transition-colors whitespace-nowrap border border-blue-200"
+                  >
+                    <CheckSquare className="w-4 h-4" />
+                    전체 선택
+                  </button>
+                  {selectedZoneIds.size > 0 && (
+                    <button
+                      onClick={deleteSelectedZones}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-red-100 text-red-600 text-sm font-medium rounded-lg hover:bg-red-200 transition-colors animate-in fade-in whitespace-nowrap border border-red-200"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      선택 삭제 ({selectedZoneIds.size})
+                    </button>
+                  )}
+                </>
+              )}
+
               {/* 3. Name Mgmt */}
               <button
                 onClick={() => setShowNameModal(true)}
@@ -771,6 +793,6 @@ export default function Home() {
           </div>
         </div>
       </div>
-    </div>
+    </div >
   );
 }
