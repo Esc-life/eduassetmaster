@@ -834,3 +834,31 @@ export async function importBulkData(config: any, data: {
     }
 }
 
+/**
+ * Update multiple zone names at once (Firebase version)
+ */
+export async function batchUpdateZoneNames(config: any, changes: { zoneId: string, oldName: string, newName: string }[]) {
+    const db = getFirebaseStore(config);
+    const batch = writeBatch(db);
+
+    try {
+        for (const change of changes) {
+            // 1. Update Locations
+            batch.update(doc(db, "Locations", change.zoneId), { name: change.newName });
+
+            // 2. Update DeviceInstances (Needs querying first since we don't have all IDs)
+            const instQ = query(collection(db, "DeviceInstances"), where("locationId", "==", change.zoneId));
+            const instSnap = await getDocs(instQ);
+            instSnap.docs.forEach(d => {
+                batch.update(doc(db, "DeviceInstances", d.id), { locationName: change.newName });
+            });
+        }
+
+        await batch.commit();
+        return { success: true };
+    } catch (e) {
+        console.error('Firebase batch update failed:', e);
+        return { success: false, error: String(e) };
+    }
+}
+

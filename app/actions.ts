@@ -29,7 +29,8 @@ import {
     updateData as baseUpdateData,
     appendData as baseAppendData,
     addSheet as baseAddSheet,
-    clearData as baseClearData
+    clearData as baseClearData,
+    batchUpdateData as baseBatchUpdateData
 } from '@/lib/google-sheets';
 import { MOCK_DEVICES, MOCK_SOFTWARE, MOCK_CREDENTIALS } from '@/lib/mock-data';
 import { Device, Software, Credential, Location, DeviceInstance } from '@/types';
@@ -88,6 +89,12 @@ const updateData = async (range: string, values: any[][], sheetId?: string) => {
     const targetId = sheetId || await getUserSheetId();
     const creds = await _getSheetsCredentials(targetId);
     return baseUpdateData(range, values, targetId, creds);
+};
+
+const batchUpdateData = async (data: { range: string, values: any[][] }[], sheetId?: string) => {
+    const targetId = sheetId || await getUserSheetId();
+    const creds = await _getSheetsCredentials(targetId);
+    return baseBatchUpdateData(data, targetId, creds);
 };
 
 const appendData = async (range: string, values: any[][], sheetId?: string) => {
@@ -2301,6 +2308,85 @@ export async function importAllData(backup: any) {
         return { success: true };
     } catch (e) {
         console.error('Import Error:', e);
+        return { success: false, error: String(e) };
+    }
+}
+
+/**
+ * Batch Update Zone Names for High Performance
+ */
+export async function batchUpdateZoneNames(changes: { zoneId: string, oldName: string, newName: string }[]) {
+    if (changes.length === 0) return { success: true };
+
+    console.log(`[BatchUpdate] Processing ${changes.length} name changes...`);
+    const appConfig = await _getAppConfig();
+    if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
+        return await fbActions.batchUpdateZoneNames(appConfig.firebase, changes);
+    }
+
+    const sheetId = await getUserSheetId();
+    if (sheetId === 'NO_SHEET') return { success: false, error: '시트가 없습니다.' };
+
+    try {
+        // 1. Prepare Batch Updates for Locations
+        let locRows = null;
+        try { locRows = await getData('Locations!A:C', sheetId); } catch (e) { }
+
+        const locUpdates: { range: string, values: any[][] }[] = [];
+        if (locRows) {
+            changes.forEach(change => {
+                const rowIndex = locRows.findIndex((r: any[]) => r[0] === change.zoneId);
+                if (rowIndex !== -1) {
+                    const updatedRow = [...locRows[rowIndex]];
+                    updatedRow[2] = change.newName;
+                    locUpdates.push({ range: `Locations!A${rowIndex + 1}`, values: [updatedRow] });
+                }
+            });
+        }
+
+        // 2. Prepare Batch Updates for DeviceInstances & Devices
+        const instanceUpdates: { range: string, values: any[][] }[] = [];
+        const deviceUpdates: { range: string, values: any[][] }[] = [];
+
+        try {
+            const instRows = await getData('DeviceInstances!A2:F', sheetId);
+            const devRows = await getData('Devices!A2:R', sheetId);
+
+            if (instRows) {
+                instRows.forEach((row: any[], idx: number) => {
+                    const change = changes.find(c => c.zoneId === row[2] || (c.oldName && row[3] === c.oldName));
+                    if (change) {
+                        const newRow = [...row];
+                        newRow[3] = change.newName;
+                        instanceUpdates.push({ range: `DeviceInstances!A${idx + 2}`, values: [newRow] });
+                    }
+                });
+            }
+
+            if (devRows && instRows) {
+                devRows.forEach((row: any[], idx: number) => {
+                    const devId = row[0];
+                    const zoneIdOfDevice = instRows.find(ir => ir[1] === devId)?.[2];
+                    const change = changes.find(c => c.zoneId === zoneIdOfDevice || c.zoneId === row[6] || (c.oldName && row[13] === c.oldName));
+
+                    if (change) {
+                        const newRow = [...row];
+                        newRow[13] = change.newName;
+                        deviceUpdates.push({ range: `Devices!A${idx + 2}`, values: [newRow] });
+                    }
+                });
+            }
+        } catch (e) { console.warn('Bulk name update sync skipped some steps:', e); }
+
+        // 3. Execute all updates in one batch call
+        const finalBatch = [...locUpdates, ...instanceUpdates, ...deviceUpdates];
+        if (finalBatch.length > 0) {
+            await batchUpdateData(finalBatch, sheetId);
+        }
+
+        return { success: true };
+    } catch (e) {
+        console.error('Batch update failed:', e);
         return { success: false, error: String(e) };
     }
 }

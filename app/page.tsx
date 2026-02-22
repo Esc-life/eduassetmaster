@@ -11,7 +11,7 @@ import { DeleteConfirmModal } from '@/components/devices/DeleteConfirmModal';
 import Link from 'next/link';
 import { Image as ImageIcon, PlusCircle, Check, Trash2, MousePointer2, ScanSearch, Loader2, Save, Minus, RotateCcw, FileSpreadsheet, ScanLine, Edit3, Settings, MoreHorizontal, CheckSquare, Edit } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { fetchMapConfiguration, saveMapConfiguration, syncZonesToSheet, fetchAssetData, updateDevice, createDeviceInstance, deleteDeviceInstance, updateZoneName, fetchMapList, deleteMap } from '@/app/actions';
+import { fetchMapConfiguration, saveMapConfiguration, syncZonesToSheet, fetchAssetData, updateDevice, createDeviceInstance, deleteDeviceInstance, updateZoneName, batchUpdateZoneNames, fetchMapList, deleteMap } from '@/app/actions';
 import { DeviceEditModal } from '@/components/devices/DeviceEditModal';
 import { ZoneEditModal } from '@/components/map/ZoneEditModal';
 import { ZoneBatchEditModal } from '@/components/map/ZoneBatchEditModal';
@@ -306,9 +306,9 @@ export default function Home() {
         }
       });
 
-      // 2. Apply each name change (updates DeviceInstances, Devices, Locations, MapZones JSON)
-      for (const change of nameChanges) {
-        await updateZoneName(change.zoneId, change.oldName, change.newName);
+      // 2. Apply all name changes in one batch (much faster)
+      if (nameChanges.length > 0) {
+        await batchUpdateZoneNames(nameChanges);
       }
 
       // 3. Sync the full zone list to Locations sheet/collection

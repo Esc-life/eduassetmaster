@@ -95,6 +95,34 @@ export async function updateData(range: string, values: any[][], spreadsheetId?:
 }
 
 /**
+ * Update data in multiple ranges in a single call.
+ */
+export async function batchUpdateData(data: { range: string, values: any[][] }[], spreadsheetId?: string, credentials?: any) {
+    try {
+        const sheets = getSheetsClient(credentials);
+        if (!sheets) throw new Error('Google Sheets Client initialization failed');
+
+        const targetSheetId = spreadsheetId || process.env.GOOGLE_SPREADSHEET_ID;
+        if (!targetSheetId) throw new Error('Spreadsheet ID is missing');
+
+        const response = await sheets.spreadsheets.values.batchUpdate({
+            spreadsheetId: targetSheetId,
+            requestBody: {
+                valueInputOption: 'USER_ENTERED',
+                data: data.map(item => ({
+                    range: item.range,
+                    values: item.values
+                }))
+            }
+        });
+        return response.data;
+    } catch (error: any) {
+        console.error('Error in batch update:', error.message);
+        throw error;
+    }
+}
+
+/**
  * Clear data in a specific range.
  */
 export async function clearData(range: string, spreadsheetId?: string, credentials?: any) {
