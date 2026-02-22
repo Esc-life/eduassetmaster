@@ -1795,7 +1795,7 @@ export async function deleteMyAccount() {
     try {
         // 1. Clear all data in user's spreadsheet
         if (sheetId && sheetId !== 'NO_SHEET') {
-            const sheetsToClean = ['Devices', 'DeviceInstances', 'Software', 'Accounts', 'Config', 'Locations', 'Credentials', 'Loans'];
+            const sheetsToClean = ['Devices', 'DeviceInstances', 'Software', 'Accounts', 'Config', 'Locations', 'Credentials', 'Loans', 'SystemConfig'];
             for (const sheet of sheetsToClean) {
                 try { await clearData(`${sheet}!A2:Z`, sheetId); } catch (e) { /* sheet may not exist */ }
             }
@@ -1894,7 +1894,7 @@ export async function importAllData(backup: any) {
         }
 
         // 1. Clear existing data
-        const sheetsToClear = ['Devices', 'DeviceInstances', 'Software', 'Credentials', 'Loans', 'Locations', 'Config'];
+        const sheetsToClear = ['Devices', 'DeviceInstances', 'Software', 'Credentials', 'Loans', 'Locations', 'Config', 'SystemConfig'];
         for (const sheet of sheetsToClear) {
             try { await clearData(`${sheet}!A2:Z`, sheetId); } catch (e) { /* sheet may not exist */ }
         }
@@ -1965,7 +1965,8 @@ export async function importAllData(backup: any) {
 
         // 8. Import SystemConfig (except MapImage chunks)
         if (importData.systemConfig) {
-            try { await addSheet('Config', sheetId); } catch (e) { }
+            try { await addSheet('SystemConfig', sheetId); } catch (e) { }
+            try { await updateData('SystemConfig!A1', [['Key', 'Value']], sheetId); } catch (e) { }
             const configRows: string[][] = [];
             for (const [key, value] of Object.entries(importData.systemConfig)) {
                 if (key && !key.startsWith('MapImage')) {
@@ -1973,7 +1974,7 @@ export async function importAllData(backup: any) {
                 }
             }
             if (configRows.length > 0) {
-                await appendData('Config!A1', configRows, sheetId);
+                await updateData('SystemConfig!A2', configRows, sheetId);
             }
         }
 

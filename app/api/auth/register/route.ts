@@ -16,15 +16,16 @@ export async function POST(req: Request) {
                 // This will throw if we don't have edit access
                 await initializeUserSheet(spreadsheetId);
 
-                // Save Initial Config (Vision Key, Manager Name)
+                // Save Initial Config (Vision Key, Manager Name) to SystemConfig sheet
+                // IMPORTANT: Must use SystemConfig (not Config) because:
+                //   - fetchSystemConfig reads from SystemConfig!A2:B
+                //   - saveMapConfiguration overwrites Config!A1 with map data
                 if (visionApiKey || name) {
                     const configRows = [
                         ['GOOGLE_VISION_KEY', visionApiKey || ''],
                         ['ManagerName', name || '']
                     ];
-                    // Use appendData or updateData. Config sheet has header at A1.
-                    // Initial save: A2
-                    await appendData('Config!A2', configRows, spreadsheetId);
+                    await updateData('SystemConfig!A2', configRows, spreadsheetId);
                 }
             } catch (initError: any) {
                 console.error("Sheet Init Error:", initError);
@@ -41,7 +42,6 @@ export async function POST(req: Request) {
         }
 
         // 1. Check if Users sheet exists (Master Sheet)
-        // ... (Existing logic)
         let rows = await getData('Users!A:E');
 
         if (rows === null) {

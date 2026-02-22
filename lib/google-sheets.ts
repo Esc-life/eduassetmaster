@@ -181,7 +181,8 @@ export async function initializeUserSheet(spreadsheetId: string) {
         { title: 'Config', header: ['Key', 'Value'] },
         { title: 'Locations', header: ['Zone ID', 'Auto Name', 'Custom Name'] },
         { title: 'Credentials', header: ['Service', 'Admin ID', 'Contact', 'Note'] },
-        { title: 'Loans', header: ['ID', 'DeviceID', 'DeviceName', 'UserID', 'UserName', 'LoanDate', 'DueDate', 'ReturnDate', 'Status', 'Notes'] }
+        { title: 'Loans', header: ['ID', 'DeviceID', 'DeviceName', 'UserID', 'UserName', 'LoanDate', 'DueDate', 'ReturnDate', 'Status', 'Notes'] },
+        { title: 'SystemConfig', header: ['Key', 'Value'] }
     ];
 
     console.log(`[Init] Checking sheets for ${spreadsheetId}...`);
