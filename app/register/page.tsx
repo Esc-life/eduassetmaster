@@ -43,6 +43,7 @@ export default function RegisterPage() {
     const [isSheetLoading, setIsSheetLoading] = useState(false);
     const [isSheetVerified, setIsSheetVerified] = useState(false);
     const [sheetVerifyError, setSheetVerifyError] = useState('');
+    const [extractedEmail, setExtractedEmail] = useState('');
 
     useEffect(() => {
         getSystemEmail().then(res => setSystemEmail(res.email));
@@ -73,7 +74,7 @@ export default function RegisterPage() {
         setIsSheetLoading(true);
         setSheetVerifyError('');
         try {
-            const res = await verifySpreadsheetAccess(form.spreadsheetId);
+            const res = await verifySpreadsheetAccess(form.spreadsheetId, form.serviceAccountJson);
             if (res.success) {
                 setIsSheetVerified(true);
                 alert('연결 성공! 구글 시트 초기화(탭 생성)가 완료되었습니다.');
@@ -103,8 +104,10 @@ export default function RegisterPage() {
         reader.onload = (event) => {
             try {
                 const content = event.target?.result as string;
-                // Validate if it's JSON
-                JSON.parse(content);
+                const parsed = JSON.parse(content);
+                if (parsed.client_email) {
+                    setExtractedEmail(parsed.client_email);
+                }
                 setForm(prev => ({ ...prev, serviceAccountJson: content }));
             } catch (err) {
                 alert('올바른 JSON 파일이 아닙니다.');
@@ -342,13 +345,70 @@ export default function RegisterPage() {
 
                         {/* Google Sheets Config */}
                         {form.dbType === 'sheet' && (
-                            <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg space-y-4 animate-in fade-in">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">시트 ID (Spreadsheet ID)</label>
-                                    <div className="mt-1 flex gap-2">
+                            <div className="bg-gray-50 dark:bg-gray-900 p-6 rounded-lg space-y-6 animate-in fade-in transition-all">
+
+                                {/* Step 1: JSON Upload */}
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-bold text-gray-800 dark:text-gray-200">
+                                        1. 서비스 계정 등록하기 (JSON 파일 업로드)
+                                    </label>
+                                    <div className="flex items-center gap-3">
+                                        <input
+                                            type="file"
+                                            accept=".json"
+                                            onChange={handleFileUpload}
+                                            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-900/30 dark:file:text-blue-300"
+                                        />
+                                        {form.serviceAccountJson && (
+                                            <span className="text-xs text-green-600 font-bold flex items-center gap-1 whitespace-nowrap">
+                                                <Check className="w-3 h-3" /> 업로드 완료
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="text-[11px] text-gray-500">
+                                        Google Cloud Console에서 생성한 서비스 계정 키(JSON)를 업로드하세요.
+                                    </p>
+                                </div>
+
+                                {/* Step 2: Permission Guide */}
+                                <div className="space-y-3 p-4 bg-blue-50/50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-800">
+                                    <label className="block text-sm font-bold text-blue-900 dark:text-blue-200">
+                                        2. 구글 시트에 서비스 계정 초대하기
+                                    </label>
+                                    <p className="text-xs text-blue-800 dark:text-blue-300 leading-relaxed">
+                                        아래 이메일을 복사하여, 사용할 <strong>구글 시트의 [공유]</strong> 버튼을 누르고 <strong>'편집자(Editor)'</strong> 권한으로 초대해주세요.
+                                    </p>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            readOnly
+                                            value={extractedEmail || systemEmail || '파일을 먼저 업로드해주세요'}
+                                            className="flex-1 text-[11px] bg-white dark:bg-gray-800 border border-blue-200 dark:border-gray-700 rounded px-3 py-2 font-mono text-blue-900 dark:text-blue-100"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const email = extractedEmail || systemEmail;
+                                                if (email) {
+                                                    navigator.clipboard.writeText(email);
+                                                    alert('이메일이 복사되었습니다.');
+                                                }
+                                            }}
+                                            className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-bold transition-colors"
+                                        >
+                                            복사
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Step 3: Sheet ID & Activation */}
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-bold text-gray-800 dark:text-gray-200">
+                                        3. 구글 시트 ID 입력 및 활성화
+                                    </label>
+                                    <div className="flex gap-2">
                                         <input
                                             type="text"
-                                            className="block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 bg-white dark:bg-gray-800 text-gray-900 dark:text-white sm:text-sm font-mono"
+                                            className="block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 bg-white dark:bg-gray-800 text-gray-900 dark:text-white sm:text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none"
                                             placeholder="1BxiMVs0XRA5nFMdKbBdB..."
                                             value={form.spreadsheetId}
                                             onChange={(e) => {
@@ -366,57 +426,21 @@ export default function RegisterPage() {
                                                     : 'bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50'}`}
                                         >
                                             {isSheetLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : isSheetVerified ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-                                            {isSheetVerified ? '연결됨' : '연결 및 활성화'}
+                                            {isSheetVerified ? '활성화됨' : '탭 생성 및 활성화'}
                                         </button>
                                     </div>
 
                                     {sheetVerifyError && (
-                                        <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-                                            <p className="text-xs text-red-800 dark:text-red-200 whitespace-pre-wrap">{sheetVerifyError}</p>
-                                            <div className="mt-2 flex items-center gap-2">
-                                                <input
-                                                    readOnly
-                                                    value={systemEmail}
-                                                    className="flex-1 text-[10px] bg-white dark:bg-gray-800 border rounded px-2 py-1 font-mono"
-                                                />
-                                                <button
-                                                    type="button"
-                                                    onClick={() => navigator.clipboard.writeText(systemEmail)}
-                                                    className="text-[10px] bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 px-2 py-1 rounded"
-                                                >
-                                                    복사
-                                                </button>
-                                            </div>
+                                        <div className="mt-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-[11px] text-red-800 dark:text-red-200">
+                                            연결 실패: {sheetVerifyError}
                                         </div>
                                     )}
 
-                                    {!sheetVerifyError && !isSheetVerified && (
-                                        <p className="mt-1 text-[11px] text-gray-500">
-                                            구글 시트 URL의 /d/ 와 /edit 사이 값입니다. 입력 후 <strong>'연결 및 활성화'</strong>를 눌러주세요.
+                                    {!isSheetVerified && (
+                                        <p className="text-[11px] text-gray-500">
+                                            시트 ID 입력 후 위 버튼을 누르면 데이터 보관을 위한 <strong>필수 탭들이 자동으로 생성</strong>됩니다.
                                         </p>
                                     )}
-                                </div>
-
-                                <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                        고급 설정: 별도 서비스 계정 사용 (선택 사항)
-                                    </label>
-                                    <div className="flex items-center gap-3">
-                                        <input
-                                            type="file"
-                                            accept=".json"
-                                            onChange={handleFileUpload}
-                                            className="block w-full text-xs text-gray-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200"
-                                        />
-                                        {form.serviceAccountJson && (
-                                            <span className="text-[10px] text-green-600 font-bold flex items-center gap-1 whitespace-nowrap">
-                                                <Check className="w-3 h-3" /> JSON 업로드됨
-                                            </span>
-                                        )}
-                                    </div>
-                                    <p className="mt-1 text-[10px] text-gray-400">
-                                        관리자 서비스 계정 대신 본인의 서비스 계정을 사용하려면 JSON 파일을 업로드하세요.
-                                    </p>
                                 </div>
                             </div>
                         )}

@@ -201,7 +201,7 @@ export async function addSheet(title: string, spreadsheetId?: string, credential
  * Initialize a new user's spreadsheet with required sheets and headers.
  * Safe to run multiple times (idempotent logic).
  */
-export async function initializeUserSheet(spreadsheetId: string) {
+export async function initializeUserSheet(spreadsheetId: string, credentials?: any) {
     const REQUIRED_SHEETS = [
         { title: 'Devices', header: ['ID', 'Category', 'Model', 'IP', 'Status', 'PurchaseDate', 'GroupID', 'Name', 'AcquisitionDivision', 'Quantity', 'UnitPrice', 'TotalAmount', 'ServiceLifeChange', 'InstallLocation', 'OSVersion', 'WindowsPassword', 'UserName', 'PCName'] },
         { title: 'DeviceInstances', header: ['ID', 'DeviceID', 'LocationID', 'LocationName', 'Quantity', 'Notes'] },
@@ -219,18 +219,18 @@ export async function initializeUserSheet(spreadsheetId: string) {
     for (const sheet of REQUIRED_SHEETS) {
         try {
             // Check if sheet exists by trying to read A1
-            const check = await getData(`${sheet.title}!A1`, spreadsheetId);
+            const check = await getData(`${sheet.title}!A1`, spreadsheetId, credentials);
 
             if (check === null) {
                 // Sheet does not exist, create it
                 console.log(`[Init] Creating sheet: ${sheet.title}`);
-                await addSheet(sheet.title, spreadsheetId);
+                await addSheet(sheet.title, spreadsheetId, credentials);
                 // Add Header
-                await updateData(`${sheet.title}!A1`, [sheet.header], spreadsheetId);
+                await updateData(`${sheet.title}!A1`, [sheet.header], spreadsheetId, credentials);
             } else if (check.length === 0) {
                 // Sheet exists but is empty, add header
                 console.log(`[Init] Sheet ${sheet.title} exists but empty. Adding header.`);
-                await updateData(`${sheet.title}!A1`, [sheet.header], spreadsheetId);
+                await updateData(`${sheet.title}!A1`, [sheet.header], spreadsheetId, credentials);
             }
         } catch (error: any) {
             console.error(`[Init] Failed to init ${sheet.title}:`, error.message);

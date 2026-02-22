@@ -2438,12 +2438,26 @@ export async function getSystemEmail() {
     };
 }
 
-export async function verifySpreadsheetAccess(spreadsheetId: string) {
+export async function verifySpreadsheetAccess(spreadsheetId: string, serviceAccountJson?: string) {
     if (!spreadsheetId) return { success: false, error: '시트 ID가 없습니다.' };
 
     const { initializeUserSheet } = await import('@/lib/google-sheets');
+
+    let credentials = undefined;
+    if (serviceAccountJson) {
+        try {
+            const parsed = JSON.parse(serviceAccountJson);
+            credentials = {
+                client_email: parsed.client_email,
+                private_key: parsed.private_key
+            };
+        } catch (e) {
+            return { success: false, error: '서비스 계정 JSON 형식이 올바르지 않습니다.' };
+        }
+    }
+
     try {
-        await initializeUserSheet(spreadsheetId);
+        await initializeUserSheet(spreadsheetId, credentials);
         return { success: true };
     } catch (e: any) {
         if (e.message === 'PERMISSION_DENIED') {
