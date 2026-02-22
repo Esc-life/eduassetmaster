@@ -1485,10 +1485,10 @@ export interface LoanRecord {
     notes?: string;
 }
 
-export async function getLoans() {
+export async function getLoans(): Promise<LoanRecord[]> {
     const appConfig = await _getAppConfig();
     if (appConfig?.dbType === 'firebase' && appConfig.firebase) {
-        return await fbActions.fetchLoans(appConfig.firebase);
+        return (await fbActions.fetchLoans(appConfig.firebase)) as LoanRecord[];
     }
 
     const sheetId = await getUserSheetId();
@@ -1514,7 +1514,7 @@ export async function getLoans() {
                 loanDate: r[5],
                 dueDate: r[6],
                 returnDate: r[7] || undefined,
-                status,
+                status: status as any,
                 notes: r[9] || ''
             };
         });

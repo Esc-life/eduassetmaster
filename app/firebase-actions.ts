@@ -538,7 +538,7 @@ export async function deleteAccountFromDB(config: any, id: string) {
 }
 
 // --- Loan Management ---
-export async function fetchLoans(config: any) {
+export async function fetchLoans(config: any): Promise<any[]> {
     const db = getFirebaseStore(config);
     try {
         const snap = await getDocs(collection(db, "Loans"));
@@ -550,9 +550,23 @@ export async function fetchLoans(config: any) {
             if (status === 'Active' && data.dueDate && data.dueDate < today) {
                 status = 'Overdue';
             }
-            return { id: d.id, ...data, status };
+            return {
+                id: d.id,
+                deviceId: data.deviceId || '',
+                deviceName: data.deviceName || '',
+                userId: data.userId || '',
+                userName: data.userName || '',
+                loanDate: data.loanDate || '',
+                dueDate: data.dueDate || '',
+                returnDate: data.returnDate || '',
+                ...data,
+                status
+            };
         });
-    } catch (e) { return []; }
+    } catch (e) {
+        console.error("fetchLoans error", e);
+        return [];
+    }
 }
 
 export async function createLoanToDB(config: any, deviceId: string, userId: string, userName: string, dueDate: string, notes: string) {
