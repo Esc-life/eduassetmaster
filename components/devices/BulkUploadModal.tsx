@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { X, Upload, FileSpreadsheet, FileText, Check, AlertCircle, Loader2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { parsePdfAction } from '@/app/actions';
+import { useMessage } from '@/components/Providers';
 
 interface BulkUploadModalProps {
     isOpen: boolean;
@@ -33,6 +34,7 @@ const TARGET_FIELDS = [
 ];
 
 export function BulkUploadModal({ isOpen, onClose, onSave }: BulkUploadModalProps) {
+    const { showAlert } = useMessage();
     const [step, setStep] = useState<Step>('upload');
     const [textData, setTextData] = useState('');
     const [parsedData, setParsedData] = useState<any[]>([]);
@@ -125,18 +127,38 @@ export function BulkUploadModal({ isOpen, onClose, onSave }: BulkUploadModalProp
                                 const hasData = Object.keys(obj).some(k => k !== '_raw' && obj[k] !== undefined && obj[k] !== null && String(obj[k]).trim() !== '');
                                 if (!hasData) return false;
 
-                                // 2. Filter out summary rows
+                                // 2. Filter out summary and system rows
                                 const values = Object.values(obj).map(v => String(v).trim().toLowerCase());
-                                const invalidKeywords = ['합계', '소계', '총계', '누계', 'total', 'subtotal'];
-                                // Check if any value exactly matches or contains keywords (safer to match strictly or startWith usually, but contains is safer for 'Total Amount')
-                                // But 'Total Amount' might be a header. Here we check values. '합계' usually is in the first column.
+                                const invalidKeywords = [
+                                    '합계', '소계', '총계', '누계', '계', 'total', 'subtotal',
+                                    '평균', 'average', '비고', 'remark', '페이지', 'page'
+                                ];
+
+                                // Check if any cell matches invalid keywords EXACTLY or if the first few columns contain them
                                 if (values.some(v => invalidKeywords.includes(v))) return false;
+
+                                // Additional heuristic: If Category or Name contains "202x년" or similar date patterns, it's likely a header/footer
+                                const category = String(obj['category'] || obj['물품분류명'] || '').trim();
+                                const name = String(obj['name'] || obj['품명/규격'] || '').trim();
+
+                                if (/\d{4}년/.test(category) || /\d{4}\.\d{2}\.\d{2}/.test(category)) return false;
+                                if (category.includes('발행일') || category.includes('출력일')) return false;
+
+                                // 3. Filter out rows where essential item data is missing but meta-data exists
+                                if (category === '' && name === '') return false;
 
                                 return true;
                             });
 
+                        const filteredObjects = objects.filter(obj => {
+                            // Ensure it's not a title row repeating
+                            const name = String(obj['name'] || obj['품명/규격'] || '').trim();
+                            if (name === '품명/규격' || name === '품명') return false;
+                            return true;
+                        });
+
                         setHeaders(headerRow.filter(h => h !== ''));
-                        setParsedData(objects);
+                        setParsedData(filteredObjects);
                         autoMapColumns(headerRow);
                         setStep('mapping');
                     }
@@ -149,16 +171,16 @@ export function BulkUploadModal({ isOpen, onClose, onSave }: BulkUploadModalProp
                 const result = await parsePdfAction(formData);
                 if (result.success && result.text) {
                     setTextData(result.text);
-                    alert('PDF 텍스트가 추출되었습니다. 확인 후 "다음"을 눌러주세요.');
+                    showAlert('PDF 텍스트가 추출되었습니다. 확인 후 "다음"을 눌러주세요.', 'success');
                 } else {
-                    alert('PDF 처리 실패: ' + result.error);
+                    showAlert('PDF 처리 실패: ' + result.error, 'error');
                 }
             } else {
-                alert('지원되지 않는 파일 형식입니다. (xlsx, xls, csv, pdf)');
+                showAlert('지원되지 않는 파일 형식입니다. (xlsx, xls, csv, pdf)', 'error');
             }
         } catch (error) {
             console.error(error);
-            alert('파일 처리 중 오류가 발생했습니다.');
+            showAlert('파일 처리 중 오류가 발생했습니다.', 'error');
         } finally {
             setIsProcessing(false);
         }

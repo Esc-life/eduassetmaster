@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Device } from '@/types';
 import * as XLSX from 'xlsx';
 import { X, FileSpreadsheet, Check, AlertTriangle, Loader2 } from 'lucide-react';
+import { useMessage } from '@/components/Providers';
 
 interface DisposalModalProps {
     isOpen: boolean;
@@ -13,6 +14,7 @@ interface DisposalModalProps {
 }
 
 export function DisposalModal({ isOpen, onClose, devices, onConfirm }: DisposalModalProps) {
+    const { showAlert, showConfirmAsync } = useMessage();
     const [isProcessing, setIsProcessing] = useState(false);
 
     if (!isOpen) return null;
@@ -46,13 +48,14 @@ export function DisposalModal({ isOpen, onClose, devices, onConfirm }: DisposalM
     };
 
     const handleConfirm = async () => {
-        if (!confirm('선택한 기기를 불용(고장/폐기) 상태로 변경하시겠습니까?')) return;
+        const ok = await showConfirmAsync('선택한 기기를 불용(고장/폐기) 상태로 변경하시겠습니까?');
+        if (!ok) return;
         setIsProcessing(true);
         try {
             await onConfirm(devices.map(d => d.id));
             onClose();
         } catch (e) {
-            alert('오류 발생: ' + e);
+            showAlert('오류 발생: ' + e, 'error');
         } finally {
             setIsProcessing(false);
         }

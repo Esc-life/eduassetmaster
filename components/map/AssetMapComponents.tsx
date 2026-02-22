@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Device, Location, DeviceInstance } from '@/types';
 import { X, Monitor, Info, Edit, Plus, Search, Trash2, AlertCircle } from 'lucide-react';
 import { PropsWithChildren } from 'react';
+import { useMessage } from '@/components/Providers';
 
 interface AssetZoneProps {
     location: Location;
@@ -110,6 +111,7 @@ export function AssetDetailModal({
     onRemoveInstance,
     children
 }: PropsWithChildren<AssetDetailModalProps>) {
+    const { showAlert, showConfirmAsync } = useMessage();
     const [showAddDevice, setShowAddDevice] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('');
@@ -152,7 +154,7 @@ export function AssetDetailModal({
             setSelectedDevice(device);
             setQuantity(1);
         } else {
-            alert('배치 가능한 잔여 수량이 없습니다.');
+            showAlert('배치 가능한 잔여 수량이 없습니다.', 'error');
         }
     };
 
@@ -161,7 +163,7 @@ export function AssetDetailModal({
 
         const { remaining } = getDeviceStats(selectedDevice);
         if (quantity > remaining) {
-            alert(`배치 가능한 수량을 초과했습니다. (잔여: ${remaining}대)`);
+            showAlert(`배치 가능한 수량을 초과했습니다. (잔여: ${remaining}대)`, 'error');
             return;
         }
 
@@ -174,7 +176,7 @@ export function AssetDetailModal({
             setCategoryFilter('');
             setQuantity(1);
         } catch (error) {
-            alert('기기 배정 실패: ' + error);
+            showAlert('기기 배정 실패: ' + error, 'error');
         } finally {
             setIsAssigning(false);
         }
@@ -182,11 +184,12 @@ export function AssetDetailModal({
 
     const handleRemove = async (instanceId: string) => {
         if (!onRemoveInstance) return;
-        if (!confirm('이 배치를 삭제하시겠습니까?')) return;
+        const ok = await showConfirmAsync('이 배치를 삭제하시겠습니까?');
+        if (!ok) return;
         try {
             await onRemoveInstance(instanceId);
         } catch (error) {
-            alert('삭제 실패');
+            showAlert('삭제 실패', 'error');
         }
     };
 

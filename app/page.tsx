@@ -9,20 +9,19 @@ import { MOCK_DEVICES, MOCK_SOFTWARE } from '@/lib/mock-data';
 import { useOCR } from '@/hooks/useOCR';
 import { DeleteConfirmModal } from '@/components/devices/DeleteConfirmModal';
 import Link from 'next/link';
-import { Image as ImageIcon, PlusCircle, Check, Trash2, MousePointer2, ScanSearch, Loader2, Save, Minus, RotateCcw, FileSpreadsheet, ScanLine, Edit3, Settings, MoreHorizontal, CheckSquare, Edit } from 'lucide-react';
+import { Image as ImageIcon, PlusCircle, Check, Trash2, MousePointer2, ScanSearch, Loader2, Save, Minus, RotateCcw, FileSpreadsheet, ScanLine, Edit3, Settings, MoreHorizontal, CheckSquare, Edit, ChevronDown, Layers } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { fetchMapConfiguration, saveMapConfiguration, syncZonesToSheet, fetchAssetData, updateDevice, createDeviceInstance, deleteDeviceInstance, updateZoneName, batchUpdateZoneNames, deleteZonesFromLocations, fetchMapList, deleteMap } from '@/app/actions';
 import { useMessage } from '@/components/Providers';
 import { DeviceEditModal } from '@/components/devices/DeviceEditModal';
 import { ZoneEditModal } from '@/components/map/ZoneEditModal';
 import { ZoneBatchEditModal } from '@/components/map/ZoneBatchEditModal';
-import { Layers, ChevronDown } from 'lucide-react';
 
 // Mock pin locations linked to mock devices (Initial State) by default empty
 const INITIAL_PINS: Location[] = [];
 
 export default function Home() {
-  const { showAlert, showConfirm } = useMessage();
+  const { showAlert, showConfirm, showAlertAsync } = useMessage();
   const [mapImage, setMapImage] = useState<string>();
   const [mapFile, setMapFile] = useState<File>();
   const [pins, setPins] = useState<Location[]>(INITIAL_PINS);
@@ -30,6 +29,7 @@ export default function Home() {
   const [zoom, setZoom] = useState(100);
   const [isEditing, setIsEditing] = useState(false);
   const [devices, setDevices] = useState<Device[]>([]); // Real devices
+  const [allZones, setAllZones] = useState<Location[]>([]); // All zones across maps
   const [deviceInstances, setDeviceInstances] = useState<DeviceInstance[]>([]); // Device instances
   const [editDevice, setEditDevice] = useState<Device | null>(null); // For editing
   const [isLoadingMap, setIsLoadingMap] = useState(true); // Server Data Fetching
@@ -102,7 +102,7 @@ export default function Home() {
 
       try {
         const { mapImage: serverImage, zones: serverZones, updatedAt: serverUpdatedAt } = await fetchMapConfiguration(currentMapId);
-        const { devices: serverDevices, deviceInstances: serverInstances } = await fetchAssetData();
+        const { devices: serverDevices, deviceInstances: serverInstances, zones: allServerZones } = await fetchAssetData();
         const serverMapList = await fetchMapList();
 
         setMapList(serverMapList);
@@ -130,6 +130,7 @@ export default function Home() {
         else setDevices([]);
         if (serverInstances) setDeviceInstances(serverInstances);
         else setDeviceInstances([]);
+        if (allServerZones) setAllZones(allServerZones);
       } catch (error) {
         console.error('Failed to load map data:', error);
         setIsLoadingMap(false);
@@ -397,7 +398,7 @@ export default function Home() {
     const floorName = prompt("새로운 층 또는 건물 이름을 입력하세요 (예: 2F, 본관1층)");
     if (!floorName) return;
     if (mapList.includes(floorName)) {
-      alert("이미 존재하는 이름입니다.");
+      showAlertAsync("이미 존재하는 이름입니다.", 'error');
       return;
     }
     setCurrentMapId(floorName);
@@ -440,9 +441,9 @@ export default function Home() {
     setIsEditing(true);
 
     if (addedCount > 0) {
-      alert(`${addedCount}개의 구역이 추가되었습니다.`);
+      showAlertAsync(`${addedCount}개의 구역이 추가되었습니다.`, 'success');
     } else {
-      alert("모든 구역이 이미 존재하여 추가되지 않았습니다.");
+      showAlertAsync("모든 구역이 이미 존재하여 추가되지 않았습니다.", 'alert');
     }
   };
 
@@ -692,7 +693,10 @@ export default function Home() {
                 isOpen={!!selectedPin}
                 onClose={() => setSelectedPin(null)}
                 zone={selectedPin}
-                deviceInstances={deviceInstances.filter(inst => inst.locationId === selectedPin.id)}
+                deviceInstances={deviceInstances.filter(inst =>
+                  inst.locationId === selectedPin.id ||
+                  ((!inst.locationId || inst.locationId === 'TEXT_ONLY') && inst.locationName === selectedPin.name)
+                )}
                 allDeviceInstances={deviceInstances}
                 allDevices={devices}
                 onEditDevice={(device) => {
@@ -747,7 +751,7 @@ export default function Home() {
               if (Object.keys(updates).length > 0) {
                 const result = await updateDevice(editDevice.id, updates);
                 if (!result.success) {
-                  alert('수정 실패: ' + result.error);
+                  showAlertAsync('수정 실패: ' + result.error, 'error');
                   return;
                 }
               }
@@ -763,7 +767,7 @@ export default function Home() {
                 setLastSelectedPin(null);
               }
             }}
-            zones={pins}
+            zones={allZones}
           />
 
           {/* Zone Edit Modal */}

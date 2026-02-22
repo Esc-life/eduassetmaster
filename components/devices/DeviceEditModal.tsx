@@ -5,6 +5,7 @@ import { X, Save, Plus, Trash2, AlertTriangle } from 'lucide-react';
 import { Device, Location } from '@/types';
 import { getDeviceInstances, updateDeviceWithDistribution } from '@/app/actions';
 import { useRouter } from 'next/navigation';
+import { useMessage } from '@/components/Providers';
 
 interface DeviceEditModalProps {
     isOpen: boolean;
@@ -16,6 +17,7 @@ interface DeviceEditModalProps {
 
 export function DeviceEditModal({ isOpen, device, onClose, onSave, zones = [] }: DeviceEditModalProps) {
     const router = useRouter();
+    const { showAlert } = useMessage();
     const [formData, setFormData] = useState<Partial<Device>>({
         name: '',
         model: '',
@@ -67,12 +69,26 @@ export function DeviceEditModal({ isOpen, device, onClose, onSave, zones = [] }:
             setIsLoadingDist(true);
             getDeviceInstances(device.id).then((insts: any[]) => {
                 if (insts && insts.length > 0) {
-                    setDistributions(insts.map((i: any) => ({ locationId: i.locationId, locationName: i.locationName, quantity: i.quantity })));
+                    setDistributions(insts.map((i: any) => {
+                        let locId = i.locationId;
+                        // If ID is missing or generic, try to resolve via zones prop by name
+                        if (!locId || locId === 'TEXT_ONLY') {
+                            const match = zones.find(z => z.name === i.locationName);
+                            if (match) locId = match.id;
+                        }
+                        return { locationId: locId, locationName: i.locationName, quantity: i.quantity };
+                    }));
                 } else {
                     const qty = parseInt(String(device.quantity || '1'));
                     if (device.installLocation && device.installLocation.trim() !== '') {
                         // 기존 단순 텍스트가 있으면 그것을 1개의 배치로 간주
-                        setDistributions([{ locationName: device.installLocation, quantity: qty }]);
+                        // 여기서도 zones가 있으면 ID를 찾아본다
+                        const match = zones.find(z => z.name === device.installLocation);
+                        setDistributions([{
+                            locationId: match ? match.id : 'TEXT_ONLY',
+                            locationName: device.installLocation,
+                            quantity: qty
+                        }]);
                     } else {
                         setDistributions([{ locationName: '', quantity: qty }]);
                     }
@@ -172,7 +188,7 @@ export function DeviceEditModal({ isOpen, device, onClose, onSave, zones = [] }:
                 onClose();
             }
         } catch (error) {
-            alert('저장 실패: ' + error);
+            showAlert('저장 실패: ' + error, 'error');
         } finally {
             setIsSaving(false);
         }

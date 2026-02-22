@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { X, Trash2, AlertTriangle } from 'lucide-react';
+import { useMessage } from '@/components/Providers';
 
 interface DeleteConfirmModalProps {
     isOpen: boolean;
@@ -13,6 +14,7 @@ interface DeleteConfirmModalProps {
 }
 
 export function DeleteConfirmModal({ isOpen, type, onClose, onConfirm, deviceName, validationText }: DeleteConfirmModalProps) {
+    const { showAlert } = useMessage();
     const [confirmText, setConfirmText] = useState('');
     const [isDeleting, setIsDeleting] = useState(false);
 
@@ -21,7 +23,7 @@ export function DeleteConfirmModal({ isOpen, type, onClose, onConfirm, deviceNam
 
     const handleConfirm = async () => {
         if (needsInput && confirmText !== targetText) {
-            alert(`"${targetText}"를 정확히 입력해주세요.`);
+            showAlert(`"${targetText}"를 정확히 입력해주세요.`, 'error');
             return;
         }
 

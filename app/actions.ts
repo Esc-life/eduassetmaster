@@ -171,7 +171,8 @@ export async function fetchAssetData(overrideSheetId?: string) {
             devices: (fbData.devices || []) as Device[],
             software: (softwareList || []) as any[],
             credentials: (credentialsList || []) as any[],
-            deviceInstances: (fbData.instances || []) as DeviceInstance[]
+            deviceInstances: (fbData.instances || []) as DeviceInstance[],
+            zones: (fbData.zones || []) as Location[]
         };
     }
 
@@ -243,18 +244,17 @@ export async function fetchAssetData(overrideSheetId?: string) {
                 notes: row[5],
             }));
 
-            // Dynamic installLocation computation
-            devices.forEach(d => {
-                const myInst = deviceInstances.filter(i => i.deviceId === d.id);
-                if (myInst.length > 0) {
-                    d.installLocation = myInst.map(i => {
-                        const qty = Number(i.quantity || 1);
-                        return qty > 0 ? `${i.locationName}(${qty})` : i.locationName;
-                    }).join(', ');
-                }
-            });
+            // Fetch All Zones for matching and dropdowns
+            const locRows = await getData('Locations!A2:C', sheetId);
+            const zones: Location[] = (locRows || []).map((row: any[]) => ({
+                id: row[0],
+                name: row[2] || row[1], // Priority to Custom Name, fallback to Auto Name
+                type: 'Classroom',
+                pinX: 0,
+                pinY: 0
+            }));
 
-            return { devices, software, credentials, deviceInstances };
+            return { devices, software, credentials, deviceInstances, zones };
 
         } catch (error) {
             console.error('[fetchAssetData] Error:', error);
@@ -1718,7 +1718,16 @@ export async function updateDeviceWithDistribution(
         await updateData(`Devices!A${deviceIndex + 2}`, [updatedRow], sheetId);
 
         const instanceRows = await getData('DeviceInstances!A2:F', sheetId);
-        const mapConfig = await fetchMapConfiguration(sheetId);
+
+        // Fetch ALL zones across all maps for name-based matching
+        const locRows = await getData('Locations!A2:C', sheetId);
+        const allZones: Location[] = (locRows || []).map((row: any[]) => ({
+            id: row[0],
+            name: (row[2] || row[1] || '').trim(),
+            type: 'Classroom',
+            pinX: 0,
+            pinY: 0
+        }));
 
         let otherInstances: any[][] = [];
         if (instanceRows) {
@@ -1728,10 +1737,10 @@ export async function updateDeviceWithDistribution(
         const newInstanceRows = distributions.map(dist => {
             let zone = null;
             if (dist.locationId && dist.locationId !== 'TEXT_ONLY') {
-                zone = mapConfig.zones.find((z: Location) => z.id === dist.locationId);
+                zone = allZones.find((z: Location) => z.id === dist.locationId);
             }
             if (!zone) {
-                zone = mapConfig.zones.find((z: Location) => (z.name || '').trim() === (dist.locationName || '').trim());
+                zone = allZones.find((z: Location) => (z.name || '').trim() === (dist.locationName || '').trim());
             }
             return [
                 `inst-${Math.random().toString(36).substr(2, 9)}`,

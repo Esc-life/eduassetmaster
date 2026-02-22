@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { fetchAssetData, registerBulkDevices, updateDevice, deleteDevice, deleteAllDevices, deleteBulkDevices, fetchMapConfiguration, setDevicesStatus } from '@/app/actions';
+import { useMessage } from '@/components/Providers';
 import { Device, DeviceStatus, Location } from '@/types';
 import { Search, Filter, MoreHorizontal, Laptop, Tablet, Smartphone, Monitor, Loader2, FileSpreadsheet, Plus, Edit, Trash2, AlertTriangle, Minus, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { BulkUploadModal } from '@/components/devices/BulkUploadModal';
@@ -12,6 +13,7 @@ import { useRouter } from 'next/navigation';
 
 export default function DevicesPage() {
     const router = useRouter();
+    const { showAlertAsync } = useMessage();
     const [devices, setDevices] = useState<Device[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [filterStatus, setFilterStatus] = useState<DeviceStatus | 'All'>('All');
@@ -29,10 +31,10 @@ export default function DevicesPage() {
             try {
                 const data = await fetchAssetData();
                 setDevices(data.devices);
-
-                // Load zones for dropdown
-                const mapConfig = await fetchMapConfiguration();
-                setZones(mapConfig.zones);
+                // Use unified zones from fetchAssetData (all zones across all maps)
+                if ((data as any).zones) {
+                    setZones((data as any).zones);
+                }
             } catch (error) {
                 console.warn('[Devices] Server data fetch failed:', error);
                 setDevices([]);
@@ -47,11 +49,11 @@ export default function DevicesPage() {
         setIsLoading(true);
         const result = await registerBulkDevices(data);
         if (result.success) {
-            alert(`${(result as any).count}개 기기가 성공적으로 등록되었습니다.`);
+            await showAlertAsync(`${(result as any).count}개 기기가 성공적으로 등록되었습니다.`, 'success');
             // Reload page to reflect changes
             window.location.reload();
         } else {
-            alert('등록 실패: ' + result.error);
+            await showAlertAsync('등록 실패: ' + result.error, 'error');
             setIsLoading(false);
         }
     };
@@ -61,10 +63,10 @@ export default function DevicesPage() {
         setIsLoading(true);
         const result = await updateDevice(editDevice.id, updates);
         if (result.success) {
-            alert('수정이 저장되었습니다.');
+            await showAlertAsync('수정이 저장되었습니다.', 'success');
             window.location.reload();
         } else {
-            alert('수정 실패: ' + result.error);
+            await showAlertAsync('수정 실패: ' + result.error, 'error');
             setIsLoading(false);
         }
     };
@@ -73,20 +75,20 @@ export default function DevicesPage() {
         if (!deleteModal.device) return;
         const result = await deleteDevice(deleteModal.device.id);
         if (result.success) {
-            alert('삭제되었습니다.');
+            await showAlertAsync('삭제되었습니다.', 'success');
             window.location.reload();
         } else {
-            alert('삭제 실패: ' + result.error);
+            await showAlertAsync('삭제 실패: ' + result.error, 'error');
         }
     };
 
     const handleDeleteAll = async () => {
         const result = await deleteAllDevices();
         if (result.success) {
-            alert('모든 기기가 삭제되었습니다.');
+            await showAlertAsync('모든 기기가 삭제되었습니다.', 'success');
             window.location.reload();
         } else {
-            alert('전체 삭제 실패: ' + result.error);
+            await showAlertAsync('전체 삭제 실패: ' + result.error, 'error');
         }
     };
 
@@ -165,10 +167,10 @@ export default function DevicesPage() {
     const handleDeleteSelected = async () => {
         const result = await deleteBulkDevices(selectedDevices);
         if (result.success) {
-            alert(`${selectedDevices.length}개 기기가 삭제되었습니다.`);
+            await showAlertAsync(`${selectedDevices.length}개 기기가 삭제되었습니다.`, 'success');
             window.location.reload();
         } else {
-            alert('일괄 삭제 실패: ' + result.error);
+            await showAlertAsync('일괄 삭제 실패: ' + result.error, 'error');
         }
     };
 
@@ -242,10 +244,10 @@ export default function DevicesPage() {
                 onConfirm={async (ids) => {
                     const res = await setDevicesStatus(ids, '고장/폐기');
                     if (res.success) {
-                        alert('상태가 변경되었습니다.');
+                        await showAlertAsync('상태가 변경되었습니다.', 'success');
                         window.location.reload();
                     } else {
-                        alert('변경 실패: ' + res.error);
+                        await showAlertAsync('변경 실패: ' + res.error, 'error');
                     }
                 }}
             />
