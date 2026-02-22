@@ -1299,16 +1299,17 @@ export async function recognizeZoneNamesWithAI(imageBase64: string, zones: any[]
 아래는 이미지에서 감지된 구역들의 위치 정보입니다 (이미지 좌상단 기준 백분율 좌표):
 ${zoneDescriptions}
 
-각 구역 위치(사각형 영역) 안에 있거나 영역 바로 옆에 표시된 교실/공간 이름을 읽어주세요.
-반드시 아래 JSON 배열 형식으로만 응답하세요. 다른 텍스트는 포함하지 마세요:
+각 구역 위치(사각형 영역) "내부"에 적힌 교실/공간 이름을 읽어주세요. 
+박스 바깥에 있는 '1층', '2층', '5층' 같은 층수 표시나 구역 번호는 무시하고, 실제 공간 이름(예: 과학실, 1-1)만 추출하세요.
+
+반드시 아래 JSON 배열 형식으로만 응답하세요. 다른 설명은 생략하세요:
 [{"index":0,"name":"교실이름"},{"index":1,"name":"교실이름"},...]
 
 규칙:
 - index는 제공된 목록의 순서(0부터 시작)와 정확히 일치해야 합니다.
-- 텍스트가 세로로 써있거나 기울어져 있어도 읽어내세요.
-- 해당 위치에서 텍스트를 도저히 읽을 수 없으면 name을 "분석 불가"로 설정하세요.
-- "1-1", "과학실", "교무실", "실습실", "강당" 등 한국어 학교 공간명인 경우가 많습니다.
-- 텍스트가 여러 줄이면 한 줄로(띄어쓰기 포함) 합쳐서 출력하세요.`;
+- 텍스트가 세로/가로 혼용되어 있어도 문맥에 맞게 읽으세요. (예: "전", "담", "실" -> "전담실")
+- 박스 내부에 텍스트가 없으면 "분석 불가"라고 적으세요.
+- 학교 특성상 "Wee 클래스", "방과후실", "돌봄교실" 등이 많으므로 오타에 주의하세요.`;
 
         const response = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
@@ -1428,55 +1429,86 @@ async function recognizeZoneNamesWithOCR(imageBase64: string, zones: any[], prev
             return { success: false, error: '이미지 크기를 분석할 수 없어 위치 매칭에 실패했습니다.', zones };
         }
 
-        console.log(`[OCR Logic] Matching against image size: ${imgW}x${imgH}`);
-
-        // 2. Proximity Matching: Match text blocks that are INSIDE the zone rectangles
+        // 2. Proximity Matching: Match text blocks with intelligence
         const textBlocks = annotations.slice(1);
-        const zoneMatches = new Map<string, { text: string, x: number, y: number }[]>();
+        const zoneMatches = new Map<string, { text: string, x: number, y: number, h: number }[]>();
 
         textBlocks.forEach((block: any) => {
             const text = block.description?.trim();
             if (!text || text.length < 1) return;
 
             const vertices = block.boundingPoly.vertices;
-            // Center of text block in percentage relative to imgW/imgH
-            const avgX = (vertices.reduce((sum: number, v: any) => sum + (v.x || 0), 0) / 4 / imgW) * 100;
-            const avgY = (vertices.reduce((sum: number, v: any) => sum + (v.y || 0), 0) / 4 / imgH) * 100;
+            const xCoords = vertices.map((v: any) => v.x || 0);
+            const yCoords = vertices.map((v: any) => v.y || 0);
+
+            const minX = Math.min(...xCoords);
+            const maxX = Math.max(...xCoords);
+            const minY = Math.min(...yCoords);
+            const maxY = Math.max(...yCoords);
+
+            const blockHeight = maxY - minY;
+            const blockHeightPct = (blockHeight / imgH) * 100;
+
+            const avgX = ((minX + maxX) / 2 / imgW) * 100;
+            const avgY = ((minY + maxY) / 2 / imgH) * 100;
 
             zones.forEach(zone => {
                 const zW = zone.width || 5;
                 const zH = zone.height || 5;
 
-                // PRIORITY: Text must be inside the box (with 1.5% padding)
-                const isInsideX = avgX >= zone.pinX - 1.5 && avgX <= zone.pinX + zW + 1.5;
-                const isInsideY = avgY >= zone.pinY - 1.5 && avgY <= zone.pinY + zH + 1.5;
+                // CRITICAL: Strict Inside Matching (Reduced padding to 0.2%)
+                // This prevents picking up "1층", "2층" labels or text from adjacent rooms
+                const isInsideX = avgX >= zone.pinX + 0.2 && avgX <= zone.pinX + zW - 0.2;
+                const isInsideY = avgY >= zone.pinY + 0.2 && avgY <= zone.pinY + zH - 0.2;
 
                 if (isInsideX && isInsideY) {
                     const list = zoneMatches.get(zone.id) || [];
-                    list.push({ text, x: avgX, y: avgY });
+                    list.push({ text, x: avgX, y: avgY, h: blockHeightPct });
                     zoneMatches.set(zone.id, list);
                 }
             });
         });
 
-        // 3. Update zones with names found inside them
+        // 3. Update zones with names found inside them (Line-Level Grouping)
         const updatedZones = zones.map(zone => {
             const matches = zoneMatches.get(zone.id);
             if (matches && matches.length > 0) {
-                // Sort by Y then X to handle multi-line names ("1" \n "학년" \n "1반")
-                matches.sort((a, b) => (a.y - b.y) || (a.x - b.x));
-                const combined = matches.map(m => m.text).join(' ');
+                // Determine rows to prevent vertical jitter ("실전담" -> "전담실")
+                const rows: { text: string, x: number, y: number }[][] = [];
+                matches.sort((a, b) => a.y - b.y);
 
-                // For Korean, join words without spaces (e.g., "과학 실" -> "과학실")
-                let cleaned = combined;
-                if (/^[가-힣\s]+$/.test(combined)) {
-                    cleaned = combined.replace(/\s+/g, '');
-                } else {
-                    cleaned = combined.replace(/\s+/g, ' ').trim();
+                matches.forEach(m => {
+                    let placed = false;
+                    for (const row of rows) {
+                        const rowY = row[0].y;
+                        const tolerance = m.h * 0.5; // 50% height tolerance
+                        if (Math.abs(m.y - rowY) < tolerance) {
+                            row.push(m);
+                            placed = true;
+                            break;
+                        }
+                    }
+                    if (!placed) rows.push([m]);
+                });
+
+                const combined = rows.map(row => {
+                    return row.sort((a, b) => a.x - b.x).map(m => m.text).join(' ');
+                }).join(' ');
+
+                // OCR Typos & Formatting
+                let cleaned = combined
+                    .replace(/Vee/gi, 'Wee')
+                    .replace(/에어\s*벨/g, '에어벨')
+                    .replace(/방과\s*후/g, '방과후')
+                    .replace(/조\s*회\s*대/g, '조회대')
+                    .replace(/휴\s*게\s*실/g, '휴게실');
+
+                if (/^[가-힣0-9\s\(\)]+$/.test(cleaned) && cleaned.length < 10) {
+                    cleaned = cleaned.replace(/\s+/g, '');
                 }
 
                 if (cleaned.length >= 1) {
-                    return { ...zone, name: cleaned };
+                    return { ...zone, name: cleaned.trim() };
                 }
             }
             return zone;
@@ -1488,7 +1520,7 @@ async function recognizeZoneNamesWithOCR(imageBase64: string, zones: any[], prev
             return { success: false, error: errorMsg, zones };
         }
 
-        return { success: true, zones: updatedZones, message: `Legacy OCR: ${changeCount}개 구역 식별됨` };
+        return { success: true, zones: updatedZones, message: `Legacy OCR: ${changeCount}개 구역 식별됨 (정밀)` };
 
     } catch (e) {
         console.error('OCR Fallback Logic Error:', e);
