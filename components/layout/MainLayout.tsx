@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, LogOut } from 'lucide-react';
+import { signOut } from 'next-auth/react';
 
 export function MainLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
@@ -34,7 +35,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
 
             {/* Main Content */}
             <div className="flex-1 flex flex-col md:ml-64 transition-all duration-300 min-w-0">
-                {/* Mobile Header with Hamburger */}
+                {/* Mobile Header with Hamburger and Logout */}
                 <div className="md:hidden sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 h-16 flex items-center justify-between">
                     <button
                         onClick={() => setIsSidebarOpen(true)}
@@ -43,10 +44,16 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                         <Menu className="w-6 h-6 text-gray-700 dark:text-gray-300" />
                     </button>
                     <span className="font-bold text-lg text-blue-600">EduAsset</span>
-                    <div className="w-8"></div> {/* Spacer for balance */}
+                    <button
+                        onClick={() => signOut({ callbackUrl: '/login' })}
+                        className="p-2 -mr-2 rounded-lg text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                        title="로그아웃"
+                    >
+                        <LogOut className="w-6 h-6" />
+                    </button>
                 </div>
 
-                {/* Desktop Header (Hidden on Mobile if you want, or kept. Usually maintained for Search/User) */}
+                {/* Desktop Header (Hidden on Mobile) */}
                 <div className="hidden md:block">
                     <Header />
                 </div>

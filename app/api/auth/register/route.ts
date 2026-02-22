@@ -3,7 +3,9 @@ import { getData, updateData, appendData, addSheet, initializeUserSheet } from "
 
 export async function POST(req: Request) {
     try {
-        const { email, password, name, spreadsheetId, visionApiKey } = await req.json();
+        const body = await req.json();
+        const { email, password, name, visionApiKey, serviceAccountJson } = body;
+        const spreadsheetId = body.spreadsheetId?.trim();
 
         if (!email || !password || !name) {
             return NextResponse.json({ message: "필수 정보가 누락되었습니다." }, { status: 400 });
@@ -11,40 +13,45 @@ export async function POST(req: Request) {
 
         // 0. Verify Spreadsheet Access (if provided)
         if (spreadsheetId) {
+            console.log(`[Register] Initializing spreadsheet: ${spreadsheetId}`);
             try {
                 // Try to initialize (create tabs/headers)
                 // This will throw if we don't have edit access
-                await initializeUserSheet(spreadsheetId);
+                const initResult = await initializeUserSheet(spreadsheetId);
+                if (!initResult) throw new Error('Initialization failed');
 
-                // Save Initial Config (Vision Key, Manager Name) to SystemConfig sheet
+                // Save Initial Config (Vision Key, Manager Name, Service Account) to SystemConfig sheet
                 // IMPORTANT: Must use SystemConfig (not Config) because:
                 //   - fetchSystemConfig reads from SystemConfig!A2:B
                 //   - saveMapConfiguration overwrites Config!A1 with map data
-                if (visionApiKey || name) {
-                    const configRows = [
-                        ['GOOGLE_VISION_KEY', visionApiKey || ''],
-                        ['ManagerName', name || '']
-                    ];
-                    await updateData('SystemConfig!A2', configRows, spreadsheetId);
+                const configRows: string[][] = [];
+                if (visionApiKey) configRows.push(['GOOGLE_VISION_KEY', visionApiKey]);
+                if (name) configRows.push(['ManagerName', name]);
+                if (serviceAccountJson) configRows.push(['SERVICE_ACCOUNT_JSON', serviceAccountJson]);
+
+                if (configRows.length > 0) {
+                    console.log(`[Register] Writing config to SystemConfig!A2 on ${spreadsheetId}`);
+                    const updateRes = await updateData('SystemConfig!A2', configRows, spreadsheetId);
+                    console.log(`[Register] Update result:`, !!updateRes);
                 }
             } catch (initError: any) {
-                console.error("Sheet Init Error:", initError);
+                console.error("[Register] Sheet Init Error detail:", initError);
                 if (initError.message === 'PERMISSION_DENIED' || initError.code === 403) {
                     return NextResponse.json({
-                        message: "스프레드시트 접근 권한이 없습니다.\n서비스 계정을 '편집자'로 초대했는지 확인해주세요."
+                        message: "스프레드시트 접근 권한이 없습니다.\n관리자 서비스 계정 이메일을 '편집자'로 초대했는지 확인해주세요."
                     }, { status: 403 });
                 }
-                // Other errors (e.g. invalid ID)
                 return NextResponse.json({
-                    message: "스프레드시트 ID가 올바르지 않거나 접근할 수 없습니다."
+                    message: `스프레드시트 초기화 실패: ${initError.message || '알 수 없는 오류'}`
                 }, { status: 400 });
             }
         }
 
-        // 1. Check if Users sheet exists (Master Sheet)
+        // 1. Check if Users sheet exists (Master Sheet) in Admin Spreadsheet
         let rows = await getData('Users!A:E');
 
         if (rows === null) {
+            console.log("[Register] Creating master Users sheet");
             await addSheet('Users');
             await updateData('Users!A1', [['ID', 'Name', 'Email', 'Password', 'SpreadsheetID', 'CreatedAt']]);
             rows = [];
@@ -55,7 +62,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ message: "이미 등록된 이메일입니다." }, { status: 409 });
         }
 
-        // 3. Create User
+        // 3. Create User record for Admin
         const newUser = [
             crypto.randomUUID(),
             name,
@@ -65,14 +72,13 @@ export async function POST(req: Request) {
             new Date().toISOString()
         ];
 
-        // 4. Save
-        let targetRange = 'Users!A1';
-        // If empty (just header), append works fine.
-        await appendData(targetRange, [newUser]);
+        // 4. Save to Admin Master Spreadsheet
+        console.log(`[Register] Saving user ${email} to master sheet`);
+        await appendData('Users!A1', [newUser]);
 
         return NextResponse.json({ message: "User created" }, { status: 201 });
     } catch (error: any) {
-        console.error('Register Error:', error);
+        console.error('[Register] General Error:', error);
         return NextResponse.json({ message: "서버 오류가 발생했습니다." }, { status: 500 });
     }
 }

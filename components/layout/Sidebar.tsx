@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { LayoutDashboard, MonitorSmartphone, Key, CalendarClock, Settings, X } from 'lucide-react';
+import { LayoutDashboard, MonitorSmartphone, Key, CalendarClock, Settings, X, LogOut } from 'lucide-react';
+import { signOut } from 'next-auth/react';
 
 interface SidebarProps {
     onItemClick?: () => void;
@@ -48,8 +49,17 @@ export function Sidebar({ onItemClick }: SidebarProps) {
                     </Link>
                 ))}
             </nav>
-            <div className="p-4 border-t border-blue-800 text-sm text-blue-200">
-                v1.0.0
+            <div className="p-4 space-y-4 border-t border-blue-800">
+                <button
+                    onClick={() => signOut({ callbackUrl: '/login' })}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-blue-200 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
+                >
+                    <LogOut className="w-5 h-5" />
+                    <span>로그아웃</span>
+                </button>
+                <div className="text-sm text-blue-300 px-4">
+                    v1.0.0
+                </div>
             </div>
         </aside>
     );

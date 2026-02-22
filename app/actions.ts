@@ -24,7 +24,13 @@
 
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getData, updateData, appendData, addSheet, clearData } from '@/lib/google-sheets';
+import {
+    getData as baseGetData,
+    updateData as baseUpdateData,
+    appendData as baseAppendData,
+    addSheet as baseAddSheet,
+    clearData as baseClearData
+} from '@/lib/google-sheets';
 import { MOCK_DEVICES, MOCK_SOFTWARE, MOCK_CREDENTIALS } from '@/lib/mock-data';
 import { Device, Software, Credential, Location, DeviceInstance } from '@/types';
 import { cookies } from 'next/headers';
@@ -41,6 +47,66 @@ async function _getAppConfig() {
     } catch (e) { }
     return null;
 }
+
+/**
+ * Helper to get user-specific Sheets credentials.
+ * Priority: 1. Cookie (Performance) 2. Spreadsheet (Reliability)
+ */
+async function _getSheetsCredentials(sheetId?: string) {
+    const config = await _getAppConfig();
+
+    // 1. Try Cookie
+    const jsonFromCookie = config?.sheet?.serviceAccountJson;
+    if (jsonFromCookie) {
+        try { return JSON.parse(jsonFromCookie); } catch (e) { }
+    }
+
+    // 2. Try Spreadsheet (via Master Service Account)
+    if (sheetId && sheetId !== 'NO_SHEET') {
+        try {
+            // We use baseGetData here to avoid recursion
+            const rows = await baseGetData('SystemConfig!A2:B', sheetId);
+            if (rows) {
+                const credRow = rows.find((r: any[]) => r[0] === 'SERVICE_ACCOUNT_JSON');
+                if (credRow && credRow[1]) {
+                    return JSON.parse(credRow[1]);
+                }
+            }
+        } catch (e) { }
+    }
+    return null;
+}
+
+// --- Dynamic Wrappers to inject credentials automatically ---
+const getData = async (range: string, sheetId?: string) => {
+    const targetId = sheetId || await getUserSheetId();
+    const creds = await _getSheetsCredentials(targetId);
+    return baseGetData(range, targetId, creds);
+};
+
+const updateData = async (range: string, values: any[][], sheetId?: string) => {
+    const targetId = sheetId || await getUserSheetId();
+    const creds = await _getSheetsCredentials(targetId);
+    return baseUpdateData(range, values, targetId, creds);
+};
+
+const appendData = async (range: string, values: any[][], sheetId?: string) => {
+    const targetId = sheetId || await getUserSheetId();
+    const creds = await _getSheetsCredentials(targetId);
+    return baseAppendData(range, values, targetId, creds);
+};
+
+const addSheet = async (title: string, sheetId?: string) => {
+    const targetId = sheetId || await getUserSheetId();
+    const creds = await _getSheetsCredentials(targetId);
+    return baseAddSheet(title, targetId, creds);
+};
+
+const clearData = async (range: string, sheetId?: string) => {
+    const targetId = sheetId || await getUserSheetId();
+    const creds = await _getSheetsCredentials(targetId);
+    return baseClearData(range, targetId, creds);
+};
 
 
 export async function parsePdfAction(formData: FormData): Promise<{ success: boolean; text?: string; error?: string }> {
