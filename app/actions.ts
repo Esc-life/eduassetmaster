@@ -336,7 +336,8 @@ export async function fetchMapConfiguration(mapId: string = 'default', overrideS
         } catch (e) { }
 
         return { mapImage: mapImage || null, zones, updatedAt };
-    } catch (error) {
+    } catch (error: any) {
+        if (error.message === 'PERMISSION_DENIED') throw error;
         return { mapImage: null, zones: [], updatedAt: null };
     }
 }
@@ -405,7 +406,8 @@ export async function fetchZonesOnly(overrideSheetId?: string) {
             pinX: 0,
             pinY: 0
         })).filter(z => z.id);
-    } catch (e) {
+    } catch (e: any) {
+        if (e.message === 'PERMISSION_DENIED') throw e;
         return [];
     }
 }
@@ -489,7 +491,9 @@ export async function fetchMapList(overrideSheetId?: string) {
         if (listRow && listRow[1]) {
             return listRow[1].split(',');
         }
-    } catch (e) { }
+    } catch (e: any) {
+        if (e.message === 'PERMISSION_DENIED') throw e;
+    }
     return ['default'];
 }
 
