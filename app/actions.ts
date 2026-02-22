@@ -1327,7 +1327,12 @@ export async function processScannedImage(imageBase64: string, locationName: str
 
         if (!geminiResponse.ok) {
             const err = await geminiResponse.json();
-            return { success: false, error: err.error?.message || 'Gemini Vision API call failed' };
+            let errorMsg = err.error?.message || 'Gemini Vision API call failed';
+
+            if (errorMsg.includes('blocked') || errorMsg.includes('generativelanguage')) {
+                errorMsg = 'API 사용이 차단되었습니다.\n\n[해결 방법]\n1. Google Cloud Console 접속\n2. "Generative Language API" 사용 설정 활성화\n3. API 키 제한 해제 (또는 해당 API 허용)';
+            }
+            return { success: false, error: errorMsg };
         }
 
         const geminiData = await geminiResponse.json();

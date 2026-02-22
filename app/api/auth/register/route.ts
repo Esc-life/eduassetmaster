@@ -11,23 +11,25 @@ export async function POST(req: Request) {
             return NextResponse.json({ message: "필수 정보가 누락되었습니다." }, { status: 400 });
         }
 
+        // Extract minimal credentials if user provided their own JSON
+        let userCredentials = undefined;
+        let minimalJson = '';
+        if (serviceAccountJson) {
+            try {
+                const parsed = JSON.parse(serviceAccountJson);
+                userCredentials = {
+                    client_email: parsed.client_email,
+                    private_key: parsed.private_key
+                };
+                minimalJson = JSON.stringify(userCredentials);
+            } catch (e) {
+                console.error("[Register] Invalid user service account JSON");
+            }
+        }
+
         // 0. Verify Spreadsheet Access (if provided)
         if (spreadsheetId) {
             console.log(`[Register] Initializing spreadsheet: ${spreadsheetId}`);
-
-            // Extract credentials if user provided their own JSON
-            let userCredentials = undefined;
-            if (serviceAccountJson) {
-                try {
-                    const parsed = JSON.parse(serviceAccountJson);
-                    userCredentials = {
-                        client_email: parsed.client_email,
-                        private_key: parsed.private_key
-                    };
-                } catch (e) {
-                    console.error("[Register] Invalid user service account JSON");
-                }
-            }
 
             try {
                 // Try to initialize (create tabs/headers) using user's own credentials if available
@@ -38,7 +40,7 @@ export async function POST(req: Request) {
                 if (visionApiKey) configRows.push(['GOOGLE_VISION_KEY', visionApiKey]);
                 if (name) configRows.push(['ManagerName', name]);
                 if (school) configRows.push(['SchoolName', school]);
-                if (serviceAccountJson) configRows.push(['SERVICE_ACCOUNT_JSON', serviceAccountJson]);
+                if (minimalJson) configRows.push(['SERVICE_ACCOUNT_JSON', minimalJson]);
 
                 if (configRows.length > 0) {
                     console.log(`[Register] Writing config rows to ${spreadsheetId}:`, configRows.map(r => r[0]));
@@ -83,7 +85,7 @@ export async function POST(req: Request) {
             password,
             spreadsheetId || '',
             new Date().toISOString(),
-            serviceAccountJson || ''
+            minimalJson || ''
         ];
 
         // 4. Save to Admin Master Spreadsheet

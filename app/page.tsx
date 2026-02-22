@@ -11,6 +11,7 @@ import { DeleteConfirmModal } from '@/components/devices/DeleteConfirmModal';
 import Link from 'next/link';
 import { Image as ImageIcon, PlusCircle, Check, Trash2, MousePointer2, ScanSearch, Loader2, Save, Minus, RotateCcw, FileSpreadsheet, ScanLine, Edit3, Settings, MoreHorizontal, CheckSquare, Edit, ChevronDown, Layers } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Info } from 'lucide-react';
 import { fetchMapConfiguration, saveMapConfiguration, syncZonesToSheet, fetchAssetData, updateDevice, createDeviceInstance, deleteDeviceInstance, updateZoneName, batchUpdateZoneNames, deleteZonesFromLocations, fetchMapList, deleteMap } from '@/app/actions';
 import { useMessage } from '@/components/Providers';
 import { DeviceEditModal } from '@/components/devices/DeviceEditModal';
@@ -784,25 +785,47 @@ export default function Home() {
           />
 
           {/* AI Result Confirmation Modal (Structure) */}
-          {showOCRModal && (
-            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-xl max-w-sm w-full"
-              >
-                <h3 className="text-lg font-bold mb-2">구역 찾기 완료</h3>
-                <p className="text-gray-600 dark:text-gray-300 text-sm mb-4">
-                  {ocrResults.length}개의 구역 구조를 찾았습니다.<br />
-                  적용 후 [구역 편집] 모드에서 불필요한 구역을 정리해주세요.
-                </p>
-                <div className="flex justify-end gap-2">
-                  <button onClick={() => { setShowOCRModal(false); setOcrResults([]); }} className="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded-lg">취소</button>
-                  <button onClick={confirmStructureUpdate} className="px-4 py-2 bg-primary text-white rounded-lg">적용 및 편집</button>
-                </div>
-              </motion.div>
-            </div>
-          )}
+          <AnimatePresence>
+            {showOCRModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in">
+                <motion.div
+                  initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                  animate={{ scale: 1, opacity: 1, y: 0 }}
+                  exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                  className="relative w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-800 overflow-hidden"
+                >
+                  <div className="p-6 pb-8">
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="p-2 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
+                        <Info className="w-6 h-6" />
+                      </div>
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                        구역 찾기 완료
+                      </h3>
+                    </div>
+                    <p className="text-gray-600 dark:text-gray-300 leading-relaxed font-medium">
+                      {ocrResults.length}개의 구역 구조를 찾았습니다.<br />
+                      <span className="text-sm mt-2 block">적용 후 [구역 편집] 모드에서 불필요한 구역을 정리해주세요.</span>
+                    </p>
+                  </div>
+                  <div className="flex border-t border-gray-100 dark:border-gray-800">
+                    <button
+                      onClick={() => { setShowOCRModal(false); setOcrResults([]); }}
+                      className="flex-1 px-4 py-4 text-sm font-medium text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-r border-gray-100 dark:border-gray-800"
+                    >
+                      취소
+                    </button>
+                    <button
+                      onClick={confirmStructureUpdate}
+                      className="flex-1 px-4 py-4 text-sm font-bold text-blue-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                    >
+                      적용 및 편집
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
 
           {/* Zone Batch Edit Modal */}
           <ZoneBatchEditModal
